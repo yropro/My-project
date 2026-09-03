@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Leviathan Tail
+  m_EditorClassIdentifier: 
+  languageKey: Lv2dfuU8
+  faction: 
+  serialized: 'Boss#3.38
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-4.025000095367432,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Join 1","k":"","h":"A3","sa":"FF","b":"FF","o":{"x":-1.9249999523162842,"y":0.15000000596046449},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 6","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":-4.425000190734863,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 1","k":"","h":"9E","sa":"FF","b":"E3","o":{"x":-2.8499999046325685,"y":0.17499999701976777},"r":260.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 5","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":-3.424999952316284,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 1","k":"","h":"9E","sa":"FF","b":"E3","o":{"x":-1.5750000476837159,"y":-0.4749999940395355},"r":100.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 2","k":"","h":"9E","sa":"FF","b":"E3","o":{"x":-0.949999988079071,"y":-0.574999988079071},"r":90.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 5","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":-2.7750000953674318,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 1","k":"","h":"9E","sa":"FF","b":"E3","o":{"x":-2.200000047683716,"y":-0.30000001192092898},"r":100.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 4","k":"","h":"A6","sa":"FF","b":"CC","o":{"x":0.05000000074505806,"y":0.925000011920929},"r":235.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 5","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":-2.1500000953674318,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 5","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":-1.524999976158142,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 5","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":-0.8999999761581421,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI
+    Boss/Spine 5","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":-0.2750000059604645,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Secondary","k":"","h":"DE","sa":"FF","b":"FF","o":{"x":-0.375,"y":0.44999998807907107},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}'
+  noMenuSpawn: 1

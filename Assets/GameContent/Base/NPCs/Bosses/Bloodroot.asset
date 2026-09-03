@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Bloodroot
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Bosses
+  languageKey: wEQYPcKn
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: f78a05c11ee23f04fa4f8e43e8bd350a, type: 2}
+  faction: Flora
+  allowGrapple: 1
+  scale: 3
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 1
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale:
+  - scale: 0
+    value: 3
+    calculated: 0.525
+  - scale: 1
+    value: 5
+    calculated: 3
+  - scale: 2
+    value: 5
+    calculated: 3
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e949bb9957866494fbc8c70b5146e950, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: 779d27b4945cc2047a61d3722e0c6b65, type: 2}
+    customizers:
+    - type: 700
+      value: Corrosive
+  - item: {fileID: 11400000, guid: 8446ae2c2887e90489777346b40c985d, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 094844d5a9d6d8447b64e10c70dc44e0, type: 2}
+    customizers:
+    - type: 20
+      value: 
+  - item: {fileID: 11400000, guid: 5e6ba7c04b19a4a4bb8713e6b55c6999, type: 2}
+    customizers:
+    - type: 900
+      value: 
+    - type: 20
+      value: 
+  - item: {fileID: 11400000, guid: 4b245541ec4e95348b99e03c93fb21c8, type: 2}
+    customizers:
+    - type: 100
+      value: 4
+  extraItems: []

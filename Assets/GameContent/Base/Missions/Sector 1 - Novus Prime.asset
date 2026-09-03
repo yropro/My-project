@@ -1,0 +1,140 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 1 - Novus Prime
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: o3RTFjfM
+  displayName: Reach Novus Prime
+  levelFrom: {fileID: 11400000, guid: 4fa09da49e9999d4f9d48279daf74d46, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Escort the fleet to Novus Prime.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: daa1f966b8f497748826f4ce7fca4a7b, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 3
+      dialog: Excellent work. That was close... too close. I doubt anyone else could've
+        got us out of that.
+    - name: 3
+      dialog: We need to return to Earth immediately and warn the Emperor about this
+        new enemy.
+    - name: 1
+      dialog: Strange. Hyperdrive systems are operational, but... we can't plot a
+        direct course back to Earth.
+    - name: 0
+      dialog: What? Why not?
+    - name: 1
+      dialog: Unknown. Navigation data appears... corrupted.
+    - name: 3
+      dialog: That's a serious problem. Could the enemy be responsible?
+    - name: 0
+      dialog: The enemy are called Species-XI.
+    - name: 3
+      dialog: How do you know that?
+    - name: 1
+      dialog: A strange glowing white entity told us...
+    - name: 3
+      dialog: I see... That's not exactly reassuring.
+    - name: 0
+      dialog: She also said she left this ship for us.
+    - name: 3
+      dialog: Noted. For now, head toward the sector gateway at Novus Prime. We'll
+        talk more there.
+    - name: 1
+      dialog: Before we leave, you have a mission reward to collect. Priorities,
+        after all.
+    autoPilotMapping: 3
+    autoPilotDialog: []
+    inputTutorialStep: 9
+    situationalTutorial: 0
+    requirementType: 145
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 1
+      dialog: All right, let's get out of here before more strange creatures appear.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 1/Fixed/Periculum
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: Oh, look at that, some friendly locals!
+    - name: 5
+      dialog: Surrender your ship, or die!
+    - name: 19
+      dialog: 'Correction: not friendly. Definitely not friendly.'
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 10
+    requirementTarget: Junker/Sparrow (Tutorial)
+    requirementQuantity: 3
+  - initialDialog:
+    - name: 19
+      dialog: Clearly, those ships didn't have the benefit of advanced combat AI.
+    - name: 19
+      dialog: Let's move on to Novus Prime before more of them show up.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 1/Fixed/Novus Prime
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 3
+      dialog: Great work leading us here. This is the sector gateway, we'll establish
+        camp and hold the position.
+    - name: 3
+      dialog: Dock with the mothership. We've got more to discuss.
+    autoPilotMapping: 4
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 1
+    requirementType: 150
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 3
+      dialog: You can buy and sell items here as well as repair, upgrade, and redesign
+        your ship.
+    - name: 3
+      dialog: This sector gateway will take us one step closer to Earth.
+    - name: 3
+      dialog: The Skeran forces in this sector hold the three keystones needed to
+        power it though.
+    - name: 3
+      dialog: I'll start tracking them down. In the meantime, I have another task
+        for you. When you undock I'll update your navigation.
+    - name: 19
+      dialog: You should edit the ship's design before undocking. Wouldn't want someone
+        to mistake it for space junk.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 160
+    requirementTarget: 
+    requirementQuantity: 1

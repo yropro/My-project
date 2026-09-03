@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Zyraxx (Armor 4)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Bosses
+  languageKey: CNeCQ9qp
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: df8e0d67d3661454b8fe15692a1c82cf, type: 2}
+  faction: Shadow
+  allowGrapple: 1
+  scale: 3
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 0
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 5000
+  difficultyScale:
+  - scale: 0
+    value: 4
+    calculated: 0.7
+  - scale: 1
+    value: 3
+    calculated: 1.8000001
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: 9456c6eefff22ae4a8ac9031f21813d1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 89da62f8222a4764aa81f24e5f8f93e1, type: 2}
+    customizers:
+    - type: 310
+      value: 2
+    - type: 340
+      value: 20
+  extraItems: []

@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Avalon
+  m_EditorClassIdentifier: 
+  languageKey: PiwXpqcc
+  faction: Skeran
+  type: 1000
+  id: 8
+  starMap: {fileID: 11400000, guid: d47f58f9d2812b94981d49d825e446c3, type: 2}
+  minPosition: {x: 6.25, y: 0}
+  maxPosition: {x: 6.25, y: 0}
+  generationMethod: 0
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 0
+  debrisType: 4
+  nebula: 0
+  combatMusic: 190
+  arrivalAutoPilot: 6
+  arrivalAutoPilotDialog:
+  - name: 4
+    dialog: Your incursion ends here. You are hopelessly outmatched!
+  - name: 9999
+    dialog: 
+  - name: 3
+    dialog: I wouldn't be so sure about that.
+  - name: 3
+    dialog: All ships, focus fire on the Citadel. This ends here!
+  arrivalSkipAutoPilot: 15
+  fleeDialog:
+  - name: 3
+    dialog: Hull's about to give. I'm getting the crew clear... it's on you now.
+  arrivalMissions:
+  - {fileID: 11400000, guid: 5ee1063acbdb6714bbb6bea0df837bbc, type: 2}
+  completeAutoPilot: 7
+  completeAutoPilotDialog:
+  - name: 3
+    dialog: Good work. Now, go place that keystone in the sector gateway. We're not
+      done yet!
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 44bcd3d6bb2ee0f4a83bb9ed7dd60748, type: 2}
+  - {fileID: 11400000, guid: 44bcd3d6bb2ee0f4a83bb9ed7dd60748, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons:
+  - squadronBase: {fileID: 11400000, guid: 80e0aee6330ce724fb1d871d717f7c2e, type: 2}
+    position: {x: 10, y: 0}
+    rotation: 180
+  - squadronBase: {fileID: 11400000, guid: 5710dc2d249c2c34e915d46e4df51c1c, type: 2}
+    position: {x: 11, y: -6}
+    rotation: 180
+  - squadronBase: {fileID: 11400000, guid: 5710dc2d249c2c34e915d46e4df51c1c, type: 2}
+    position: {x: 11, y: 6}
+    rotation: 180
+  gatewayShips: 0
+  squadrons: []
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 0}
+  eliteTimer: 0
+  eliteMusic: 0
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 1
+  spreadStrengthDegrade: 0.1
+  minimumSpread: 0
+  spreadStarDesigns:
+  - {fileID: 11400000, guid: 6342e790614f5f74ba06387cfa575549, type: 2}
+  - {fileID: 11400000, guid: b0f0c6f10a0404747bfed85773c68386, type: 2}

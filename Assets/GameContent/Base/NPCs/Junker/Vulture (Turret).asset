@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Vulture (Turret)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Junker
+  languageKey: XpHgS56w
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: afa1841115b23bd458f56cc56b5fad29, type: 2}
+  faction: Junker
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale: []
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e7cf2549873571b40b263ca4c354960a, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: bea3e675b5ad94f40b642e14db8149cb, type: 2}
+    customizers:
+    - type: 700
+      value: Thermal
+  - item: {fileID: 11400000, guid: 9ac9084e607834d43a657e0580328ba0, type: 2}
+    customizers:
+    - type: 90
+      value: overchargedthruster
+  - item: {fileID: 11400000, guid: 8a91e151d6723e8438c42ef2212562a3, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c2022e6be5a414f4b9541fbd6898feb2, type: 2}
+    customizers:
+    - type: 90
+      value: bigblasta
+    - type: 200
+      value: 90
+    - type: 350
+      value: 100
+  - item: {fileID: 11400000, guid: d4be66e4e79aee74092e39fe4e4edad1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 9e89ea63657348b438c8f08a0025f315, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: e11bc4111d9e5d5478af1986a703b98d, type: 2}
+    customizers: []
+  extraItems: []

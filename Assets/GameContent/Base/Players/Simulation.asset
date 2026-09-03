@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1824242386, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Simulation
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Players
+  languageKey: ZYvhR325
+  description: Simulation player.
+  pilot:
+    xp: 0
+    consumables:
+    - Small Shield Battery
+    - Small Hull Nanobots
+    - Heat Sink
+    upgradeUnlocks: []
+    unlockedSecondaryClasses: 
+  templateBase: {fileID: 11400000, guid: 49222e89880f564488d965a689a9bcb6, type: 2}
+  shieldDamageType: 0
+  equippedItems:
+  - {fileID: 11400000, guid: 9ac9084e607834d43a657e0580328ba0, type: 2}
+  - {fileID: 11400000, guid: 8a91e151d6723e8438c42ef2212562a3, type: 2}
+  storedItems:
+  - itemBase: {fileID: 11400000, guid: 244dfef85adf87f40b690959ce18b968, type: 2}
+    quantity: 1000000
+  - itemBase: {fileID: 11400000, guid: bda9c81cfacb88a48b90c3bbbc370757, type: 2}
+    quantity: 5
+  - itemBase: {fileID: 11400000, guid: 09b5dbb7f29fc8249b059577d5f537ce, type: 2}
+    quantity: 5
+  startingMissions: []
+  skippedStartingMissions: []

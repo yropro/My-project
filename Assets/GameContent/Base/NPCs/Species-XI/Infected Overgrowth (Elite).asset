@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Infected Overgrowth (Elite)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Species-XI
+  languageKey: ofT9Ujbv
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 9d1d09d8899516149bdc4d15d4aa3271, type: 2}
+  faction: Species-XI
+  allowGrapple: 1
+  scale: 2
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale:
+  - scale: 1
+    value: 8
+    calculated: 4.8
+  - scale: 2
+    value: 6
+    calculated: 3.6000001
+  - scale: 4
+    value: 0.8
+    calculated: 0.4
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: a430aad035369cd48abbdf8361e071ae, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  - {fileID: 11400000, guid: 57f4bca0de3ae1648acd0ee7217e7f71, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: 92a2aad5ff6b7ee42a99a2c43430cc9b, type: 2}
+    customizers:
+    - type: 700
+      value: Thermal
+    - type: 710
+      value: 0.01
+    - type: 720
+      value: 1250
+  - item: {fileID: 11400000, guid: 2fa64367eb07eb4468d8861180b6eb03, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 573647fd9d049f54abac0d3e6e08c8d9, type: 2}
+    customizers:
+    - type: 220
+      value: 11
+  - item: {fileID: 11400000, guid: 8ad0750eca7d85242a946059c67dbed8, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 813b3146c1a8d724194237d2062165bf, type: 2}
+    customizers:
+    - type: 130
+      value: 5
+    - type: 220
+      value: 15
+    - type: 230
+      value: 1.5
+    - type: 20
+      value: 
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: da3c89c8813f5774ca2743c6afe3de94, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: fe9f548dd4bf4ba45b0f6d7941c54301, type: 2}
+    customizers: []
+  extraItems: []

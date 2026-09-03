@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1617794041, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Grays Skirmish
+  m_EditorClassIdentifier: 
+  minLevel: 1
+  spawnWeight: 200
+  faction: Grays
+  allowInvasion: 0
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 5
+  debrisType: 0
+  allowRandomAsteroids: 1
+  nebulaChance: 0
+  combatMusic: 2200
+  arrivalMissions: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 7cd74a461fae9c44394b9d481d9ce416, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  spawnEnemies: 0
+  squadrons: []
+  gatewayShips: 3
+  destroyAllShips: 0
+  autoSpawnCount: 4
+  validAutoSpawnSquadrons:
+  - {fileID: 11400000, guid: 4be3f77b4c9e3c44198ca2b11fe473bf, type: 2}
+  - {fileID: 11400000, guid: 259f6f6d888755947934c326be514a51, type: 2}
+  - {fileID: 11400000, guid: e5be0204fae69a1499f8dd7d39d688d4, type: 2}
+  autoAggroEnemies: 1

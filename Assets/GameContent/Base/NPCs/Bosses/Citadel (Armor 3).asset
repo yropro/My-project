@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Citadel (Armor 3)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Bosses
+  languageKey: Bgp98LOq
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 87258738f20536f4cb38c2dd1e134477, type: 2}
+  faction: Skeran
+  allowGrapple: 1
+  scale: 3
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 0
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 1
+  aiBehaviour: 5000
+  difficultyScale:
+  - scale: 0
+    value: 2
+    calculated: 0.35
+  - scale: 1
+    value: 3
+    calculated: 1.8000001
+  - scale: 3
+    value: 0.5
+    calculated: 0.1
+  - scale: 4
+    value: 0.4
+    calculated: 0.2
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Radiation
+  - item: {fileID: 11400000, guid: 9456c6eefff22ae4a8ac9031f21813d1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 098b760cd2cb76744a61a9d97fb6cf66, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 098b760cd2cb76744a61a9d97fb6cf66, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 098b760cd2cb76744a61a9d97fb6cf66, type: 2}
+    customizers:
+    - type: 200
+      value: 125
+  - item: {fileID: 11400000, guid: 098b760cd2cb76744a61a9d97fb6cf66, type: 2}
+    customizers:
+    - type: 200
+      value: 125
+  - item: {fileID: 11400000, guid: bf042ff1c9194e84a9ec7a49afc30d02, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: bf042ff1c9194e84a9ec7a49afc30d02, type: 2}
+    customizers: []
+  extraItems: []

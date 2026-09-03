@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Earth
+  m_EditorClassIdentifier: 
+  languageKey: sJnQ8iZh
+  faction: Conclave
+  type: 100
+  id: 0
+  starMap: {fileID: 11400000, guid: 3dc4775cc4064134988fdab8305fb5bc, type: 2}
+  minPosition: {x: 0, y: 0}
+  maxPosition: {x: 0, y: 0}
+  generationMethod: 0
+  alwaysVisible: 1
+  autoComplete: 1
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: -4603091085154494538, guid: 0000000000000000d000000000000000, type: 0}
+  backgroundHue: 9
+  debrisType: 6
+  nebula: 0
+  combatMusic: 9400
+  arrivalAutoPilot: 0
+  arrivalAutoPilotDialog: []
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions: []
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables: []
+  structures:
+  - structureName: Singularity Key
+    position: {x: 13, y: -9}
+  positionedSquadrons: []
+  gatewayShips: 0
+  squadrons: []
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 0}
+  eliteTimer: 0
+  eliteMusic: 0
+  starmapGateway: {fileID: 11400000, guid: c3744723e865655429ba012b78a375a4, type: 2}
+  starmapGatewayStarId: 1
+  starmapGatewayPosition: {x: 2.5, y: -3.5}
+  starmapGatewayCharged: 1
+  spreadStrength: 0
+  spreadStrengthDegrade: 1
+  minimumSpread: 0
+  spreadStarDesigns: []

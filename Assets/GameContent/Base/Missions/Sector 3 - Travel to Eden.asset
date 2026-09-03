@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 3 - Travel to Eden
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: U2Dy7ZWm
+  displayName: Travel to Eden
+  levelFrom: {fileID: 11400000, guid: ed99691be73fc6b47a050cf68f92aa0d, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Locate the next sector gateway at Eden.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: 1d2d0440ab5bc1643be65060c6a72830, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 12
+      dialog: You know, Gid... after all this, I'm thinkin' I might retire, settle
+        down somewhere, maybe start a garden.
+    - name: 3
+      dialog: Didn't take you for the gardening type.
+    - name: 12
+      dialog: How hard can gardening be, eh? Long as the plants ain't armed.
+    - name: 3
+      dialog: In this sector... that might be too much to ask. We're just one jump
+        away from the Sector gateway at Eden, let's go!
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 3/Fixed/Eden
+    requirementQuantity: 1

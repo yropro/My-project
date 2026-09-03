@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1515019235, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Carrion
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Squadrons/Shadow
+  languageKey: keECallc
+  displayName: Carrion
+  multiplier: 2
+  friendly: 0
+  customDisplayPositions:
+  - index: 0
+    position: {x: 0, y: 0}
+    rotation: 45
+    scale: 1
+  - index: 1
+    position: {x: -0.16, y: -0.16}
+    rotation: 45
+    scale: 1
+  - index: 2
+    position: {x: -0.32, y: -0.32}
+    rotation: 45
+    scale: 1
+  - index: 3
+    position: {x: -0.48, y: -0.48}
+    rotation: 45
+    scale: 1
+  - index: 4
+    position: {x: -0.64, y: -0.64}
+    rotation: 45
+    scale: 1
+  - index: 5
+    position: {x: -0.8, y: -0.8}
+    rotation: 45
+    scale: 1
+  - index: 6
+    position: {x: -0.96, y: -0.96}
+    rotation: 45
+    scale: 1
+  - index: 7
+    position: {x: -1.08, y: -1.08}
+    rotation: 45
+    scale: 1
+  formation: 3
+  spiralRadius: 20
+  shipsByLevels:
+  - levelRequired: 1
+    ships:
+    - {fileID: 11400000, guid: 0b8acc4c5aa93df429df739f389890d4, type: 2}
+    - {fileID: 11400000, guid: 011805561401d3e4bb0c01b4eda98c3b, type: 2}
+    - {fileID: 11400000, guid: 011805561401d3e4bb0c01b4eda98c3b, type: 2}
+    - {fileID: 11400000, guid: 011805561401d3e4bb0c01b4eda98c3b, type: 2}
+    - {fileID: 11400000, guid: 011805561401d3e4bb0c01b4eda98c3b, type: 2}
+    - {fileID: 11400000, guid: 011805561401d3e4bb0c01b4eda98c3b, type: 2}
+    - {fileID: 11400000, guid: 011805561401d3e4bb0c01b4eda98c3b, type: 2}
+    - {fileID: 11400000, guid: ee72588c95ffc7e4fa4b9e8c35cf3a54, type: 2}
+  invulnerableLeader: 1
+  splitSquadron: 0
+  splitLeaderNpc: {fileID: 0}
+  splitTailNpc: {fileID: 0}
+  invulnerableLayers: 0
+  inactiveLayers: 0
+  attachRotation: 0
+  rotateAway: 0
+  rigidAttachment: 0
+  combatFormationDrift: 0
+  respawn: 0
+  respawnMinSeconds: 0
+  respawnMaxSeconds: 0

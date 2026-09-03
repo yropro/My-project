@@ -1,0 +1,94 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 3 - Travel to Sector 4
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: hZxaCpBL
+  displayName: Travel to Sector 4
+  levelFrom: {fileID: 11400000, guid: f3b24bdc4a9986040a0a91d672a7a6f3, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Travel through the gateway to Sector 4.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: de5ae89e93a805b4e97e0612bce27c41, type: 2}
+  - {fileID: 11400000, guid: 70599559dc56d324d9aa0d329511eb2e, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog: []
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 4 - Phase 1/Fixed/Earth
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 4
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 0
+  - initialDialog:
+    - name: 16
+      dialog: Admiral Gideon. Report.
+    - name: 3
+      dialog: We made it back and we are not alone.
+    - name: 16
+      dialog: I know. The creature arrived first and is already at work.
+    - name: 0
+      dialog: She called it a weapon and says it will "silence the void".
+    - name: 3
+      dialog: She avoids specifics.
+    - name: 16
+      dialog: The Emperor has given me full authority to defend Earth. I will take
+        any weapon I can use.
+    - name: 16
+      dialog: A Skeran fleet just breached the outer rim.
+    - name: 0
+      dialog: Yeah... we destroyed their Citadel on the way through.
+    - name: 3
+      dialog: We'll deal with them.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 16
+    autoPilotDialog:
+    - name: 11
+      dialog: Did your race ever wonder why the gateways in your home sector converge
+        on your planet?
+    - name: 0
+      dialog: The Architects?
+    - name: 11
+      dialog: Exactly. The Architects shaped this sector around their home, not yours.
+    - name: 11
+      dialog: You inherited their world, their technology, and their sins.
+    - name: 11
+      dialog: I will finish what they started. Hold the sector until the weapon is
+        complete.
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 1

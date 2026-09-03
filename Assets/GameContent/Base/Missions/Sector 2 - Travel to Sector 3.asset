@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 2 - Travel to Sector 3
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: hj40rVq9
+  displayName: Travel to Sector 3
+  levelFrom: {fileID: 11400000, guid: f1fdaf80cd130fc4e9a84251e8c867bd, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Travel through the gateway to Sector 3.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: 995d8476f6dadbe42b7a19893b78ecb1, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog: []
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 3/Fixed/Sylvara
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: Sector 3... where even the plants want to kill us.
+    - name: 18
+      dialog: The Flora? I've not met them before.
+    - name: 19
+      dialog: They see us as corrupt destroyers of nature. Which, to be fair... is
+        mostly accurate. But also, rude.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 4
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 0

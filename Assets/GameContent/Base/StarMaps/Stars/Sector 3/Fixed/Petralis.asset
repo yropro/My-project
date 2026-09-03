@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Petralis
+  m_EditorClassIdentifier: 
+  languageKey: 2tYduHEy
+  faction: Flora
+  type: 1000
+  id: 5
+  starMap: {fileID: 11400000, guid: c3744723e865655429ba012b78a375a4, type: 2}
+  minPosition: {x: -2.5, y: -1.5}
+  maxPosition: {x: -2, y: -2.5}
+  generationMethod: 1
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 11
+  debrisType: 0
+  nebula: 0
+  combatMusic: 2080
+  arrivalAutoPilot: 11
+  arrivalAutoPilotDialog:
+  - name: 19
+    dialog: That thing's glowing like a haunted Christmas tree...
+  - name: 18
+    dialog: Think it's too late to return it and get store credit?
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions:
+  - {fileID: 11400000, guid: 88c1d665bf24cbe4aaf67eee6909e224, type: 2}
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 44bcd3d6bb2ee0f4a83bb9ed7dd60748, type: 2}
+  - {fileID: 11400000, guid: 44bcd3d6bb2ee0f4a83bb9ed7dd60748, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons:
+  - squadronBase: {fileID: 11400000, guid: 505de9e14014c8b44adf7f4925cee881, type: 2}
+    position: {x: 15, y: 0}
+    rotation: 180
+  gatewayShips: 1
+  squadrons: []
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 0}
+  eliteTimer: 0
+  eliteMusic: 0
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 0
+  spreadStrengthDegrade: 1
+  minimumSpread: 0
+  spreadStarDesigns: []

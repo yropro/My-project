@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Watcher
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Turrets
+  languageKey: t6B8fedf
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: d08a1f61fc4e42749bfb2b96f3be84e6, type: 2}
+  faction: 
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 1
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 3000
+  difficultyScale: []
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: 9456c6eefff22ae4a8ac9031f21813d1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c4387f0a94dd76745b3024e4f6ff9c5f, type: 2}
+    customizers: []
+  extraItems: []

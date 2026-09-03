@@ -1,0 +1,86 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Flagship
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Friendly
+  languageKey: ODCKNow0
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: eb25ff552819c6b4684a3e23eb9f897e, type: 2}
+  faction: Sentinel
+  allowGrapple: 1
+  scale: 3
+  attachStructure: Flagship
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 1
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 500
+  difficultyScale:
+  - scale: 0
+    value: 0.05
+    calculated: 0.00875
+  - scale: 1
+    value: 100
+    calculated: 40
+  - scale: 2
+    value: 100
+    calculated: 40
+  - scale: 3
+    value: 0.5
+    calculated: 0.1
+  - scale: 4
+    value: 0.5
+    calculated: 0.25
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: 443ebe8f02b0cd74288cd13164333984, type: 2}
+    customizers:
+    - type: 700
+      value: Debris
+  - item: {fileID: 11400000, guid: 9ac9084e607834d43a657e0580328ba0, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 6840b9c4917b3bf4396d5afdc0ce5c85, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 098b760cd2cb76744a61a9d97fb6cf66, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 098b760cd2cb76744a61a9d97fb6cf66, type: 2}
+    customizers: []
+  extraItems: []

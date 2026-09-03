@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1515019235, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Rapier (Warzone)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Squadrons/Friendly
+  languageKey: ORzOKDwE
+  displayName: Rapiers
+  multiplier: 1
+  friendly: 1
+  customDisplayPositions: []
+  formation: 0
+  spiralRadius: 20
+  shipsByLevels:
+  - levelRequired: 1
+    ships:
+    - {fileID: 11400000, guid: 222f0f487644c5b4383863f0b9eb330b, type: 2}
+    - {fileID: 11400000, guid: 222f0f487644c5b4383863f0b9eb330b, type: 2}
+  - levelRequired: 20
+    ships:
+    - {fileID: 11400000, guid: 222f0f487644c5b4383863f0b9eb330b, type: 2}
+  - levelRequired: 34
+    ships:
+    - {fileID: 11400000, guid: c6783a05219bc13488875264bfd0bbc6, type: 2}
+    - {fileID: 11400000, guid: c6783a05219bc13488875264bfd0bbc6, type: 2}
+  - levelRequired: 55
+    ships:
+    - {fileID: 11400000, guid: 222f0f487644c5b4383863f0b9eb330b, type: 2}
+  - levelRequired: 75
+    ships:
+    - {fileID: 11400000, guid: c6783a05219bc13488875264bfd0bbc6, type: 2}
+    - {fileID: 11400000, guid: c6783a05219bc13488875264bfd0bbc6, type: 2}
+  invulnerableLeader: 0
+  splitSquadron: 0
+  splitLeaderNpc: {fileID: 0}
+  splitTailNpc: {fileID: 0}
+  invulnerableLayers: 0
+  inactiveLayers: 0
+  attachRotation: 0
+  rotateAway: 0
+  rigidAttachment: 0
+  combatFormationDrift: 1
+  respawn: 0
+  respawnMinSeconds: 0
+  respawnMaxSeconds: 0

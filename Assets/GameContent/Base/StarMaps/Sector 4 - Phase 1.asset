@@ -1,0 +1,114 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -662120390, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 4 - Phase 1
+  m_EditorClassIdentifier: 
+  resourcePath: Base/StarMaps
+  languageKey: bTZJ7nnV
+  inDevelopment: 0
+  editorOnly: 0
+  primaryDamageType: 4
+  primaryFaction: Species-XI
+  ambientMusic: 9400
+  levelRanges:
+  - newGamePlus: 0
+    minLevel: 43
+    specialLevel: 0
+    maxLevel: 51
+  - newGamePlus: 1
+    minLevel: 63
+    specialLevel: 0
+    maxLevel: 71
+  - newGamePlus: 2
+    minLevel: 83
+    specialLevel: 0
+    maxLevel: 91
+  modifierWeight: 3
+  fleetFlagship: 1
+  singularityKeyPhase: 1
+  singularityKeyTargetStarMapBase: {fileID: 11400000, guid: 3dc4775cc4064134988fdab8305fb5bc, type: 2}
+  singularityKeyTargetStarId: 0
+  singularityKeyBackStarMapBase: {fileID: 0}
+  singularityKeyBackStarId: 0
+  singularityKeyPrerequisiteMissions:
+  - {fileID: 11400000, guid: e94846ef4c33a4041bb63007c328c1ed, type: 2}
+  showEchoOnJump: 0
+  difficultyScale:
+  - scale: 0
+    value: 1.1
+    calculated: 0.22000001
+  - scale: 1
+    value: 1.3
+    calculated: 0.45499998
+  - scale: 2
+    value: 1.3
+    calculated: 0.45499998
+  - scale: 3
+    value: 1.75
+    calculated: 0.35
+  - scale: 4
+    value: 1.75
+    calculated: 0.875
+  generator: 3
+  cacheCount: 20
+  cachePrefabs:
+  - prefab: {fileID: 0}
+    chance: 0.3
+  - prefab: {fileID: 0}
+    chance: 0.1
+  - prefab: {fileID: 0}
+    chance: 0.4
+  - prefab: {fileID: 0}
+    chance: 0.2
+  fixedCaches:
+  - itemBase: {fileID: 11400000, guid: b9bac1fb18389814386add55f4624860, type: 2}
+    faction: Species-XI
+    minPosition: {x: -7, y: -7}
+    maxPosition: {x: 7, y: 7}
+  - itemBase: {fileID: 11400000, guid: 718032a896fef2146b1ea79d53228f2b, type: 2}
+    faction: Shadow
+    minPosition: {x: -7, y: -7}
+    maxPosition: {x: 7, y: 7}
+  fixedStarPath: Base/StarMaps/Stars/Sector 4 - Phase 1/Fixed
+  starDesignPath: Base/StarMaps/Stars/Sector 4 - Shared/Designs
+  randomBackgroundHues: 06000000090000000b000000
+  obstructions:
+  - prefab: {fileID: 1620143232695162444, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.3
+    debrisType: 1
+  - prefab: {fileID: -179735409765873471, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.2
+    debrisType: 1
+  - prefab: {fileID: -5882790665483657399, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.2
+    debrisType: 0
+  - prefab: {fileID: -8203814204471976968, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.15
+    debrisType: 0
+  firstInvaderStarDesign: {fileID: 11400000, guid: 49129e0b7bcdf6a4c9f69185ccebe4cf, type: 2}
+  invaderStarDesigns:
+  - starType: 10
+    starDesign: {fileID: 11400000, guid: 89944b0dbca22e14698424814e24863d, type: 2}
+  - starType: 100
+    starDesign: {fileID: 11400000, guid: 49129e0b7bcdf6a4c9f69185ccebe4cf, type: 2}
+  - starType: 120
+    starDesign: {fileID: 11400000, guid: dd463cae670a0db40aa3e747176d4137, type: 2}
+  - starType: 110
+    starDesign: {fileID: 11400000, guid: 37b072a7a7cfda947889fd2d3e533350, type: 2}
+  - starType: 130
+    starDesign: {fileID: 11400000, guid: d115a6735e6545c4fbcc8872381cff3e, type: 2}
+  - starType: 200
+    starDesign: {fileID: 11400000, guid: b11fc094b117a53478a62e8a62b3ec4a, type: 2}
+  - starType: 500
+    starDesign: {fileID: 11400000, guid: 0c0bd0dd4029e6449b071f474e4a7d2b, type: 2}
+  generationStage: 7
+  lastYieldTime: 18.682203

@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Crypsis
+  m_EditorClassIdentifier: 
+  languageKey: lALYBu7d
+  faction: Grays
+  type: 500
+  id: 9
+  starMap: {fileID: 11400000, guid: c3744723e865655429ba012b78a375a4, type: 2}
+  minPosition: {x: 3, y: 2}
+  maxPosition: {x: 4, y: 3}
+  generationMethod: 2
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 4
+  debrisType: 1
+  nebula: 0
+  combatMusic: 2200
+  arrivalAutoPilot: 11
+  arrivalAutoPilotDialog:
+  - name: 14
+    dialog: Your defiance is illogical. Surrender now for optimal preservation.
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions: []
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons:
+  - squadronBase: {fileID: 11400000, guid: 3119dcce78b859f44a331efc37a858d9, type: 2}
+    position: {x: 10, y: 0}
+    rotation: 180
+  gatewayShips: 1
+  squadrons:
+  - {fileID: 11400000, guid: 4be3f77b4c9e3c44198ca2b11fe473bf, type: 2}
+  - {fileID: 11400000, guid: 259f6f6d888755947934c326be514a51, type: 2}
+  - {fileID: 11400000, guid: e5be0204fae69a1499f8dd7d39d688d4, type: 2}
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 11400000, guid: 06a83600f32577648aa93559590236c2, type: 2}
+  eliteTimer: 45
+  eliteMusic: 2250
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 1
+  spreadStrengthDegrade: 0
+  minimumSpread: 0
+  spreadStarDesigns:
+  - {fileID: 11400000, guid: 700e328bf520d9f468baecfcd8129745, type: 2}
+  - {fileID: 11400000, guid: 2b8f81904c4a12d4dbfad9cdb6cf60ce, type: 2}
+  - {fileID: 11400000, guid: 7c722bbed4373eb42953afc826fb4979, type: 2}

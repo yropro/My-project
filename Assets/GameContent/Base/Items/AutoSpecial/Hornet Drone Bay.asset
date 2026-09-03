@@ -1,0 +1,111 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1607911566, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Hornet Drone Bay
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/AutoSpecial
+  languageKey: 8aTmuEj9
+  description: Deploys drones that will prioritize attacking your locked target.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps:
+  - Sector 1
+  - Sector 2
+  - Sector 3
+  - Sector 4 - Phase 1
+  - Sector 4 - Phase 2
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 1
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  activatableIcons:
+  - faction: Conclave
+    image: {fileID: 0}
+  hueShiftIcon: 1
+  targetFriendly: 0
+  playCooldownSound: 1
+  statusEffectChance: 0
+  critChance: 0.002
+  maxCharges: 0
+  maxSpeed: 0
+  maxRange: 0
+  npcBases:
+  - faction: Conclave
+    npcBase: {fileID: 11400000, guid: 0f85c31145e8e854fa3b85ab9af788d8, type: 2}
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 0.125
+    loop: 0
+    pitchVariance: 0.2
+    volumeVariance: 0.2
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 0
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  droneDropper:
+    type: 7
+    category: 510
+    secondCategory: 0
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 20
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    charges: 0
+    maxCharges: 4
+    rechargeSeconds: 0
+    duration: 0
+    cooldown: 0.75
+    heatPerSecond: 0
+    aimAheadOfTarget: 0
+    isLinked: 0
+    aimSnap: 1
+    damageType: 0
+    statusEffectChance: 0
+    damage: 15
+    critChance: 0.1
+    critModifier: 1
+    maxSpeed: 7
+    maxRange: 20
+    health: 270
+    destroyCooldown: 4
+    droneBehaviour: 0
+    cooldownForDestroy: 0
+  legendaries:
+  - {fileID: 11400000, guid: abfe8b367e51d8b42bcb095f9e73a79e, type: 2}

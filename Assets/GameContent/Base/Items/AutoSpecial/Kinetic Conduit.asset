@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1886821070, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Kinetic Conduit
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/AutoSpecial
+  languageKey: aZyzHiN1
+  description: Connects to another weapon and damages along side it.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps:
+  - Sector 1
+  - Sector 2
+  - Sector 3
+  - Sector 4 - Phase 1
+  - Sector 4 - Phase 2
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 1
+  globalLootWeight: 3
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  activatableIcons:
+  - faction: Conclave
+    image: {fileID: 0}
+  hueShiftIcon: 0
+  targetFriendly: 0
+  playCooldownSound: 0
+  lineColor: {r: 1, g: 1, b: 1, a: 1}
+  lineWidth: 0.05
+  statusEffectChance: 0
+  critChance: 0
+  conduit:
+    type: 7
+    category: 420
+    secondCategory: 0
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 20
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    charges: 0
+    maxCharges: 0
+    rechargeSeconds: 0
+    duration: 0
+    cooldown: 0
+    heatPerSecond: 0
+    aimAheadOfTarget: 0
+    isLinked: 0
+    aimSnap: 1
+    damageType: 0
+    statusEffectChance: 0
+    damage: 480
+    critChance: 0.2
+    critModifier: 1
+    linkedSlot: -1

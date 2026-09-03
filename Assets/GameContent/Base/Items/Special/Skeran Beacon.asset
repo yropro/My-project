@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1076664692, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Skeran Beacon
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Special
+  languageKey: 5MneXQ9S
+  description: Call in friendly Skeran ships to assist you.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps: []
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 1
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  activatableIcons:
+  - faction: Conclave
+    image: {fileID: 0}
+  hueShiftIcon: 0
+  targetFriendly: 0
+  playCooldownSound: 1
+  maxCharges: 0.05
+  duration: 0.5
+  weightedNpcBases:
+  - npcBase: {fileID: 11400000, guid: 85c370fc248826d4fb22392cd0233744, type: 2}
+    weight: 20
+  - npcBase: {fileID: 11400000, guid: db759d58321093e4491b30f5da24e416, type: 2}
+    weight: 20
+  - npcBase: {fileID: 11400000, guid: 4251d1469e238fb4e814d9b8509da383, type: 2}
+    weight: 20
+  - npcBase: {fileID: 11400000, guid: a0fabedf58c94984aa183dc4e5e60b3f, type: 2}
+    weight: 15
+  - npcBase: {fileID: 11400000, guid: 7962cacacab136b4f84fff00075ad421, type: 2}
+    weight: 5
+  - npcBase: {fileID: 11400000, guid: 45dc738cbfce58b4a8c2ebfd03091d0f, type: 2}
+    weight: 5
+  jumpType: 0
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 0.25
+    loop: 0
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 0
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  shipSpawner:
+    type: 6
+    category: 600
+    secondCategory: 650
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 20
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    charges: 0
+    maxCharges: 2
+    rechargeSeconds: 0
+    duration: 20
+    cooldown: 30
+    heatPerSecond: 0
+    aimAheadOfTarget: 0
+    isLinked: 0
+    aimSnap: 1
+    health: 1
+    damage: 1
+    critChance: 1
+    critModifier: 1
+    levelOffset: 0
+    shipIndexes: 
+  legendaries:
+  - {fileID: 11400000, guid: e607cd9154fa52b4ba396b2175e080d6, type: 2}

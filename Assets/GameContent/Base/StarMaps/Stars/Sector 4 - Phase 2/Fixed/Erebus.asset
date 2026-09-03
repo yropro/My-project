@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Erebus
+  m_EditorClassIdentifier: 
+  languageKey: W0ChExtf
+  faction: Forgotten
+  type: 1000
+  id: 2
+  starMap: {fileID: 11400000, guid: 3dc4775cc4064134988fdab8305fb5bc, type: 2}
+  minPosition: {x: -4, y: -1}
+  maxPosition: {x: -8, y: 1}
+  generationMethod: 1
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 11
+  debrisType: 5
+  nebula: 0
+  combatMusic: 2155
+  arrivalAutoPilot: 0
+  arrivalAutoPilotDialog: []
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions: []
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 44bcd3d6bb2ee0f4a83bb9ed7dd60748, type: 2}
+  - {fileID: 11400000, guid: 44bcd3d6bb2ee0f4a83bb9ed7dd60748, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons: []
+  gatewayShips: 1
+  squadrons: []
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 0}
+  eliteTimer: 0
+  eliteMusic: 0
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 1
+  spreadStrengthDegrade: 1
+  minimumSpread: 40
+  spreadStarDesigns:
+  - {fileID: 11400000, guid: a127cc6263150d84283b6793948014e3, type: 2}
+  - {fileID: 11400000, guid: 5d25467db4227584c90cbd7254c39270, type: 2}
+  - {fileID: 11400000, guid: f2298ab6b647c4f42a753743b913cf98, type: 2}
+  - {fileID: 11400000, guid: 2f204d6dd6eb556448ba098e88f7cb54, type: 2}

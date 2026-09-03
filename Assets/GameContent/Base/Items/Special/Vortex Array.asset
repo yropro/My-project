@@ -1,0 +1,108 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 674418836, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Vortex Array
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Special
+  languageKey: qohbFlJN
+  description: Shoots out an array of lasers in all directions.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps: []
+  forSaleFlagship: 1
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 1
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  activatableIcons:
+  - faction: Conclave
+    image: {fileID: 0}
+  hueShiftIcon: 0
+  targetFriendly: 0
+  playCooldownSound: 1
+  statusEffectChance: 0
+  critChance: 0
+  maxRange: 0
+  maxCharges: 0.125
+  beamPrefab: {fileID: 0}
+  muzzleFlashSprites:
+  - {fileID: 0}
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 0.5
+    loop: 1
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 1
+    minPitch: 0.2
+    maxPitch: 0.5
+    fadeVolume: 1
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.25
+  laserSpinner:
+    type: 6
+    category: 300
+    secondCategory: 600
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 20
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    charges: 4
+    maxCharges: 4
+    rechargeSeconds: 0
+    duration: 8
+    cooldown: 4
+    heatPerSecond: 0
+    aimAheadOfTarget: 0
+    isLinked: 0
+    aimSnap: 1
+    damageType: 2
+    statusEffectChance: 0.25
+    damage: 700
+    critChance: 0.25
+    critModifier: 1
+    maxRange: 7.5
+    chainable: 0
+    chainTargets: 0
+    chainDamage: 0.5
+    chainRange: 0.5
+    snapEulerAngle: 0
+    changeRate: 3
+    snapChange: 0
+    rotationRate: 90
+    increaseChargePerActivate: 0
+  legendaries: []

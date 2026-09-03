@@ -1,0 +1,11 @@
+{
+  "id": "com.eric.leviathan",
+  "name": "Leviathan",
+  "author": "Eric",
+  "version": "0.0.1",
+  "description": "Prototype segmented player ship.",
+  "gameVersion": "",
+  "dependencies": [],
+  "loadOrder": 0,
+  "tags": ["content"]
+}

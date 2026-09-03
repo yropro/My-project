@@ -1,0 +1,84 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Bastion
+  m_EditorClassIdentifier: 
+  languageKey: T748amiF
+  faction: Pantheon
+  type: 500
+  id: 9
+  starMap: {fileID: 11400000, guid: 9e3ab6eea230fa54393b796ea5184e14, type: 2}
+  minPosition: {x: 1, y: -2.5}
+  maxPosition: {x: 2, y: -2}
+  generationMethod: 1
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 5
+  debrisType: 1
+  nebula: 0
+  combatMusic: 1200
+  arrivalAutoPilot: 11
+  arrivalAutoPilotDialog:
+  - name: 13
+    dialog: A Conclave ship... unexpected. Do you come to see what freedom truly
+      looks like?
+  - name: 0
+    dialog: I go where I need to.
+  - name: 13
+    dialog: Then take a good look. This is what the Conclave fears, what it could
+      never control.
+  - name: 19
+    dialog: I kind of like these guys...
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions:
+  - {fileID: 11400000, guid: ab1f2641bbd0e3a4c9df7f7bd61b233a, type: 2}
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons:
+  - squadronBase: {fileID: 11400000, guid: 3119dcce78b859f44a331efc37a858d9, type: 2}
+    position: {x: 10, y: 0}
+    rotation: 180
+  gatewayShips: 1
+  squadrons:
+  - {fileID: 11400000, guid: 6709f8729421b8041acf8027a7cee083, type: 2}
+  - {fileID: 11400000, guid: eb949821f4e7d9d43bca230447cfafd6, type: 2}
+  - {fileID: 11400000, guid: 01f489b13375a4746a8f576fecb47828, type: 2}
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 11400000, guid: c3a1b49ae766258489cf3424e36229f7, type: 2}
+  eliteTimer: 30
+  eliteMusic: 1250
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 1
+  spreadStrengthDegrade: 0.05
+  minimumSpread: 6
+  spreadStarDesigns:
+  - {fileID: 11400000, guid: acff87fad4d615241912910624b67fa3, type: 2}
+  - {fileID: 11400000, guid: 72e2334bc351cac40b741bf9308bb91c, type: 2}
+  - {fileID: 11400000, guid: d47ee8551074922439dfb59561c5ce25, type: 2}

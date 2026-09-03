@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 3 - Bloodroot
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: qSzuRLOd
+  displayName: Bloodroot
+  levelFrom: {fileID: 11400000, guid: fe01146a1c75d224a80fed29bb1f08c7, type: 2}
+  autoAddStarMapBase: {fileID: 11400000, guid: c3744723e865655429ba012b78a375a4, type: 2}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Find and destroy the Bloodroot.
+  itemRewards:
+  - itemBase: {fileID: 11400000, guid: 2a531422ef74e4d41956a88d8b17a51f, type: 2}
+    rarity: 0
+    quantity: 1
+  rewardFactionUnlocks: []
+  rewardAchievement: 310
+  rewardMissions: []
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 3
+      dialog: We've located the second keystone. It's embedded in a massive Flora
+        vessel twisted vines, burning red leaves. Eliminate it and retrieve the keystone.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 10
+    requirementTarget: Bosses/Bloodroot
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 8
+    autoPilotDialog:
+    - name: 11
+      dialog: You see? Even the guardians of life can bleed. The roots of this galaxy
+        are rotting... and you're the fire it needs.
+    - name: 0
+      dialog: I did what I had to. The fleet needs that keystone.
+    - name: 11
+      dialog: Of course. Orders given, orders followed. Such a reliable weapon...
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1

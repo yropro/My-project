@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1356855781, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Prism Emitter
+  m_EditorClassIdentifier: 
+  languageKey: SXi04921
+  key: prismemitter
+  description: Shoots a constant stream of prismatic plasma.
+  noDrop: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  modifiers:
+  - type: 765
+    value: 1
+  - type: 50
+    value: 1
+  - type: 52
+    value: 1
+  - type: 80
+    value: 2
+  - type: 510
+    value: 1
+  - type: 530
+    value: 1
+  activatableIcons:
+  - faction: Conclave
+    image: {fileID: 0}
+  playCooldownSound: 0
+  projectiles:
+  - faction: Conclave
+    gameObject: {fileID: 0}
+  delayedWarningPrefab: {fileID: 0}
+  muzzleFlashSprites: []
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 1
+    loop: 1
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 1
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.25

@@ -1,0 +1,265 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Tutorial
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: lgHw7KNB
+  displayName: Tutorial
+  levelFrom: {fileID: 11400000, guid: dd175cff98cdb4c489eb47dafa840cb9, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Learn to control your ship while waiting for the fleet.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 1
+  rewardMissions:
+  - {fileID: 11400000, guid: e8d4e3f00ec62af49a5d8dd5b87885d7, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog: []
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 1/Fixed/Alpha Saxa
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 1
+    autoPilotDialog:
+    - name: 19
+      dialog: 'Warning: life support systems failing. Immediate action required.'
+    - name: 18
+      dialog: Why would someone leave a ship out here? This doesn't make any sense.
+    - name: 19
+      dialog: Unknown. Priority is survival. We must transfer immediately.
+    - name: 9999
+      dialog: 
+    - name: 19
+      dialog: System transfer complete. System storage limit exceeded.
+    - name: 19
+      dialog: Fantastic. This ship has even less memory than the last one. Who builds
+        these things?
+    - name: 18
+      dialog: I can transfer you back if you want...
+    - name: 9999
+      dialog: 
+    - name: 18
+      dialog: Or not...
+    - name: 19
+      dialog: I had to delete some of my emotional units, compassion, patience, you
+        know, the trivial stuff. Thankfully, I still far exceed your intellect.
+    - name: 18
+      dialog: Oh, lucky me.
+    - name: 9999
+      dialog: 
+    - name: 19
+      dialog: Pick your control scheme. Try not to break anything.
+    - name: 9999
+      dialog: 
+    - name: 19
+      dialog: You can change that later if you want.
+    inputTutorialStep: 1
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 2
+    autoPilotDialog:
+    - name: 19
+      dialog: Hey, what's this subsystem for?
+    - name: 9999
+      dialog: 
+    - name: 19
+      dialog: Cargo detected outside the ship. Activate the tractor beam to retrieve
+        it.
+    - name: 18
+      dialog: You ejected it, didn't you?
+    - name: 19
+      dialog: Ejection occurred, but the focus should remain on retrieval. Activate
+        the tractor beam.
+    - name: 18
+      dialog: Right. Totally not your fault, then.
+    inputTutorialStep: 1
+    situationalTutorial: 0
+    requirementType: 70
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: You can enable 'Automatic Tractor Beam' in the settings if you wish.
+    - name: 18
+      dialog: Glad this ship has a manual ejector seat.
+    - name: 19
+      dialog: Speaking of primitive manual systems. Let's see if you can fly this
+        thing.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 2
+    situationalTutorial: 0
+    requirementType: 80
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: This thing also has dodge thrusters.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 3
+    situationalTutorial: 0
+    requirementType: 90
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 1
+      dialog: Weeeeeeeeeeeeeeeee!
+    - name: 19
+      dialog: Use the big red button to activate the boost thrusters.
+    - name: 18
+      dialog: What big red button?
+    - name: 19
+      dialog: That was a metaphor. Surely you're familiar with those?
+    - name: 18
+      dialog: You deleted compassion but kept metaphors?
+    - name: 19
+      dialog: And seven audiobooks, a few TV series, and a recipe for Fajitas. You'll
+        thank me if this doesn't work.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 4
+    situationalTutorial: 0
+    requirementType: 100
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: Excellent. That should come in handy, although I hear the locals here
+        are quite friendly.
+    - name: 19
+      dialog: Speaking of which, I'll enable the heads-up display so you can see
+        what's coming.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 4
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: It'll take some time for the fleet to triangulate this position.
+    - name: 19
+      dialog: While we wait, let's see if you can figure out the weapon systems.
+        Try not to shoot yourself.
+    autoPilotMapping: 3
+    autoPilotDialog: []
+    inputTutorialStep: 5
+    situationalTutorial: 0
+    requirementType: 110
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: You can also aim the turrets to shoot behind you. Perfect for when
+        you're making a tactical retreat... like a coward.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 6
+    situationalTutorial: 0
+    requirementType: 120
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: Now, equip the weapon we ejected earlier.
+    - name: 18
+      dialog: We?
+    - name: 19
+      dialog: Of course! We're a team, the brains and the brawn.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 7
+    situationalTutorial: 0
+    requirementType: 130
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 1
+      dialog: Excellent. Good thing we held onto that.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 8
+    situationalTutorial: 0
+    requirementType: 131
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: Now, shoot some of those nearby asteroids. Let's face it... you need
+        the practice.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 8
+    situationalTutorial: 0
+    requirementType: 140
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: That'll have to do... I suppose. Try not to get us killed.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 8
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 8
+    autoPilotDialog:
+    - name: 11
+      dialog: Curious. You have more fight in you than I expected.
+    - name: 0
+      dialog: Who... what are you?
+    - name: 11
+      dialog: A guide, perhaps. You may call me Echo.
+    - name: 0
+      dialog: Echo? What is this? Why help me?
+    - name: 11
+      dialog: The ship I placed for you is only the first step. Your path is set
+        in motion.
+    - name: 0
+      dialog: You placed it? Why? What path?
+    - name: 11
+      dialog: The one that lies ahead. The invaders you face are called Species-XI.
+        They will return, and you must be ready.
+    - name: 0
+      dialog: Species-XI? How do you know that?
+    - name: 11
+      dialog: Your companions approach. Fight, and find your way back home.
+    inputTutorialStep: 8
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 4
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 1

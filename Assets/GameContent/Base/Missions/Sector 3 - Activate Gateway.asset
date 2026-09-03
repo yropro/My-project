@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 3 - Activate Gateway
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: 3FNBikT3
+  displayName: Activate Gateway
+  levelFrom: {fileID: 11400000, guid: f3b24bdc4a9986040a0a91d672a7a6f3, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 11400000, guid: c3744723e865655429ba012b78a375a4, type: 2}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Activate the Sector Gateway at Eden.
+  itemRewards: []
+  rewardFactionUnlocks:
+  - Flora
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: 8bfb48ce5afc2a845b412d8918ca3e63, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 3
+      dialog: We're close enough to Sector 4 now that I might be able to break through
+        the interference. If the Grand Marshal's still alive, I'll find out soon
+        enough.
+    - name: 3
+      dialog: Meanwhile, you know the drill. That gateway isn't going to open itself.
+        Track down the keystones, and we can finally make the jump home.
+    autoPilotMapping: 4
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 30
+    requirementTarget: 
+    requirementQuantity: 3
+  - initialDialog:
+    - name: 1
+      dialog: Sector gateway activated. Coordinates are locked for our return to
+        Earth.
+    - name: 12
+      dialog: I'd grab a whisky or two before facing Grand Marshal Vex in person.
+        Maybe three.
+    - name: 3
+      dialog: Careful. He's not the sort to appreciate your... charm.
+    - name: 18
+      dialog: Well, here goes nothing. Earth, Vex, and whatever's left of the welcome
+        party.
+    - name: 19
+      dialog: Try to smile. He might promote you... or vaporize you. Either way,
+        memorable.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 8
+    autoPilotDialog:
+    - name: 11
+      dialog: The components I claimed will form the core of something greater.
+    - name: 0
+      dialog: Oh, what's that?
+    - name: 11
+      dialog: A weapon. One designed to silence the void.
+    - name: 11
+      dialog: And now... we build it together.
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: Why did that feel less like a gift and more like a veiled ultimatum?
+    - name: 18
+      dialog: I'm done trying to figure her out. Let's get to Earth then we'll deal
+        with it.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1

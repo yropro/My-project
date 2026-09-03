@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Prosperous (Trader)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Friendly
+  languageKey: DDvdvZNe
+  friendlyDisplayPosition:
+  - index: 0
+    position: {x: 0, y: 0}
+    rotation: 135
+    scale: 0.4
+  templateBase: {fileID: 11400000, guid: 7413812c64b3f2d4183d0fb46b8a86b7, type: 2}
+  faction: Neutral
+  allowGrapple: 1
+  scale: 3
+  attachStructure: Trader
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 1
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 1
+  aiBehaviour: 500
+  difficultyScale: []
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Debris
+  - item: {fileID: 11400000, guid: 4a0fd4e8f412e484dbebb96f666c4f58, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c4387f0a94dd76745b3024e4f6ff9c5f, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 943538bde541e714aad475a45c7f23b7, type: 2}
+    customizers:
+    - type: 350
+      value: 150
+  extraItems: []

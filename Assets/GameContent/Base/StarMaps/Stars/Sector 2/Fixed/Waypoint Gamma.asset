@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Waypoint Gamma
+  m_EditorClassIdentifier: 
+  languageKey: n6LzRSl6
+  faction: Conclave
+  type: 10
+  id: 3
+  starMap: {fileID: 11400000, guid: 9e3ab6eea230fa54393b796ea5184e14, type: 2}
+  minPosition: {x: 3.25, y: -0.25}
+  maxPosition: {x: 3.75, y: -0.75}
+  generationMethod: 1
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 99
+  debrisType: 0
+  nebula: 0
+  combatMusic: 1400
+  arrivalAutoPilot: 0
+  arrivalAutoPilotDialog: []
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions: []
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables: []
+  structures:
+  - structureName: Waypoint
+    position: {x: 2, y: -2}
+  positionedSquadrons: []
+  gatewayShips: 1
+  squadrons: []
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 0}
+  eliteTimer: 0
+  eliteMusic: 0
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 0
+  spreadStrengthDegrade: 1
+  minimumSpread: 0
+  spreadStarDesigns: []

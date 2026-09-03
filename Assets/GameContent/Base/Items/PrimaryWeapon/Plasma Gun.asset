@@ -1,0 +1,124 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1771633768, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Plasma Gun
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/PrimaryWeapon
+  languageKey: hzF7I0El
+  description: Shoots bolts of radioactive plasma that seek out enemies.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps: []
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  - faction: Skeran
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 0
+  globalLootWeight: 5
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  activatableIcons:
+  - faction: Conclave
+    image: {fileID: 0}
+  hueShiftIcon: 0
+  targetFriendly: 0
+  playCooldownSound: 0
+  projectiles:
+  - faction: Conclave
+    gameObject: {fileID: 0}
+  hueShiftProjectile: 0
+  delayedWarningPrefab: {fileID: 0}
+  muzzleFlashSprites:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 0.25
+    loop: 0
+    pitchVariance: 0.2
+    volumeVariance: 0.2
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 0
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  statusEffectChance: 0.0025
+  critChance: 0
+  velocity: 0
+  reloadTime: 0
+  launcher:
+    type: 4
+    category: 200
+    secondCategory: 0
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 20
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 1
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    charges: 0
+    maxCharges: 0
+    rechargeSeconds: 0
+    duration: 0
+    cooldown: 0
+    heatPerSecond: 3
+    aimAheadOfTarget: 1
+    isLinked: 0
+    aimSnap: 1
+    damageType: 5
+    statusEffectChance: 0.15
+    damage: 66
+    critChance: 0.25
+    critModifier: 1
+    reloadTime: 0.15
+    health: 0
+    autoDestroyTime: 1
+    delayActivation: 0
+    inheritParentVelocity: 1
+    piercing: 0
+    bounce: 0
+    explosiveRadius: 0
+    explodeAtRange: 1
+    shotCount: 1
+    shotAngle: 0
+    fireAlternate: 0
+    velocity: 12.5
+    emitPerActivate: 0
+    projectileMaxRange: -1
+  legendaries:
+  - {fileID: 11400000, guid: 1787a99f522e4ea4ca37a7989727176e, type: 2}

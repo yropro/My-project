@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Blight (Elite)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Shadow
+  languageKey: D0SwonY7
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 7a5b3d812237003449af56e186cb5a23, type: 2}
+  faction: Shadow
+  allowGrapple: 1
+  scale: 2
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale:
+  - scale: 0
+    value: 3
+    calculated: 0.525
+  - scale: 1
+    value: 10
+    calculated: 4
+  - scale: 2
+    value: 3
+    calculated: 1.2
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: a430aad035369cd48abbdf8361e071ae, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Corrosive
+  - item: {fileID: 11400000, guid: 4a0fd4e8f412e484dbebb96f666c4f58, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 89da62f8222a4764aa81f24e5f8f93e1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 7c0a4457df27afa4c8a79a6ff0225a83, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 16c3764d41fc25542a540c4bd418cdfa, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 943538bde541e714aad475a45c7f23b7, type: 2}
+    customizers:
+    - type: 200
+      value: 35
+    - type: 350
+      value: 150
+  - item: {fileID: 11400000, guid: ee0ecf82f0192834291d06e82a3363c2, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 996038711158f5f4a8d8fe87f4adf323, type: 2}
+    customizers: []
+  extraItems: []

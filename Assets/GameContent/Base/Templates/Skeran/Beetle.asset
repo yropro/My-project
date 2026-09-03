@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Beetle
+  m_EditorClassIdentifier: 
+  languageKey: 68HdKGHJ
+  faction: Skeran
+  serialized: 'Destroyer#0.44#0.30#0.05#0.00
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.25,"y":0.20000000298023225},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Vanity
+    Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.4000000059604645,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Spike
+    2","k":"","h":"DE","sa":"FF","b":"D9","o":{"x":0.25,"y":0.20000000298023225},"r":230.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran/Hull
+    2","k":"","h":"F0","sa":"FF","b":"E6","o":{"x":-0.17499999701976777,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Spike
+    2","k":"","h":"DE","sa":"FF","b":"D9","o":{"x":-0.15000000596046449,"y":0.22499999403953553},"r":230.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran/Hull
+    3","k":"","h":"E3","sa":"FF","b":"FF","o":{"x":0.15000000596046449,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Spike
+    1","k":"","h":"DE","sa":"FF","b":"D9","o":{"x":-0.10000000149011612,"y":0.125},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran/Cockpit
+    1","k":"","h":"EB","sa":"FF","b":"FF","o":{"x":0.4000000059604645,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Wing
+    3","k":"","h":"E8","sa":"FF","b":"F2","o":{"x":0.05000000074505806,"y":0.125},"r":260.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"DE","sa":"FF","b":"FF","o":{"x":0.15000000596046449,"y":0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"DE","sa":"FF","b":"FF","o":{"x":-0.125,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"DE","sa":"FF","b":"FF","o":{"x":0.02500000037252903,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Utility","k":"","h":"DE","sa":"FF","b":"FF","o":{"x":-0.05000000074505806,"y":0.15000000596046449},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 0

@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1617794041, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Shadow Skirmish
+  m_EditorClassIdentifier: 
+  minLevel: 43
+  spawnWeight: 8
+  faction: Shadow
+  allowInvasion: 1
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 99
+  debrisType: 0
+  allowRandomAsteroids: 1
+  nebulaChance: 0.2
+  combatMusic: 1100
+  arrivalMissions:
+  - {fileID: 11400000, guid: 3f756e48883aecd45a5049355e9b1483, type: 2}
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 7cd74a461fae9c44394b9d481d9ce416, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  spawnEnemies: 0
+  squadrons: []
+  gatewayShips: 2
+  destroyAllShips: 0
+  autoSpawnCount: 5
+  validAutoSpawnSquadrons:
+  - {fileID: 11400000, guid: 3fdacb2194b0bd6438d3591056feb3d9, type: 2}
+  - {fileID: 11400000, guid: 6ac8ec0951ae7c34bb8f3c27342f6c5e, type: 2}
+  - {fileID: 11400000, guid: a7088d2ea7b8f7e4295432309b1440ec, type: 2}
+  - {fileID: 11400000, guid: eda00e4e674d5674bab1f23fefe878a1, type: 2}
+  - {fileID: 11400000, guid: 8dd0e4e44c9b5ca41957807fad144daa, type: 2}
+  - {fileID: 11400000, guid: 95f4d19d6f9ee6f4980c27ec13bd64f0, type: 2}
+  - {fileID: 11400000, guid: 54b197f9a7f5aad41b3268e57cb14942, type: 2}
+  autoAggroEnemies: 0

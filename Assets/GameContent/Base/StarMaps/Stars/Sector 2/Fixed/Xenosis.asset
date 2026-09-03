@@ -1,0 +1,73 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Xenosis
+  m_EditorClassIdentifier: 
+  languageKey: IDll0rCJ
+  faction: Species-XI
+  type: 500
+  id: 10
+  starMap: {fileID: 11400000, guid: 9e3ab6eea230fa54393b796ea5184e14, type: 2}
+  minPosition: {x: -2, y: -1.5}
+  maxPosition: {x: -2.5, y: -1.75}
+  generationMethod: 1
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 1
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 6
+  debrisType: 6
+  nebula: 0
+  combatMusic: 9049
+  arrivalAutoPilot: 0
+  arrivalAutoPilotDialog: []
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions: []
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons: []
+  gatewayShips: 3
+  squadrons:
+  - {fileID: 11400000, guid: c5c72e6752785e84d8134f4bab26a921, type: 2}
+  - {fileID: 11400000, guid: 3ba883da5894848438e8791f34a60bc0, type: 2}
+  - {fileID: 11400000, guid: 3515a15862d392b4cb8b3862b98f5922, type: 2}
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 11400000, guid: 89e3956a003983f43b79e338ba5a6cfc, type: 2}
+  eliteTimer: 30
+  eliteMusic: 9050
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 1
+  spreadStrengthDegrade: 0.1
+  minimumSpread: 4
+  spreadStarDesigns:
+  - {fileID: 11400000, guid: d115a6735e6545c4fbcc8872381cff3e, type: 2}
+  - {fileID: 11400000, guid: dd463cae670a0db40aa3e747176d4137, type: 2}
+  - {fileID: 11400000, guid: 49129e0b7bcdf6a4c9f69185ccebe4cf, type: 2}
+  - {fileID: 11400000, guid: b11fc094b117a53478a62e8a62b3ec4a, type: 2}
+  - {fileID: 11400000, guid: 37b072a7a7cfda947889fd2d3e533350, type: 2}
+  - {fileID: 11400000, guid: 0c0bd0dd4029e6449b071f474e4a7d2b, type: 2}

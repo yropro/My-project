@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Hodr
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Bosses
+  languageKey: 2sd0ijPC
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: eb578645d50ea8641bf66e5960e92506, type: 2}
+  faction: Pantheon
+  allowGrapple: 1
+  scale: 3
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 0
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale:
+  - scale: 1
+    value: 5
+    calculated: 3
+  - scale: 2
+    value: 2
+    calculated: 1.2
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: 443ebe8f02b0cd74288cd13164333984, type: 2}
+    customizers:
+    - type: 700
+      value: Cold
+  - item: {fileID: 11400000, guid: 141bd4ea571a3434daf4d6800708fea8, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 0b232a00f5f177347a8c5472f24c7deb, type: 2}
+    customizers:
+    - type: 495
+      value: 0.15
+  - item: {fileID: 11400000, guid: 0f4ea1b43bea0f64fb4051e40cb2f80d, type: 2}
+    customizers:
+    - type: 350
+      value: 150
+  - item: {fileID: 11400000, guid: 97d11f1c134187140b9b952efa85baff, type: 2}
+    customizers: []
+  extraItems: []

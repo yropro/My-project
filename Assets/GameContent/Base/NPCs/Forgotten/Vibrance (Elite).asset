@@ -1,0 +1,77 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Vibrance (Elite)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Forgotten
+  languageKey: hvUxjhCD
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: e76a65c7aa8dc2e438de87b2c670d06c, type: 2}
+  faction: Forgotten
+  allowGrapple: 1
+  scale: 2
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale:
+  - scale: 0
+    value: 1.25
+    calculated: 0.19999999
+  - scale: 1
+    value: 8
+    calculated: 2.8
+  - scale: 2
+    value: 8
+    calculated: 2.8
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e7cf2549873571b40b263ca4c354960a, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: 443ebe8f02b0cd74288cd13164333984, type: 2}
+    customizers:
+    - type: 700
+      value: Kinetic
+    - type: 90
+      value: quantumshield
+  - item: {fileID: 11400000, guid: 141bd4ea571a3434daf4d6800708fea8, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 0b232a00f5f177347a8c5472f24c7deb, type: 2}
+    customizers:
+    - type: 220
+      value: 11
+  - item: {fileID: 11400000, guid: 0b232a00f5f177347a8c5472f24c7deb, type: 2}
+    customizers:
+    - type: 220
+      value: 11
+  - item: {fileID: 11400000, guid: 88ee75a4b37f1624a9c1c0997b4e0592, type: 2}
+    customizers:
+    - type: 90
+      value: heavyherondronebay
+  - item: {fileID: 11400000, guid: 098b760cd2cb76744a61a9d97fb6cf66, type: 2}
+    customizers:
+    - type: 90
+      value: sentinelpdl
+    - type: 200
+      value: 125
+  - item: {fileID: 11400000, guid: da3c89c8813f5774ca2743c6afe3de94, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 291f12b8d1ede314a8d29730421c91d1, type: 2}
+    customizers: []
+  extraItems: []

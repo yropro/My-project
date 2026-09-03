@@ -1,0 +1,132 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -662120390, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 2
+  m_EditorClassIdentifier: 
+  resourcePath: Base/StarMaps
+  languageKey: 1spy9QKY
+  inDevelopment: 0
+  editorOnly: 0
+  primaryDamageType: 1
+  primaryFaction: Phantom
+  ambientMusic: 1400
+  levelRanges:
+  - newGamePlus: 0
+    minLevel: 18
+    specialLevel: 0
+    maxLevel: 36
+  - newGamePlus: 1
+    minLevel: 53
+    specialLevel: 0
+    maxLevel: 61
+  - newGamePlus: 2
+    minLevel: 73
+    specialLevel: 0
+    maxLevel: 81
+  - newGamePlus: 3
+    minLevel: 93
+    specialLevel: 0
+    maxLevel: 100
+  modifierWeight: 1
+  fleetFlagship: 0
+  singularityKeyPhase: 0
+  singularityKeyTargetStarMapBase: {fileID: 0}
+  singularityKeyTargetStarId: 0
+  singularityKeyBackStarMapBase: {fileID: 0}
+  singularityKeyBackStarId: 0
+  singularityKeyPrerequisiteMissions: []
+  showEchoOnJump: 1
+  difficultyScale:
+  - scale: 0
+    value: 1.05
+    calculated: 0.18374999
+  - scale: 1
+    value: 1.1
+    calculated: 0.44000003
+  - scale: 2
+    value: 1.1
+    calculated: 0.44000003
+  - scale: 3
+    value: 1.25
+    calculated: 0.25
+  - scale: 4
+    value: 1.25
+    calculated: 0.625
+  generator: 1
+  cacheCount: 20
+  cachePrefabs:
+  - prefab: {fileID: 0}
+    chance: 0.4
+  - prefab: {fileID: 0}
+    chance: 0.25
+  - prefab: {fileID: 0}
+    chance: 0.25
+  - prefab: {fileID: 0}
+    chance: 0.1
+  fixedCaches:
+  - itemBase: {fileID: 11400000, guid: 2f19adcd67464e54dadb2c2ff96191e9, type: 2}
+    faction: Pantheon
+    minPosition: {x: -7, y: -7}
+    maxPosition: {x: 7, y: 7}
+  - itemBase: {fileID: 11400000, guid: 62d7d8d39b14b8a4097d835178721fc6, type: 2}
+    faction: Shadow
+    minPosition: {x: -7, y: -7}
+    maxPosition: {x: 7, y: 7}
+  - itemBase: {fileID: 11400000, guid: 7be9687fe99cc23418fe047354819fd4, type: 2}
+    faction: Species-XI
+    minPosition: {x: -7, y: -7}
+    maxPosition: {x: 7, y: 7}
+  - itemBase: {fileID: 11400000, guid: be76ff6369e686b4589efc6f9dcbbb23, type: 2}
+    faction: Phantom
+    minPosition: {x: -7, y: -7}
+    maxPosition: {x: 0, y: 7}
+  - itemBase: {fileID: 11400000, guid: 4465bf24105a7c14c9d5a3ab53d6536e, type: 2}
+    faction: Phantom
+    minPosition: {x: 0, y: -7}
+    maxPosition: {x: 7, y: 7}
+  fixedStarPath: Base/StarMaps/Stars/Sector 2/Fixed
+  starDesignPath: Base/StarMaps/Stars/Sector 2/Designs
+  randomBackgroundHues: 030000000400000005000000
+  obstructions:
+  - prefab: {fileID: 1620143232695162444, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.3
+    debrisType: 1
+  - prefab: {fileID: -179735409765873471, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.2
+    debrisType: 1
+  - prefab: {fileID: 786882066299589297, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.15
+    debrisType: 0
+  - prefab: {fileID: -186400082009735621, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.05
+    debrisType: 0
+  - prefab: {fileID: -8203814204471976968, guid: 0000000000000000d000000000000000, type: 0}
+    chance: 0.1
+    debrisType: 0
+  firstInvaderStarDesign: {fileID: 11400000, guid: 49129e0b7bcdf6a4c9f69185ccebe4cf, type: 2}
+  invaderStarDesigns:
+  - starType: 10
+    starDesign: {fileID: 11400000, guid: 89944b0dbca22e14698424814e24863d, type: 2}
+  - starType: 100
+    starDesign: {fileID: 11400000, guid: 49129e0b7bcdf6a4c9f69185ccebe4cf, type: 2}
+  - starType: 120
+    starDesign: {fileID: 11400000, guid: dd463cae670a0db40aa3e747176d4137, type: 2}
+  - starType: 110
+    starDesign: {fileID: 11400000, guid: 37b072a7a7cfda947889fd2d3e533350, type: 2}
+  - starType: 130
+    starDesign: {fileID: 11400000, guid: d115a6735e6545c4fbcc8872381cff3e, type: 2}
+  - starType: 200
+    starDesign: {fileID: 11400000, guid: b11fc094b117a53478a62e8a62b3ec4a, type: 2}
+  - starType: 500
+    starDesign: {fileID: 11400000, guid: 0c0bd0dd4029e6449b071f474e4a7d2b, type: 2}
+  generationStage: 7
+  lastYieldTime: 12.890428

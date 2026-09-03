@@ -1,0 +1,11 @@
+{
+  "id": "com.yourname.modname",
+  "name": "My Mod",
+  "author": "Your Name",
+  "version": "1.0.0",
+  "description": "A description of what this mod does.",
+  "gameVersion": "",
+  "dependencies": [],
+  "loadOrder": 0,
+  "tags": ["content"]
+}

@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1515019235, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Squids + Sprites
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Squadrons/Species-XI
+  languageKey: 54HfJLPP
+  displayName: Squids + Infected Sprites
+  multiplier: 1
+  friendly: 0
+  customDisplayPositions: []
+  formation: 1
+  spiralRadius: 20
+  shipsByLevels:
+  - levelRequired: 1
+    ships:
+    - {fileID: 11400000, guid: 6a1f0412587585144ae239f1bee983e1, type: 2}
+    - {fileID: 11400000, guid: 6a1f0412587585144ae239f1bee983e1, type: 2}
+    - {fileID: 11400000, guid: 6159aeb267364b6458a2d0ed81de3316, type: 2}
+    - {fileID: 11400000, guid: 6159aeb267364b6458a2d0ed81de3316, type: 2}
+    - {fileID: 11400000, guid: 6159aeb267364b6458a2d0ed81de3316, type: 2}
+  - levelRequired: 24
+    ships:
+    - {fileID: 11400000, guid: 0a8cfc9a017f7894e96327615ffe2c42, type: 2}
+    - {fileID: 11400000, guid: 0a8cfc9a017f7894e96327615ffe2c42, type: 2}
+  - levelRequired: 24
+    ships:
+    - {fileID: 11400000, guid: 0a8cfc9a017f7894e96327615ffe2c42, type: 2}
+    - {fileID: 11400000, guid: 0a8cfc9a017f7894e96327615ffe2c42, type: 2}
+  - levelRequired: 65
+    ships:
+    - {fileID: 11400000, guid: 33b22e5e483d9184abb368384cd6be1c, type: 2}
+    - {fileID: 11400000, guid: 33b22e5e483d9184abb368384cd6be1c, type: 2}
+  - levelRequired: 85
+    ships:
+    - {fileID: 11400000, guid: 0a8cfc9a017f7894e96327615ffe2c42, type: 2}
+    - {fileID: 11400000, guid: 0a8cfc9a017f7894e96327615ffe2c42, type: 2}
+  invulnerableLeader: 0
+  splitSquadron: 0
+  splitLeaderNpc: {fileID: 0}
+  splitTailNpc: {fileID: 0}
+  invulnerableLayers: 0
+  inactiveLayers: 0
+  attachRotation: 0
+  rotateAway: 0
+  rigidAttachment: 0
+  combatFormationDrift: 1
+  respawn: 0
+  respawnMinSeconds: 0
+  respawnMaxSeconds: 0

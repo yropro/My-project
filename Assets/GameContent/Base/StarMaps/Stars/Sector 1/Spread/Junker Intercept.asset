@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1028655690, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Junker Intercept
+  m_EditorClassIdentifier: 
+  minLevel: 1
+  spawnWeight: 2
+  faction: Junker
+  allowInvasion: 1
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 7
+  debrisType: 2
+  allowRandomAsteroids: 0
+  nebulaChance: 0.25
+  combatMusic: 300
+  arrivalMissions:
+  - {fileID: 11400000, guid: 550528c7d3567ab409e74c1843ba2430, type: 2}
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  autoSpawnCount: 4
+  validAutoSpawnSquadrons:
+  - {fileID: 11400000, guid: bc6c70f3feb59c74b860d78f590a806b, type: 2}
+  - {fileID: 11400000, guid: 493041098cf59854fac03e25e82745ee, type: 2}
+  - {fileID: 11400000, guid: 812d152e432396f4d9d0e28b35a51bd9, type: 2}
+  interceptSquadron: {fileID: 11400000, guid: 55278f0d417f7e444b6ec3b80f48799e, type: 2}
+  interceptTimer: 60

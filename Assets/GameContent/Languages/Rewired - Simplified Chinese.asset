@@ -1,0 +1,86 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1464611097, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Rewired - Simplified Chinese
+  m_EditorClassIdentifier: 
+  _yes: "\u662F"
+  _no: "\u5426"
+  _add: "\u6DFB\u52A0"
+  _replace: "\u66FF\u6362"
+  _remove: "\u79FB\u9664"
+  _swap: Swap
+  _cancel: "\u53D6\u6D88"
+  _none: "\u65E0"
+  _okay: "\u786E\u5B9A"
+  _done: "\u5B8C\u6210"
+  _default: "\u9ED8\u8BA4"
+  _assignControllerWindowTitle: "\u9009\u62E9\u624B\u67C4"
+  _assignControllerWindowMessage: "\u5728\u4F60\u60F3\u4F7F\u7528\u7684\u624B\u67C4\u4E0A\u6309\u4EFB\u610F\u6309\u94AE\u6216\u79FB\u52A8\u4EFB\u610F\u6447\u6746\u3002"
+  _controllerAssignmentConflictWindowTitle: "\u624B\u67C4\u5206\u914D"
+  _controllerAssignmentConflictWindowMessage: "{0} \u5DF2\u5206\u914D\u7ED9 {1}\u3002\u662F\u5426\u6539\u4E3A\u5C06\u6B64\u624B\u67C4\u5206\u914D\u7ED9
+    {2}\uFF1F"
+  _elementAssignmentPrePollingWindowMessage: "\u8BF7\u5148\u5C06\u6240\u6709\u6447\u6746\u548C\u8F74\u7F6E\u4E8E\u4E2D\u592E\u6216\u5F52\u96F6,\u7136\u540E\u6309\u4EFB\u610F\u6309\u94AE\u6216\u7B49\u5F85\u8BA1\u65F6\u5668\u7ED3\u675F\u3002"
+  _joystickElementAssignmentPollingWindowMessage: "\u73B0\u5728\u6309\u4E0B\u6309\u94AE\u6216\u79FB\u52A8\u6447\u6746\u4EE5\u5C06\u5176\u5206\u914D\u7ED9
+    {0}\u3002"
+  _joystickElementAssignmentPollingWindowMessage_fullAxisFieldOnly: Now move an axis
+    to assign it to {0}.
+  _keyboardElementAssignmentPollingWindowMessage: "\u6309\u4E0B\u4E00\u4E2A\u6309\u952E\u4EE5\u5C06\u5176\u5206\u914D\u7ED9
+    {0}\u3002\u4E5F\u53EF\u4F7F\u7528\u4FEE\u9970\u952E\u3002\u82E5\u8981\u5355\u72EC\u5206\u914D\u4FEE\u9970\u952E,\u8BF7\u6309\u4F4F\u5B83
+    1 \u79D2\u3002"
+  _mouseElementAssignmentPollingWindowMessage: "\u6309\u4E0B\u9F20\u6807\u6309\u952E\u6216\u79FB\u52A8\u8F74\u4EE5\u5C06\u5176\u5206\u914D\u7ED9
+    {0}\u3002"
+  _mouseElementAssignmentPollingWindowMessage_fullAxisFieldOnly: Move an axis to
+    assign it to {0}.
+  _elementAssignmentConflictWindowMessage: "\u5206\u914D\u51B2\u7A81"
+  _elementAlreadyInUseBlocked: "{0} \u5DF2\u5728\u4F7F\u7528\u4E2D,\u65E0\u6CD5\u66FF\u6362\u3002"
+  _elementAlreadyInUseCanReplace: "{0} \u5DF2\u5728\u4F7F\u7528\u4E2D\u3002\u662F\u5426\u8981\u66FF\u6362\u5B83\uFF1F"
+  _elementAlreadyInUseCanReplace_conflictAllowed: "{0} \u5DF2\u5728\u4F7F\u7528\u4E2D\u3002\u662F\u5426\u8981\u66FF\u6362\u5B83\uFF1F\u4F60\u4E5F\u53EF\u4EE5\u9009\u62E9\u76F4\u63A5\u8FFD\u52A0\u6B64\u5206\u914D\u3002"
+  _mouseAssignmentConflictWindowTitle: "\u9F20\u6807\u5206\u914D"
+  _mouseAssignmentConflictWindowMessage: "\u9F20\u6807\u5DF2\u5206\u914D\u7ED9 {0}\u3002\u662F\u5426\u6539\u4E3A\u5C06\u9F20\u6807\u5206\u914D\u7ED9
+    {1}\uFF1F"
+  _calibrateControllerWindowTitle: "\u6821\u51C6\u624B\u67C4"
+  _calibrateAxisStep1WindowTitle: "\u6821\u51C6\u96F6\u70B9"
+  _calibrateAxisStep1WindowMessage: "\u5C06 {0} \u7F6E\u4E8E\u4E2D\u592E\u6216\u5F52\u96F6,\u7136\u540E\u6309\u4EFB\u610F\u6309\u94AE\u6216\u7B49\u5F85\u8BA1\u65F6\u5668\u7ED3\u675F\u3002"
+  _calibrateAxisStep2WindowTitle: "\u6821\u51C6\u8303\u56F4"
+  _calibrateAxisStep2WindowMessage: "\u8BA9 {0} \u5728\u6574\u4E2A\u8303\u56F4\u5185\u79FB\u52A8,\u7136\u540E\u6309\u4EFB\u610F\u6309\u94AE\u6216\u7B49\u5F85\u8BA1\u65F6\u5668\u7ED3\u675F\u3002"
+  _inputBehaviorSettingsWindowTitle: "\u7075\u654F\u5EA6\u8BBE\u7F6E"
+  _restoreDefaultsWindowTitle: "\u6062\u590D\u9ED8\u8BA4\u503C"
+  _restoreDefaultsWindowMessage_onePlayer: "\u6B64\u64CD\u4F5C\u5C06\u6062\u590D\u9ED8\u8BA4\u8F93\u5165\u914D\u7F6E\u3002\u786E\u5B9A\u8981\u7EE7\u7EED\u5417\uFF1F"
+  _restoreDefaultsWindowMessage_multiPlayer: "\u6B64\u64CD\u4F5C\u5C06\u6062\u590D\u6240\u6709\u73A9\u5BB6\u7684\u9ED8\u8BA4\u8F93\u5165\u914D\u7F6E\u3002\u786E\u5B9A\u8981\u7EE7\u7EED\u5417\uFF1F"
+  _actionColumnLabel: "\u64CD\u4F5C"
+  _keyboardColumnLabel: "\u952E\u76D8"
+  _mouseColumnLabel: "\u9F20\u6807"
+  _controllerColumnLabel: "\u624B\u67C4"
+  _removeControllerButtonLabel: "\u79FB\u9664"
+  _calibrateControllerButtonLabel: "\u6821\u51C6"
+  _assignControllerButtonLabel: "\u5206\u914D\u624B\u67C4"
+  _inputBehaviorSettingsButtonLabel: "\u7075\u654F\u5EA6"
+  _doneButtonLabel: "\u5B8C\u6210"
+  _restoreDefaultsButtonLabel: "\u6062\u590D\u9ED8\u8BA4\u503C"
+  _playersGroupLabel: "\u73A9\u5BB6:"
+  _controllerSettingsGroupLabel: "\u624B\u67C4:"
+  _assignedControllersGroupLabel: "\u5DF2\u5206\u914D\u624B\u67C4:"
+  _settingsGroupLabel: "\u8BBE\u7F6E:"
+  _mapCategoriesGroupLabel: "\u7C7B\u522B:"
+  _calibrateWindow_deadZoneSliderLabel: "\u6B7B\u533A:"
+  _calibrateWindow_upperDeadZoneSliderLabel: 'Upper Dead Zone:'
+  _calibrateWindow_zeroSliderLabel: "\u96F6\u70B9:"
+  _calibrateWindow_sensitivitySliderLabel: "\u7075\u654F\u5EA6:"
+  _calibrateWindow_invertToggleLabel: "\u53CD\u8F6C"
+  _calibrateWindow_calibrateButtonLabel: "\u6821\u51C6"
+  _modifierKeys:
+    control: Control
+    alt: Alt
+    shift: Shift
+    command: Command
+    separator: ' + '
+  _customEntries: []

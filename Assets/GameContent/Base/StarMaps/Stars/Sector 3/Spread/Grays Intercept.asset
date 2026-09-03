@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1028655690, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Grays Intercept
+  m_EditorClassIdentifier: 
+  minLevel: 1
+  spawnWeight: 100
+  faction: Grays
+  allowInvasion: 0
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 4
+  debrisType: 0
+  allowRandomAsteroids: 1
+  nebulaChance: 0
+  combatMusic: 2200
+  arrivalMissions: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  autoSpawnCount: 5
+  validAutoSpawnSquadrons:
+  - {fileID: 11400000, guid: 4be3f77b4c9e3c44198ca2b11fe473bf, type: 2}
+  - {fileID: 11400000, guid: 259f6f6d888755947934c326be514a51, type: 2}
+  - {fileID: 11400000, guid: e5be0204fae69a1499f8dd7d39d688d4, type: 2}
+  interceptSquadron: {fileID: 11400000, guid: c35c38255064d324da7e04f9d17eaf6d, type: 2}
+  interceptTimer: 60

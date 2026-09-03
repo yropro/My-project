@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 2 - Horizon (Pantheon)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: Ir9Fq2E1
+  displayName: Event Horizon
+  levelFrom: {fileID: 11400000, guid: 6f59744d67ae9ba4680aafaaa19d67ae, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 2
+  description: Locate and destroy the Elite Horizon used by the Pantheon.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 6300
+  rewardMissions: []
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 3
+      dialog: The Pantheon vessel Horizon is ahead. They broke from the Conclave
+        chasing ideals... not chaos.
+    - name: 3
+      dialog: "Ideals don\u2019t excuse treason. The Emperor made that clear. Engage
+        if you must."
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 10
+    requirementTarget: Pantheon/Horizon (Elite)
+    requirementQuantity: 1

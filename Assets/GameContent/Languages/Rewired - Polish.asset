@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1464611097, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Rewired - Polish
+  m_EditorClassIdentifier: 
+  _yes: Tak
+  _no: Nie
+  _add: Dodaj
+  _replace: "Zast\u0105p"
+  _remove: "Usu\u0144"
+  _swap: "Zamie\u0144"
+  _cancel: Anuluj
+  _none: Brak
+  _okay: OK
+  _done: Gotowe
+  _default: "Domy\u015Blne"
+  _assignControllerWindowTitle: Wybierz kontroler
+  _assignControllerWindowMessage: "Naci\u015Bnij dowolny przycisk lub porusz osi\u0105
+    na kontrolerze, kt\xF3rego chcesz u\u017Cy\u0107."
+  _controllerAssignmentConflictWindowTitle: Przypisanie kontrolera
+  _controllerAssignmentConflictWindowMessage: "{0} jest ju\u017C przypisany do {1}.
+    Czy chcesz przypisa\u0107 ten kontroler do {2} zamiast tego?"
+  _elementAssignmentPrePollingWindowMessage: "Najpierw wycentruj lub wyzeruj wszystkie
+    dr\u0105\u017Cki i osie, a nast\u0119pnie naci\u015Bnij dowolny przycisk lub
+    poczekaj, a\u017C zako\u0144czy si\u0119 odliczanie."
+  _joystickElementAssignmentPollingWindowMessage: "Teraz naci\u015Bnij przycisk lub
+    porusz osi\u0105, aby przypisa\u0107 j\u0105 do {0}."
+  _joystickElementAssignmentPollingWindowMessage_fullAxisFieldOnly: "Teraz porusz
+    osi\u0105, aby przypisa\u0107 j\u0105 do {0}."
+  _keyboardElementAssignmentPollingWindowMessage: "Naci\u015Bnij klawisz, aby przypisa\u0107
+    go do {0}. Mo\u017Cna te\u017C u\u017Cy\u0107 klawiszy modyfikuj\u0105cych. Aby
+    przypisa\u0107 sam klawisz modyfikuj\u0105cy, przytrzymaj go przez 1 sekund\u0119."
+  _mouseElementAssignmentPollingWindowMessage: "Naci\u015Bnij przycisk myszy lub
+    porusz osi\u0105, aby przypisa\u0107 j\u0105 do {0}."
+  _mouseElementAssignmentPollingWindowMessage_fullAxisFieldOnly: "Porusz osi\u0105,
+    aby przypisa\u0107 j\u0105 do {0}."
+  _elementAssignmentConflictWindowMessage: Konflikt przypisania
+  _elementAlreadyInUseBlocked: "{0} jest ju\u017C w u\u017Cyciu i nie mo\u017Ce zosta\u0107
+    zast\u0105piony."
+  _elementAlreadyInUseCanReplace: "{0} jest ju\u017C w u\u017Cyciu. Czy chcesz go
+    zast\u0105pi\u0107?"
+  _elementAlreadyInUseCanReplace_conflictAllowed: "{0} jest ju\u017C w u\u017Cyciu.
+    Czy chcesz go zast\u0105pi\u0107? Mo\u017Cesz te\u017C doda\u0107 przypisanie
+    mimo to."
+  _mouseAssignmentConflictWindowTitle: Przypisanie myszy
+  _mouseAssignmentConflictWindowMessage: "Mysz jest ju\u017C przypisana do {0}. Czy
+    chcesz przypisa\u0107 j\u0105 do {1} zamiast tego?"
+  _calibrateControllerWindowTitle: Kalibruj kontroler
+  _calibrateAxisStep1WindowTitle: Kalibruj zero
+  _calibrateAxisStep1WindowMessage: "Wycentruj lub wyzeruj {0} i naci\u015Bnij dowolny
+    przycisk albo poczekaj, a\u017C zako\u0144czy si\u0119 odliczanie."
+  _calibrateAxisStep2WindowTitle: Kalibruj zakres
+  _calibrateAxisStep2WindowMessage: "Porusz {0} po ca\u0142ym jego zakresie, a nast\u0119pnie
+    naci\u015Bnij dowolny przycisk lub poczekaj, a\u017C zako\u0144czy si\u0119 odliczanie. "
+  _inputBehaviorSettingsWindowTitle: "Ustawienia czu\u0142o\u015Bci"
+  _restoreDefaultsWindowTitle: "Przywr\xF3\u0107 domy\u015Blne"
+  _restoreDefaultsWindowMessage_onePlayer: "Spowoduje to przywr\xF3cenie domy\u015Blnej
+    konfiguracji sterowania. Czy na pewno chcesz to zrobi\u0107?"
+  _restoreDefaultsWindowMessage_multiPlayer: "Spowoduje to przywr\xF3cenie domy\u015Blnej
+    konfiguracji sterowania dla wszystkich graczy. Czy na pewno chcesz to zrobi\u0107?"
+  _actionColumnLabel: Akcje
+  _keyboardColumnLabel: Klawiatura
+  _mouseColumnLabel: Mysz
+  _controllerColumnLabel: Kontroler
+  _removeControllerButtonLabel: "Usu\u0144"
+  _calibrateControllerButtonLabel: Kalibruj
+  _assignControllerButtonLabel: Przypisz kontroler
+  _inputBehaviorSettingsButtonLabel: "Czu\u0142o\u015B\u0107"
+  _doneButtonLabel: Gotowe
+  _restoreDefaultsButtonLabel: "Przywr\xF3\u0107 domy\u015Blne"
+  _playersGroupLabel: 'Gracze:'
+  _controllerSettingsGroupLabel: 'Kontroler:'
+  _assignedControllersGroupLabel: 'Przypisane kontrolery:'
+  _settingsGroupLabel: 'Ustawienia:'
+  _mapCategoriesGroupLabel: 'Kategorie:'
+  _calibrateWindow_deadZoneSliderLabel: 'Strefa martwa:'
+  _calibrateWindow_upperDeadZoneSliderLabel: 'Upper Dead Zone:'
+  _calibrateWindow_zeroSliderLabel: 'Zero:'
+  _calibrateWindow_sensitivitySliderLabel: "Czu\u0142o\u015B\u0107:"
+  _calibrateWindow_invertToggleLabel: "Odwr\xF3\u0107"
+  _calibrateWindow_calibrateButtonLabel: Kalibruj
+  _modifierKeys:
+    control: Ctrl
+    alt: Alt
+    shift: Shift
+    command: Cmd
+    separator: ' + '
+  _customEntries: []

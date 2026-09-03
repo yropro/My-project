@@ -1,0 +1,95 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Gateway (Locked)
+  m_EditorClassIdentifier: 
+  languageKey: DVXJ1Id2
+  faction: 
+  serialized: 'Structure#1.86
+
+    {"n":"Structure/Ring","k":"","h":"FF","sa":"FF","b":"E6","o":{"x":0.7749999761581421,"y":0.7749999761581421},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Structure/Ring","k":"","h":"FF","sa":"FF","b":"E6","o":{"x":-0.7749999761581421,"y":0.7749999761581421},"r":90.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Structure/Join
+    4","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.0,"y":1.5},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Structure/Join
+    4","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.5,"y":0.0},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Light
+    3","k":"","h":"FF","sa":"00","b":"FF","o":{"x":1.225000023841858,"y":-1.225000023841858},"r":225.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    4","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-1.5,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Light","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-1.0750000476837159,"y":1.0750000476837159},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Structure/Light","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.0750000476837159,"y":1.0750000476837159},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Structure/Join
+    3","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-1.4249999523162842,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    3","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.4500000476837159,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    3","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.0,"y":1.4249999523162842},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Grays/Saucer
+    4","k":"","h":"7D","sa":"33","b":"FF","o":{"x":1.625,"y":-1.625},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Saucer
+    3","k":"","h":"7D","sa":"BD","b":"FF","o":{"x":1.625,"y":-1.625},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Saucer
+    2","k":"","h":"7D","sa":"36","b":"FF","o":{"x":1.625,"y":-1.625},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Cockpit
+    1","k":"","h":"FF","sa":"00","b":"FF","o":{"x":1.625,"y":-1.625},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Trim
+    2","k":"","h":"FF","sa":"00","b":"FF","o":{"x":1.350000023841858,"y":-1.600000023841858},"r":85.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Trim
+    2","k":"","h":"FF","sa":"00","b":"FF","o":{"x":1.649999976158142,"y":-1.350000023841858},"r":355.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Arm
+    1","k":"","h":"FF","sa":"00","b":"FF","o":{"x":1.625,"y":-1.100000023841858},"r":225.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Arm
+    1","k":"","h":"FF","sa":"00","b":"FF","o":{"x":1.100000023841858,"y":-1.625},"r":225.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Arm
+    1","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.875,"y":-1.399999976158142},"r":225.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Arm
+    1","k":"","h":"FF","sa":"00","b":"FF","o":{"x":1.399999976158142,"y":-0.875},"r":225.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Light
+    1","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.9249999523162842,"y":-1.9249999523162842},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Light
+    1","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.725000023841858,"y":-2.0250000953674318},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Light
+    1","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":2.0250000953674318,"y":-1.725000023841858},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Light
+    1","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":2.0250000953674318,"y":-1.5},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Light
+    1","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.524999976158142,"y":-2.0250000953674318},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Grays/Misc
+    1","k":"","h":"FF","sa":"00","b":"FF","o":{"x":1.9249999523162842,"y":-1.649999976158142},"r":15.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}'
+  noMenuSpawn: 1

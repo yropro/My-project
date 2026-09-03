@@ -1,0 +1,95 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1464611097, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Rewired - Portuguese
+  m_EditorClassIdentifier: 
+  _yes: Sim
+  _no: "N\xE3o"
+  _add: Adicionar
+  _replace: Substituir
+  _remove: Remover
+  _swap: Trocar
+  _cancel: Cancelar
+  _none: Nenhum
+  _okay: Ok
+  _done: "Conclu\xEDdo"
+  _default: "Padr\xE3o"
+  _assignControllerWindowTitle: Escolher Controle
+  _assignControllerWindowMessage: "Pressione qualquer bot\xE3o ou mova um eixo no
+    controle que voc\xEA deseja usar."
+  _controllerAssignmentConflictWindowTitle: "Atribui\xE7\xE3o de Controle"
+  _controllerAssignmentConflictWindowMessage: "{0} j\xE1 est\xE1 atribu\xEDdo a {1}.
+    Voc\xEA deseja atribuir este controle a {2} em vez disso?"
+  _elementAssignmentPrePollingWindowMessage: "Primeiro centralize ou zere todos os
+    anal\xF3gicos e eixos e pressione qualquer bot\xE3o ou aguarde o tempo acabar."
+  _joystickElementAssignmentPollingWindowMessage: "Agora pressione um bot\xE3o ou
+    mova um eixo para atribu\xED-lo a {0}."
+  _joystickElementAssignmentPollingWindowMessage_fullAxisFieldOnly: "Agora mova um
+    eixo para atribu\xED-lo a {0}."
+  _keyboardElementAssignmentPollingWindowMessage: "Pressione uma tecla para atribu\xED-la
+    a {0}. Teclas modificadoras tamb\xE9m podem ser usadas. Para atribuir apenas
+    uma tecla modificadora, mantenha-a pressionada por 1 segundo."
+  _mouseElementAssignmentPollingWindowMessage: "Pressione um bot\xE3o do mouse ou
+    mova um eixo para atribu\xED-lo a {0}."
+  _mouseElementAssignmentPollingWindowMessage_fullAxisFieldOnly: "Mova um eixo para
+    atribu\xED-lo a {0}."
+  _elementAssignmentConflictWindowMessage: "Conflito de Atribui\xE7\xE3o"
+  _elementAlreadyInUseBlocked: "{0} j\xE1 est\xE1 em uso e n\xE3o pode ser substitu\xEDdo."
+  _elementAlreadyInUseCanReplace: "{0} j\xE1 est\xE1 em uso. Voc\xEA deseja substitu\xED-lo?"
+  _elementAlreadyInUseCanReplace_conflictAllowed: "{0} j\xE1 est\xE1 em uso. Voc\xEA
+    deseja substitu\xED-lo? Voc\xEA tamb\xE9m pode escolher adicionar a atribui\xE7\xE3o
+    mesmo assim."
+  _mouseAssignmentConflictWindowTitle: "Atribui\xE7\xE3o do Mouse"
+  _mouseAssignmentConflictWindowMessage: "O mouse j\xE1 est\xE1 atribu\xEDdo a {0}.
+    Voc\xEA deseja atribuir o mouse a {1} em vez disso?"
+  _calibrateControllerWindowTitle: Calibrar Controle
+  _calibrateAxisStep1WindowTitle: Calibrar Zero
+  _calibrateAxisStep1WindowMessage: "Centralize ou zere {0} e pressione qualquer
+    bot\xE3o ou aguarde o tempo acabar."
+  _calibrateAxisStep2WindowTitle: Calibrar Alcance
+  _calibrateAxisStep2WindowMessage: "Mova {0} por todo seu alcance e ent\xE3o pressione
+    qualquer bot\xE3o ou aguarde o tempo acabar."
+  _inputBehaviorSettingsWindowTitle: "Configura\xE7\xF5es de Sensibilidade"
+  _restoreDefaultsWindowTitle: "Restaurar Padr\xF5es"
+  _restoreDefaultsWindowMessage_onePlayer: "Isso restaurar\xE1 a configura\xE7\xE3o
+    de entrada padr\xE3o. Tem certeza de que deseja fazer isso?"
+  _restoreDefaultsWindowMessage_multiPlayer: "Isso restaurar\xE1 a configura\xE7\xE3o
+    de entrada padr\xE3o para todos os jogadores. Tem certeza de que deseja fazer
+    isso?"
+  _actionColumnLabel: "A\xE7\xF5es"
+  _keyboardColumnLabel: Teclado
+  _mouseColumnLabel: Mouse
+  _controllerColumnLabel: Controle
+  _removeControllerButtonLabel: Remover
+  _calibrateControllerButtonLabel: Calibrar
+  _assignControllerButtonLabel: Atribuir Controle
+  _inputBehaviorSettingsButtonLabel: Sensibilidade
+  _doneButtonLabel: "Conclu\xEDdo"
+  _restoreDefaultsButtonLabel: "Restaurar Padr\xF5es"
+  _playersGroupLabel: 'Jogadores:'
+  _controllerSettingsGroupLabel: 'Controle:'
+  _assignedControllersGroupLabel: "Controles Atribu\xEDdos:"
+  _settingsGroupLabel: "Configura\xE7\xF5es:"
+  _mapCategoriesGroupLabel: 'Categorias:'
+  _calibrateWindow_deadZoneSliderLabel: 'Zona Morta:'
+  _calibrateWindow_upperDeadZoneSliderLabel: 'Upper Dead Zone:'
+  _calibrateWindow_zeroSliderLabel: 'Zero:'
+  _calibrateWindow_sensitivitySliderLabel: 'Sensibilidade:'
+  _calibrateWindow_invertToggleLabel: Inverter
+  _calibrateWindow_calibrateButtonLabel: Calibrar
+  _modifierKeys:
+    control: Ctrl
+    alt: Alt
+    shift: Shift
+    command: Cmd
+    separator: ' + '
+  _customEntries: []

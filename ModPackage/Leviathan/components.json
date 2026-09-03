@@ -1,0 +1,98 @@
+{
+    "gameVersion": "",
+    "components": [],
+    "scriptableObjects": [
+        {
+            "assetName": "LeviathanTest",
+            "type": "StarVortex.SquadronBase",
+            "json": "{\"resourcePath\":\"Base/Squadrons/Skeran\",\"languageKey\":\"8s55rtnG\",\"displayName\":\"Viper\",\"multiplier\":1,\"friendly\":false,\"customDisplayPositions\":[{\"index\":0,\"position\":{\"x\":0.0,\"y\":0.0},\"rotation\":45.0,\"scale\":1.0},{\"index\":1,\"position\":{\"x\":-0.11999999731779099,\"y\":-0.11999999731779099},\"rotation\":45.0,\"scale\":1.0},{\"index\":2,\"position\":{\"x\":-0.23999999463558198,\"y\":-0.23999999463558198},\"rotation\":45.0,\"scale\":1.0},{\"index\":3,\"position\":{\"x\":-0.36000001430511477,\"y\":-0.36000001430511477},\"rotation\":45.0,\"scale\":1.0},{\"index\":4,\"position\":{\"x\":-0.47999998927116396,\"y\":-0.47999998927116396},\"rotation\":45.0,\"scale\":1.0},{\"index\":5,\"position\":{\"x\":-0.6000000238418579,\"y\":-0.6000000238418579},\"rotation\":45.0,\"scale\":1.0}],\"formation\":3,\"spiralRadius\":20.0,\"shipsByLevels\":[{\"levelRequired\":1,\"ships\":[{\"instanceID\":31674},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33478},{\"instanceID\":33268}]}],\"invulnerableLeader\":false,\"splitSquadron\":false,\"splitLeaderNpc\":{\"instanceID\":0},\"splitTailNpc\":{\"instanceID\":0},\"invulnerableLayers\":false,\"inactiveLayers\":false,\"attachRotation\":false,\"rotateAway\":false,\"rigidAttachment\":false,\"combatFormationDrift\":false,\"respawn\":false,\"respawnMinSeconds\":0,\"respawnMaxSeconds\":0}",
+            "assetReferences": [
+                {
+                    "fieldPath": "shipsByLevels.0.ships.0",
+                    "assetName": "Viper Head",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.1",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.2",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.3",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.4",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.5",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.6",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.7",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.8",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.9",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.10",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.11",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.12",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.13",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.14",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.15",
+                    "assetName": "Viper Body",
+                    "assetType": "StarVortex.NPCBase"
+                },
+                {
+                    "fieldPath": "shipsByLevels.0.ships.16",
+                    "assetName": "Viper Tail",
+                    "assetType": "StarVortex.NPCBase"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,1232 @@
+================================================================================
+  STAR VORTEX - COMPLETE MODDING REFERENCE
+================================================================================
+
+  This document covers every ScriptableObject type, every field, prefab setup,
+  and everything you need to create mods without decompiling the game.
+
+  Contents:
+    1.  Quick Start Checklist
+    2.  Item Type System & resourcePath (CRITICAL)
+    3.  ScriptableObject Hierarchy
+    4.  Base Class Fields (inherited by all items)
+    5.  Weapon Types - Launchers
+    6.  Weapon Types - Beam Weapons
+    7.  Defence & Utility Items
+    8.  Non-Combat Items
+    9.  Prefab Setup - Projectiles
+    10. Prefab Setup - Equippable Objects
+    11. Component Manifest System
+    12. Sound Effects
+    13. Damage Types
+    14. Factions & Faction-Specific Assets
+    15. Language / Translations
+    16. mod.json Reference
+    17. Building & Packaging
+    18. Code Mods (Harmony)
+    19. Unit Conversion
+    20. Troubleshooting
+
+
+================================================================================
+  1. QUICK START CHECKLIST
+================================================================================
+
+  [ ] Unity 2022.3.62f2 (exact version required)
+  [ ] ThunderKit installed and imported from Star Vortex.exe
+  [ ] Mod SDK .unitypackage imported
+  [ ] Star Vortex Mod > Import Game Content (browse base game data)
+  [ ] mod.json edited with your mod details (must be in Assets/ root)
+  [ ] ScriptableObject created with correct resourcePath (see section 2)
+  [ ] languageKey set on every ScriptableObject
+  [ ] Prefabs use SDK materials from Materials/ (NOT built-in shaders)
+  [ ] All assets assigned to an AssetBundle (Inspector bottom bar)
+  [ ] Star Vortex Mod > Build AssetBundles
+  [ ] Star Vortex Mod > Generate Language File
+  [ ] Star Vortex Mod > Package Mod
+  [ ] Copy ModPackage/<YourMod>/ to StarVortex_Data/Mods/
+
+
+================================================================================
+  2. ITEM TYPE SYSTEM & resourcePath (CRITICAL)
+================================================================================
+
+  Every item ScriptableObject has a "resourcePath" field. This MUST be set
+  to the correct value or your item WILL NOT appear in the game.
+
+  The game discovers mod assets by type — your folder structure inside the
+  AssetBundle does not matter. However, resourcePath is used to classify
+  which equipment slot an item belongs to and to build save/load paths.
+  You can organise your project folders however you like.
+
+  VALID resourcePath VALUES:
+  -------------------------------------------------------------------------
+  | Item Slot          | resourcePath                                     |
+  |--------------------|-------------------------------------------------|
+  | Resource           | Base/Items/Resource                              |
+  | Consumable         | Base/Items/Consumable                            |
+  | Shield             | Base/Items/Shield                                |
+  | Thruster           | Base/Items/Thruster                              |
+  | Primary Weapon     | Base/Items/PrimaryWeapon                         |
+  | Secondary Weapon   | Base/Items/SecondaryWeapon                       |
+  | Special            | Base/Items/Special                               |
+  | Auto Special       | Base/Items/AutoSpecial                           |
+  | Utility            | Base/Items/Utility                               |
+  | Passive            | Base/Items/Passive                               |
+  | Schematics         | Base/Items/Schematics                            |
+  -------------------------------------------------------------------------
+
+  If resourcePath is wrong or empty, the item will load but never appear
+  in any equipment list, shop, or drop table.
+
+  EXAMPLE: A secondary weapon launcher must have:
+    resourcePath = "Base/Items/SecondaryWeapon"
+
+
+================================================================================
+  3. SCRIPTABLEOBJECT HIERARCHY
+================================================================================
+
+  All item ScriptableObjects inherit from a class hierarchy. Each level adds
+  fields. When you create a "Launcher - Basic", it has ALL fields from:
+    ItemBase > EquippableItemBase > ActivatableItemBase > LauncherItemBase
+    > BasicLauncherItemBase
+
+  Hierarchy:
+  ----------
+  ItemBase (all items)
+    |
+    +-- ConsumableItemBase
+    +-- ResourceItemBase
+    |
+    +-- EquippableItemBase (equippable items)
+        |
+        +-- ShieldItemBase
+        +-- ThrusterItemBase
+        +-- StaticUpgradeItemBase (passive upgrades)
+        +-- SchematicsItemBase
+        +-- EnrageReplaceItemBase
+        |
+        +-- ActivatableItemBase (items with an activate button)
+            |
+            +-- DroneDropperItemBase
+            +-- TurretDropperItemBase
+            +-- ShipSpawnerItemBase
+            +-- PulseItemBase
+            +-- ShieldWardItemBase
+            +-- LaserSpinnerItemBase
+            +-- PhaseShiftItemBase
+            +-- PhasePlaceholderItemBase
+            +-- TemporalDriveItemBase
+            +-- GrappleGunItemBase
+            |
+            +-- LauncherItemBase (projectile weapons)
+            |   |
+            |   +-- BasicLauncherItemBase
+            |   +-- ScatterLauncherItemBase
+            |   +-- MissileLauncherItemBase
+            |   +-- ChargingLauncherItemBase
+            |   +-- MineLauncherItemBase
+            |   +-- LeechLauncherItemBase
+            |   +-- OrbLauncherItemBase
+            |   +-- ToggleLauncherItemBase
+            |   +-- SpinalLauncherItemBase
+            |   +-- ReboundLauncherItemBase
+            |   +-- AutoBasicLauncherItemBase
+            |   +-- AutoMissileLauncherItemBase
+            |
+            +-- BeamWeaponItemBase (beam/laser weapons)
+                |
+                +-- LaserItemBase
+                +-- AutoLaserItemBase
+                +-- LeechLaserItemBase
+                +-- RepairLaserItemBase
+                +-- SpinalLaserItemBase
+                +-- PointDefenseLaserItemBase
+
+
+================================================================================
+  4. BASE CLASS FIELDS (inherited by all items)
+================================================================================
+
+  --- ItemBase fields (ALL items have these) ---
+
+  resourcePath          string    REQUIRED. See section 2 for valid values.
+  languageKey           string    REQUIRED. Unique key for translations.
+                                  Click "Generate Language Key" for a random one.
+                                  Language entries use: <key>.name and <key>.desc
+  description           string    Item description (used for language generation).
+  designNotes           string    Internal notes (not shown to players).
+  minimumLevel          int       Minimum player level to find/use this item (1+).
+  forSaleStarMaps       string[]  Star map IDs where this item is sold.
+  forSaleFlagship       bool      Whether this item is sold on the Flagship.
+  factionImages         FactionImage[]  Icons per faction (see section 14).
+  containerPrefab       GameObject      Floating pickup prefab in space.
+
+  --- EquippableItemBase fields (shields, weapons, thrusters, etc.) ---
+
+  npcUseOnly            bool      If true, only NPCs can use this item.
+                                  It won't appear in player equipment lists.
+  noSandbox             bool      If true, hidden from the Sandbox ship designer.
+  allowInvisible        bool      Whether the item works while ship is invisible.
+  npcPlayerAlternative  EquippableItemBase  If npcUseOnly, this item drops for
+                                            players instead.
+  gameObjectPrefab      GameObject  REQUIRED. The equippable prefab that gets
+                                    attached to the ship. For weapons, this is
+                                    the gun model with muzzle flash children.
+
+  --- ActivatableItemBase fields (items with activate button) ---
+
+  activatableIcons      FactionImage[]  Icons shown on the action bar per faction.
+  hueShiftIcon          bool      Whether the icon should be hue-shifted to
+                                  match the player's faction colour.
+  targetFriendly        bool      If true, targets friendly ships (e.g., repair).
+  playCooldownSound     bool      Whether to play the cooldown-ready sound.
+                                  Default: true.
+
+
+================================================================================
+  5. WEAPON TYPES - LAUNCHERS
+================================================================================
+
+  All launchers inherit LauncherItemBase fields:
+
+  --- LauncherItemBase fields ---
+
+  projectiles           FactionProjectile[]  Projectile prefabs per faction.
+                                             First entry is the default.
+  hueShiftProjectile    bool      Hue-shift projectile to faction colour.
+  delayedWarningPrefab  GameObject  Warning indicator before firing (e.g., NPC
+                                    telegraph attacks). Usually leave empty.
+  muzzleFlashSprites    Sprite[]  Muzzle flash animation frames. Used by the
+                                  MuzzleFlash component on the equippable prefab.
+  soundEffect           SoundEffectPlayer.SoundEffect  Firing sound (see sec 12).
+
+  -------------------------------------------------------------------------
+  BasicLauncherItemBase          (Create > Star Vortex > Base > Item >
+                                  Launcher - Basic)
+  -------------------------------------------------------------------------
+  Standard single-shot projectile weapon. Good for cannons, railguns, etc.
+
+  resourcePath: "Base/Items/PrimaryWeapon" or "Base/Items/SecondaryWeapon"
+
+  Level-up stats (added per level):
+    statusEffectChance  float     Status effect chance increase per level.
+    critChance          float     Critical hit chance increase per level.
+    velocity            float     Projectile speed increase per level.
+    reloadTime          float     Reload time change per level (negative = faster).
+
+  Item data:
+    launcher            BasicLauncher  The weapon's base stats. Expand in the
+                                       Inspector to set: BaseDamage, BaseHealth,
+                                       BaseReloadTime, BaseVelocity, etc.
+    legendaries         LauncherLegendary[]  Legendary variants.
+
+  -------------------------------------------------------------------------
+  ScatterLauncherItemBase        (Launcher - Scatter)
+  -------------------------------------------------------------------------
+  Fires spread/burst patterns (shotguns, cluster bombs, etc.).
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+    reloadTime          float
+    charges             float     Max charges increase per level.
+
+  Unique fields:
+    warningPrefab       GameObject  Warning indicator for NPC scatter attacks.
+    scatterLauncher     ScatterLauncher  Base stats including spread pattern.
+    legendaries         ScatterLauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  MissileLauncherItemBase        (Launcher - Missile)
+  -------------------------------------------------------------------------
+  Homing missile weapon.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+    reloadTime          float
+    charges             float     Max charges increase per level.
+
+  Item data:
+    missileLauncher     MissileLauncher  Base stats for the missile launcher.
+    legendaries         LauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  ChargingLauncherItemBase       (Launcher - Charging)
+  -------------------------------------------------------------------------
+  Hold-to-charge weapon. Damage/effects scale with charge time.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+    reloadTime          float
+
+  Item data:
+    launcher            ChargingLauncher
+    legendaries         LauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  MineLauncherItemBase           (Launcher - Mine)
+  -------------------------------------------------------------------------
+  Deployable proximity mines.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float     Deploy speed increase per level.
+    reloadTime          float
+    maxCharges          float     Max mine count increase per level.
+
+  Item data:
+    mineLauncher        MineLauncher
+    legendaries         LauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  LeechLauncherItemBase          (Launcher - Leech)
+  -------------------------------------------------------------------------
+  Health-draining projectile weapon.
+
+  Level-up stats:
+    critChance          float
+    leechPercentage     float     Heal % increase per level.
+    statusEffectChance  float
+    velocity            float
+
+  Item data:
+    launcher            LeechLauncher
+    legendaries         BeamWeaponLegendary[]
+
+  -------------------------------------------------------------------------
+  OrbLauncherItemBase            (Launcher - Orb)
+  -------------------------------------------------------------------------
+  Fires persistent orb projectiles.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+
+  Item data:
+    launcher            OrbLauncher
+    legendaries         LauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  ToggleLauncherItemBase         (Launcher - Toggle)
+  -------------------------------------------------------------------------
+  Continuous fire weapons. Hold to fire, release to stop.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+    reloadTime          float
+    duration            float     Active duration increase per level.
+    cooldown            float     Cooldown change per level (negative = faster).
+
+  Item data:
+    launcher            ToggleLauncher
+    legendaries         LauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  SpinalLauncherItemBase         (Launcher - Spinal)
+  -------------------------------------------------------------------------
+  Fixed forward-facing heavy weapon (ship doesn't rotate to aim).
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+    reloadTime          float
+
+  Item data:
+    spinalLauncher      SpinalLauncher
+    legendaries         LauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  ReboundLauncherItemBase        (Launcher - Rebound)
+  -------------------------------------------------------------------------
+  Bouncing projectiles that ricochet between targets.
+
+  Level-up stats:
+    maxActive           float     Max active projectiles increase per level.
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+
+  Unique fields:
+    reboundActivatableIcons  FactionImage[]  Alternative icons for rebound mode.
+    reboundLauncher          ReboundLauncher
+    legendaries              ReboundLauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  AutoBasicLauncherItemBase      (Launcher - Auto Basic)
+  -------------------------------------------------------------------------
+  Auto-targeting turret that fires basic projectiles. Used for ship turrets
+  that fire independently of player input.
+
+  resourcePath: typically "Base/Items/AutoSpecial"
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+    reloadTime          float
+
+  Item data:
+    launcher            AutoBasicLauncher
+    legendaries         LauncherLegendary[]
+
+  -------------------------------------------------------------------------
+  AutoMissileLauncherItemBase    (Launcher - Auto Missile)
+  -------------------------------------------------------------------------
+  Auto-targeting missile turret.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    velocity            float
+    reloadTime          float
+
+  Item data:
+    autoMissileLauncher  AutoMissileLauncher
+    legendaries          LauncherLegendary[]
+
+
+================================================================================
+  6. WEAPON TYPES - BEAM WEAPONS
+================================================================================
+
+  All beam weapons inherit BeamWeaponItemBase fields:
+
+  --- BeamWeaponItemBase fields ---
+
+  beamPrefab            GameObject  The beam visual prefab.
+  customBeamDisplay     Sprite      Custom sprite for the equipment screen.
+  muzzleFlashSprites    Sprite[]    Muzzle flash frames (same as launchers).
+  soundEffect           SoundEffectPlayer.SoundEffect  Firing sound.
+
+  -------------------------------------------------------------------------
+  LaserItemBase                  (Create > Star Vortex > Base > Item >
+                                  Beam Weapon - Laser)
+  -------------------------------------------------------------------------
+  Standard laser beam. Can chain to multiple targets.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    maxRange            float     Range increase per level (Unity units).
+    chainTargets        float     Extra chain targets per level.
+
+  Item data:
+    laser               Laser
+    legendaries         BeamWeaponLegendary[]
+
+  -------------------------------------------------------------------------
+  AutoLaserItemBase              (Beam Weapon - Auto Laser)
+  -------------------------------------------------------------------------
+  Auto-targeting laser turret.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    maxRange            float
+
+  Item data:
+    autoLaser           AutoLaser
+    legendaries         BeamWeaponLegendary[]
+
+  -------------------------------------------------------------------------
+  LeechLaserItemBase             (Beam Weapon - Leech Laser)
+  -------------------------------------------------------------------------
+  Health-draining laser beam.
+
+  Level-up stats:
+    critChance          float
+    leechPercentage     float     Heal % increase per level.
+    statusEffectChance  float
+    maxRange            float
+
+  Item data:
+    leechLaser          LeechLaser
+    legendaries         BeamWeaponLegendary[]
+
+  -------------------------------------------------------------------------
+  RepairLaserItemBase            (Beam Weapon - Repair Laser)
+  -------------------------------------------------------------------------
+  Heals friendly ships. Does not deal damage.
+
+  Level-up stats:
+    maxRange            float
+    chainTargets        float     Extra chain targets per level.
+
+  Item data:
+    repairLaser         RepairLaser  Base stats include healthRegen.
+    legendaries         BeamWeaponLegendary[]
+
+  -------------------------------------------------------------------------
+  SpinalLaserItemBase            (Beam Weapon - Spinal Laser)
+  -------------------------------------------------------------------------
+  Fixed forward-facing heavy laser.
+
+  Level-up stats:
+    spinalStatusEffectChance  float
+    spinalCritChance          float
+    spinalMaxRange            float
+
+  Item data:
+    spinalLaser         SpinalLaser
+    spinalLegendaries   BeamWeaponLegendary[]
+
+  -------------------------------------------------------------------------
+  PointDefenseLaserItemBase      (Beam Weapon - Point Defense Laser)
+  -------------------------------------------------------------------------
+  Auto-targets incoming projectiles and destroys them.
+
+  Level-up stats:
+    statusEffectChance  float
+    critChance          float
+    maxRange            float
+
+  Item data:
+    pointDefenseLaser   PointDefenseLaser
+    legendaries         BeamWeaponLegendary[]
+
+
+================================================================================
+  7. DEFENCE & UTILITY ITEMS
+================================================================================
+
+  -------------------------------------------------------------------------
+  ShieldItemBase                 (Create > Star Vortex > Base > Item > Shield)
+  -------------------------------------------------------------------------
+  Provides a damage-absorbing shield with resistance to a damage type.
+
+  resourcePath: "Base/Items/Shield"
+
+  Level-up stats:
+    healthRegen         float     Hull regen increase per level.
+    shieldRechargeRate  float     Shield recharge speed per level.
+    shieldRechargeDelay float     Delay change per level (negative = faster).
+    resistance          float     Resistance % increase per level.
+
+  Unique fields:
+    resistances         Resistance[]  Array of possible damage type resistances.
+                                      Each has: damageType, color, downColor,
+                                      minLevel. The shield randomly picks one
+                                      from those the player's level qualifies for.
+    downSound           SoundEffectPlayer.SoundEffect  Shield-down sound.
+    upSound             SoundEffectPlayer.SoundEffect  Shield-recharged sound.
+    shield              Shield  Base stats: BaseHealthMax, BaseShieldMax,
+                                BaseShieldRechargeRate, BaseShieldRechargeDelay,
+                                BaseHealthRegen, BaseResistance.
+    legendaries         ShieldLegendary[]
+
+  -------------------------------------------------------------------------
+  ThrusterItemBase               (Create > Star Vortex > Base > Item > Thruster)
+  -------------------------------------------------------------------------
+  Ship engine. Controls speed, acceleration, dodge, and boost.
+
+  resourcePath: "Base/Items/Thruster"
+
+  Level-up stats:
+    accelerationFactor  float     Acceleration increase per level.
+    dodgeFactor         float     Dodge distance increase per level.
+    boostFactor         float     Boost power increase per level.
+    maxSpeed            float     Top speed increase per level.
+
+  Unique fields:
+    boostTrailPrefab         GameObject  Visual trail during boost.
+    boostInvulnerabilitySprite Sprite    Overlay sprite during boost i-frames.
+    thrusterSound            SoundEffectPlayer.SoundEffect
+    boostSound               SoundEffectPlayer.SoundEffect
+    dodgeSound               SoundEffectPlayer.SoundEffect
+    thruster                 Thruster  Base stats: BaseAccelerationFactor,
+                                       BaseDodgeFactor, BaseBoostFactor, maxSpeed.
+    legendaries              ThrusterLegendary[]
+
+  -------------------------------------------------------------------------
+  StaticUpgradeItemBase          (Create > Star Vortex > Base > Item >
+                                  Static Upgrade)
+  -------------------------------------------------------------------------
+  Passive stat bonuses (armour plates, sensor arrays, etc.).
+
+  resourcePath: "Base/Items/Passive" or "Base/Items/Utility"
+
+  Level-up stats:
+    healthRegen           float
+    maxSpeed              float
+    turnSpeed             float
+    damageReduction       float
+    creditSalvage         float
+    itemSalvage           float
+    bonusXp               float
+    kineticResistance     float
+    coldResistance        float
+    corrosiveResistance   float
+    electricResistance    float
+    thermalResistance     float
+    radiationResistance   float
+
+  Item data:
+    staticUpgrade         StaticUpgrade  Base stats for all the above.
+    legendaries           StaticUpgradeLegendary[]
+
+  -------------------------------------------------------------------------
+  ShieldWardItemBase             (Create > Star Vortex > Base > Item >
+                                  Shield Ward)
+  -------------------------------------------------------------------------
+  Temporary shield ability for nearby friendly ships.
+
+  Level-up stats:
+    duration              float     Duration increase per level.
+    cooldown              float     Cooldown change per level.
+
+  Unique fields:
+    activateSoundEffect   SoundEffectPlayer.SoundEffect
+    deactivateSoundEffect SoundEffectPlayer.SoundEffect
+    shieldWard            ShieldWard
+    legendaries           ShieldWardLegendary[]
+
+  -------------------------------------------------------------------------
+  PhaseShiftItemBase             (Create > Star Vortex > Base > Item >
+                                  Phase Shift)
+  -------------------------------------------------------------------------
+  Temporarily phase out of existence (invulnerable + invisible).
+
+  Level-up stats:
+    duration              float
+    cooldown              float
+
+  Unique fields:
+    phaseObjectPrefab     GameObject  Visual effect while phased.
+    phaseSoundEffect      SoundEffectPlayer.SoundEffect
+    unphaseSoundEffect    SoundEffectPlayer.SoundEffect
+    phaseShift            PhaseShift
+    legendaries           PhaseShiftLegendary[]
+
+  -------------------------------------------------------------------------
+  PhasePlaceholderItemBase       (Phase Placeholder)
+  -------------------------------------------------------------------------
+  Placeholder item for phase-related mechanics.
+
+  Level-up stats:
+    duration              float
+    cooldown              float
+
+  Item data:
+    phasePlaceholder      PhasePlaceholder
+    legendaries           PhasePlaceholderLegendary[]
+
+  -------------------------------------------------------------------------
+  TemporalDriveItemBase          (Create > Star Vortex > Base > Item >
+                                  Temporal Drive)
+  -------------------------------------------------------------------------
+  Time manipulation ability.
+
+  Level-up stats:
+    duration              float
+    cooldown              float
+
+  Unique fields:
+    activateSoundEffect   SoundEffectPlayer.SoundEffect
+    activeSoundEffect     SoundEffectPlayer.SoundEffect  Looping while active.
+    deactivateSoundEffect SoundEffectPlayer.SoundEffect
+    temporalDrive         TemporalDrive
+    legendaries           TemporalDriveLegendary[]
+
+  -------------------------------------------------------------------------
+  GrappleGunItemBase             (Create > Star Vortex > Base > Item >
+                                  Grapple Gun)
+  -------------------------------------------------------------------------
+  Fires a grapple hook that attaches to a target.
+
+  Level-up stats:
+    damageTransfer        float     Damage transfer % increase per level.
+    velocity              float     Grapple projectile speed increase.
+    power                 float     Pull/push power increase.
+
+  Unique fields:
+    grapple               GameObject  Grapple projectile prefab.
+    attachment            GameObject  Attachment visual on target.
+    colorAttachment       bool        Hue-shift the attachment.
+    hitExplosion          GameObject  Explosion on impact.
+    dettachSoundEffect    SoundEffectPlayer.SoundEffect
+    soundEffect           SoundEffectPlayer.SoundEffect
+    grappleGun            GrappleGun
+    legendaries           GrappleGunLegendary[]
+
+  -------------------------------------------------------------------------
+  PulseItemBase                  (Create > Star Vortex > Base > Item > Pulse)
+  -------------------------------------------------------------------------
+  Area-of-effect expanding wave attack.
+
+  Level-up stats:
+    statusEffectChance    float
+    critChance            float
+    expansionRate         float     Wave expansion speed increase.
+    maxRange              float     Max wave radius increase.
+    cooldown              float
+
+  Unique fields:
+    wave                  GameObject  Wave visual prefab.
+    delayedWarningPrefab  GameObject  Telegraph warning.
+    explosionReplace      GameObject  Explosion override.
+    soundEffect           SoundEffectPlayer.SoundEffect
+    pulse                 Pulse
+    legendaries           PulseLegendary[]
+
+  -------------------------------------------------------------------------
+  LaserSpinnerItemBase           (Create > Star Vortex > Base > Item >
+                                  Laser Spinner)
+  -------------------------------------------------------------------------
+  Rotating laser beam attack.
+
+  Level-up stats:
+    statusEffectChance    float
+    critChance            float
+    maxRange              float
+    maxCharges            float
+
+  Unique fields:
+    beamPrefab            GameObject
+    muzzleFlashSprites    Sprite[]
+    soundEffect           SoundEffectPlayer.SoundEffect
+    laserSpinner          LaserSpinner
+    legendaries           LaserSpinnerLegendary[]
+
+  -------------------------------------------------------------------------
+  DroneDropperItemBase           (Create > Star Vortex > Base > Item >
+                                  Drone Dropper)
+  -------------------------------------------------------------------------
+  Deploys AI-controlled drone ships.
+
+  Level-up stats:
+    statusEffectChance    float
+    critChance            float
+    maxCharges            float     Max drones increase per level.
+    maxSpeed              float     Drone speed increase.
+    maxRange              float     Drone leash range increase.
+
+  Unique fields:
+    npcBases              FactionNPCBase[]  Drone NPC templates per faction.
+                                            Each has: faction (string),
+                                            npcBase (NPCBase reference).
+    soundEffect           SoundEffectPlayer.SoundEffect
+    droneDropper          DroneDropper
+    legendaries           DroneDropperLegendary[]
+
+  -------------------------------------------------------------------------
+  TurretDropperItemBase          (Create > Star Vortex > Base > Item >
+                                  Turret Dropper)
+  -------------------------------------------------------------------------
+  Deploys stationary turrets.
+
+  Level-up stats:
+    statusEffectChance    float
+    critChance            float
+    maxCharges            float     Max turrets increase per level.
+
+  Unique fields:
+    npcBases              FactionNPCBase[]  Turret NPC templates per faction.
+    soundEffect           SoundEffectPlayer.SoundEffect
+    turretDropper         TurretDropper
+    legendaries           TurretDropperLegendary[]
+
+  -------------------------------------------------------------------------
+  ShipSpawnerItemBase            (Create > Star Vortex > Base > Item >
+                                  Ship Spawner)
+  -------------------------------------------------------------------------
+  Calls in allied ships (reinforcements, mercenaries, etc.).
+
+  Level-up stats:
+    maxCharges            float     Max ship count increase per level.
+    duration              float     How long spawned ships last.
+
+  Unique fields:
+    weightedNpcBases      WeightedNPCBase[]  Ships to spawn with weights.
+                                             Each has: npcBase (NPCBase),
+                                             weight (float, spawn probability).
+    jumpType              JumpType  HyperdriveJump or VoidJump (arrival anim).
+    soundEffect           SoundEffectPlayer.SoundEffect
+    shipSpawner           ShipSpawner
+    legendaries           ShipSpawnerLegendary[]
+
+  -------------------------------------------------------------------------
+  EnrageReplaceItemBase          (Enrage Replace)
+  -------------------------------------------------------------------------
+  Used by NPC enrage mechanics to swap to a different ship template.
+
+  Unique fields:
+    replaceNpc            NPCBase  The NPC to transform into.
+    enrageReplace         EnrageReplace
+    legendaries           EnrageReplaceLegendary[]
+
+
+================================================================================
+  8. NON-COMBAT ITEMS
+================================================================================
+
+  -------------------------------------------------------------------------
+  ConsumableItemBase             (Create > Star Vortex > Base > Item >
+                                  Consumable)
+  -------------------------------------------------------------------------
+  Single-use items (repair kits, boosts, etc.).
+
+  resourcePath: "Base/Items/Consumable"
+
+  Unique fields:
+    shipEffect            GameObject    Visual effect on the ship when used.
+    tickEffect            GameObject    Repeating visual effect (for over-time).
+    consumable            Consumable    Base stats (duration, healing, etc.).
+
+  Note: Consumables ignore rarity and level. They always spawn as Common
+  at minimumLevel with no legendaries.
+
+  -------------------------------------------------------------------------
+  ResourceItemBase               (Create > Star Vortex > Base > Item > Resource)
+  -------------------------------------------------------------------------
+  Collectible resources (credits, materials, etc.).
+
+  resourcePath: "Base/Items/Resource"
+
+  Unique fields:
+    resourceItem          Item  The resource item data.
+
+  Note: Resources ignore rarity and level, same as consumables.
+
+  -------------------------------------------------------------------------
+  SchematicsItemBase             (Create > Star Vortex > Base > Item >
+                                  Schematics)
+  -------------------------------------------------------------------------
+  Ship blueprint items. Always drop as Rare, level 1.
+
+  resourcePath: "Base/Items/Schematics"
+
+  Item data:
+    schematics            Schematics
+
+  Note: No legendaries, no level scaling.
+
+
+================================================================================
+  9. PREFAB SETUP - PROJECTILES
+================================================================================
+
+  Projectiles are GameObjects referenced by your weapon ScriptableObject.
+  They need specific components to function.
+
+  REQUIRED COMPONENTS (all projectile types):
+  -------------------------------------------
+  - SpriteRenderer        The projectile's visual.
+  - Rigidbody2D           Physics body. Settings:
+                             Gravity Scale = 0
+                             Linear Drag = 0 (unless you want deceleration)
+  - Collider2D            CircleCollider2D or BoxCollider2D.
+                             Is Trigger = true (REQUIRED)
+  - AutoDestroy           Handles pooling and lifetime.
+
+  PROJECTILE COMPONENTS (pick one):
+  ----------------------------------
+  Projectile              Basic projectile. Deals damage on collision.
+  ExplosiveProjectile     Explodes on impact for area damage.
+                          Key fields: explosiveRadius (Unity units, x20 = metres)
+  ClusterProjectile       Splits into sub-projectiles on impact/timer.
+                          Key fields: projectile (sub-projectile prefab),
+                          projectileCount, projectileHealth, projectileVelocity,
+                          projectileAutoDestroy (lifetime in seconds)
+  SeekingProjectile       Homes toward the nearest enemy.
+  Missile                 Guided missile with turning speed.
+  Mine                    Deploys and waits, explodes on proximity.
+  FuzzyProjectile         Area/fuzzy damage projectile.
+  BlackHoleProjectile     Creates a gravity well.
+  LeechProjectile         Drains health from target.
+  LaserProjectile         Instant-hit laser line.
+
+  OPTIONAL COMPONENTS:
+  --------------------
+  - TrailRenderer         Visual trail behind the projectile.
+  - ParticleSystem        Particle effects on the projectile.
+  - Explosion             Add as a child GameObject. Plays on impact.
+
+  MUZZLE FLASH SETUP:
+  --------------------
+  Muzzle flashes go on your EQUIPPABLE prefab (the gun model), not the
+  projectile. Create a child GameObject named "Muzzle Flash" with:
+  - SpriteRenderer
+  - MuzzleFlash component (set sprites[] to your flash animation frames,
+    and frameRate for animation speed)
+
+  The component manifest system (section 11) automatically handles
+  restoring game scripts like MuzzleFlash on your prefabs at runtime.
+
+
+================================================================================
+  10. PREFAB SETUP - EQUIPPABLE OBJECTS
+================================================================================
+
+  The gameObjectPrefab on your ScriptableObject is what gets attached to
+  the player's ship. For weapons, this is the gun model.
+
+  TYPICAL WEAPON EQUIPPABLE STRUCTURE:
+  ------------------------------------
+  Equippable (root GameObject)
+    +-- Muzzle Flash (child)    SpriteRenderer + MuzzleFlash script
+    +-- [other visual children]
+
+  The root typically just has a SpriteRenderer for the weapon sprite.
+
+  IMPORTANT: Game scripts (MuzzleFlash, Explosion, etc.) on mod prefabs
+  will have missing script references because of Unity's GUID mismatch
+  between DLL and source code. The component manifest system (section 11)
+  handles this automatically - just set up your prefab with the components
+  in the editor and they will be restored at runtime.
+
+
+================================================================================
+  11. COMPONENT MANIFEST SYSTEM
+================================================================================
+
+  When you build your AssetBundle, the SDK automatically scans all prefabs
+  for components that come from Assembly-CSharp (game scripts). It saves
+  their type names and field values to a components.json sidecar file.
+
+  At runtime, the game's ModLoader reads this manifest and restores any
+  missing components using reflection. This means:
+
+  - You CAN add MuzzleFlash, Explosion, Projectile, and any other game
+    script to your prefabs in the Unity editor.
+  - When the bundle loads, if the script reference is broken (which it
+    will be for game scripts), the manifest restores it automatically.
+  - All serialized field values are preserved.
+
+  YOU DON'T NEED TO DO ANYTHING SPECIAL. Just:
+  1. Add game components to your prefabs normally in the editor.
+  2. Build AssetBundles (the manifest generates automatically).
+  3. Package your mod (components.json is copied automatically).
+
+
+================================================================================
+  12. SOUND EFFECTS
+================================================================================
+
+  SoundEffectPlayer.SoundEffect is a serializable class with these fields:
+
+  audioClip             AudioClip   The audio file to play.
+  volumeScale           float       Volume multiplier (default 1).
+  loop                  bool        Whether the sound loops.
+  pitchVariance         float       Random pitch variation (default 0.2).
+  volumeVariance        float       Random volume variation (default 0.2).
+  fadePitch             bool        Whether to fade pitch in.
+  minPitch              float       Starting pitch for fade (default 0.2).
+  maxPitch              float       Target pitch (default 1).
+  fadeVolume            bool        Whether to fade volume in.
+  minVolume             float       Starting volume for fade (default 0).
+  maxVolume             float       Target volume (default 1).
+  fadeSeconds           float       Fade duration in seconds (default 0.5).
+
+  For mod audio, include your .wav or .ogg files in the AssetBundle and
+  assign them to the audioClip field on your ScriptableObject.
+
+
+================================================================================
+  13. DAMAGE TYPES
+================================================================================
+
+  Damageable.DamageType enum:
+
+    Kinetic       Physical/ballistic damage
+    Cold          Ice/cryo damage
+    Corrosive     Acid/chemical damage
+    Electric      Lightning/EMP damage
+    Thermal       Fire/heat damage
+    Radiation     Nuclear/radiation damage
+
+  Damage types affect:
+  - Shield resistance bonuses
+  - Status effects applied on hit
+  - Visual effects and colours
+
+
+================================================================================
+  14. FACTIONS & FACTION-SPECIFIC ASSETS
+================================================================================
+
+  Several fields use "FactionImage" or "FactionProjectile" arrays to
+  support different visuals per faction. The first entry in the array
+  is always the default/fallback.
+
+  FactionImage structure:
+    faction     string    Faction identifier (e.g., "terran", "alien").
+    image       Sprite    The sprite for that faction.
+
+  FactionProjectile structure:
+    faction     string    Faction identifier.
+    gameObject  GameObject  The projectile prefab for that faction.
+
+  For simple mods, you only need ONE entry with an empty faction string.
+  The game uses it as the default when no faction match is found.
+
+
+================================================================================
+  15. LANGUAGE / TRANSLATIONS
+================================================================================
+
+  Every player-facing string needs a language entry. Set a unique
+  languageKey on each ScriptableObject (e.g., "mymod.bananal").
+
+  The game looks up:
+    <languageKey>.name    Item display name
+    <languageKey>.desc    Item description
+
+  GENERATING LANGUAGE FILES:
+  Star Vortex Mod > Generate Language File
+  This scans all ItemBase assets and writes Assets/Languages/lang_enUS.json.
+
+  MANUAL FORMAT (Assets/Languages/lang_enUS.json):
+  {
+    "mymod.bananal.name": "Banana Launcher",
+    "mymod.bananal.desc": "Fires explosive bananas that split into mini bananas."
+  }
+
+  OTHER LANGUAGES:
+  Create additional files: lang_de.json, lang_fr.json, lang_ja.json, etc.
+  Only lang_enUS.json is required. Missing keys fall back to English.
+
+
+================================================================================
+  16. MOD.JSON REFERENCE
+================================================================================
+
+  Place mod.json in your Assets/ root directory (not in a subfolder).
+  The build tools copy it into your mod package automatically.
+
+  {
+    "id": "com.yourname.modname",
+    "name": "My Mod",
+    "author": "Your Name",
+    "version": "1.0.0",
+    "description": "A description of what this mod does.",
+    "gameVersion": "",
+    "dependencies": [],
+    "loadOrder": 0,
+    "tags": ["content"]
+  }
+
+  Fields:
+    id            string    REQUIRED. Unique reverse-domain identifier.
+    name          string    Display name shown in the mod list.
+    author        string    Your name or team name.
+    version       string    Semantic version (major.minor.patch).
+    description   string    Short description for the mod list.
+    gameVersion   string    Target game version. Shows a warning if mismatched
+                            but does not prevent loading.
+    dependencies  string[]  Array of mod IDs that must load before yours.
+    loadOrder     int       Lower numbers load first. Use 0 unless you need
+                            specific ordering relative to other mods.
+    tags          string[]  Freeform tags for categorisation.
+
+
+================================================================================
+  17. BUILDING & PACKAGING
+================================================================================
+
+  STEP 1: Assign AssetBundle names
+  ---------------------------------
+  Select your assets in the Project window. At the bottom of the Inspector,
+  there is an "AssetBundle" dropdown. Set it to a name (e.g., "mymod").
+
+  You MUST assign ALL assets that should be in the bundle:
+  - ScriptableObject (.asset files)
+  - Prefabs (.prefab files)
+  - Sprites/textures used by prefabs
+  - Audio clips used by sound effects
+
+  Assets NOT assigned to a bundle will NOT be included in your mod.
+
+  STEP 2: Build AssetBundles
+  ---------------------------
+  Star Vortex Mod > Build AssetBundles
+
+  This builds all assigned assets into bundle files and generates the
+  component manifest (components.json).
+
+  STEP 3: Edit mod.json
+  ----------------------
+  Make sure Assets/mod.json has your mod's correct details.
+
+  STEP 4: Generate Language File
+  -------------------------------
+  Star Vortex Mod > Generate Language File
+
+  Creates lang_enUS.json from your ScriptableObject name/description fields.
+
+  STEP 5: Package Mod
+  --------------------
+  Star Vortex Mod > Package Mod
+
+  Creates ModPackage/<ModName>/ containing:
+    mod.json
+    <bundlename>.bundle
+    components.json (if generated)
+    lang_enUS.json (and any other lang_*.json)
+    icon.png (if found anywhere in Assets/)
+    <YourAssembly>.dll (if you have code mods)
+
+  STEP 6: Install
+  ----------------
+  Copy the mod folder to: StarVortex_Data/Mods/<ModName>/
+  Launch Star Vortex. Check the Mod Panel for load status.
+
+
+================================================================================
+  18. CODE MODS (HARMONY)
+================================================================================
+
+  Code mods use HarmonyX to patch game methods at runtime.
+
+  SETUP:
+  1. Create a folder for your scripts.
+  2. Create an Assembly Definition (.asmdef) in that folder.
+     In its Inspector:
+       - Tick "Override References"
+       - Add references: Assembly-CSharp, 0Harmony
+  3. Create a C# class implementing IStarVortexMod:
+
+     using HarmonyLib;
+     using StarVortex;
+     using UnityEngine;
+
+     public class MyMod : IStarVortexMod
+     {
+         public void Init(ModInfo modInfo, Harmony harmony)
+         {
+             Debug.Log("[MyMod] Loaded!");
+             harmony.PatchAll();
+         }
+
+         public void OnGameLoaded()
+         {
+             // Called after all game systems are initialized
+         }
+
+         public void Shutdown()
+         {
+             // Called when the game exits
+         }
+     }
+
+  4. Write Harmony patches as normal:
+
+     [HarmonyPatch(typeof(SomeClass), "SomeMethod")]
+     public class MyPatch
+     {
+         static void Prefix() { /* runs before */ }
+         static void Postfix() { /* runs after */ }
+     }
+
+  5. Your compiled DLL is at Library/ScriptAssemblies/<YourAssembly>.dll
+     Package Mod copies it automatically if it detects an .asmdef.
+
+  For Harmony documentation: https://harmony.pardeike.net/
+
+
+================================================================================
+  19. UNIT CONVERSION
+================================================================================
+
+  1 Unity unit = 20 metres in-game.
+
+  When setting ranges, radii, velocities, etc. in the Inspector:
+    Value 1.0  =  20m
+    Value 5.0  = 100m
+    Value 10.0 = 200m
+
+  Examples:
+    explosiveRadius: 4  = 80m blast radius
+    maxRange: 15        = 300m weapon range
+    velocity: 20        = 400m/s projectile speed
+
+
+================================================================================
+  20. TROUBLESHOOTING
+================================================================================
+
+  ITEM DOESN'T APPEAR IN EQUIPMENT LIST
+  -> Check resourcePath matches exactly (see section 2).
+  -> Make sure npcUseOnly is false and noSandbox is false.
+  -> Make sure the ScriptableObject is assigned to an AssetBundle.
+  -> Rebuild AssetBundles after any changes.
+
+  "MISSING" REFERENCES ON GAMECONTENT ASSETS
+  -> This is expected. Prefab, sprite, material, and audio references
+     show as Missing because visual assets are not part of the import.
+  -> You can safely ignore these. When your mod overrides a base game
+     asset, the game automatically inherits all missing non-SO
+     references (prefabs, sprites, materials, audio) from the original.
+  -> Just change the values you care about and build. Everything else
+     carries over from the base game at runtime.
+  -> To replace a visual asset, create your own in your mod project,
+     assign it to the field, and include it in your AssetBundle.
+
+  OVERRIDE REPLACES THE WRONG ASSET
+  -> Overrides are matched by name AND resourcePath together.
+  -> Do NOT change the resourcePath when duplicating a GameContent asset.
+  -> Some asset names exist in multiple folders (e.g., same squadron
+     name in different factions). resourcePath disambiguates them.
+
+  MISSING SCRIPT ON PREFAB COMPONENTS
+  -> This is expected for game scripts (MuzzleFlash, Explosion, etc.).
+  -> The component manifest system restores them at runtime.
+  -> Make sure you ran Build AssetBundles (generates components.json).
+  -> Make sure components.json is in your mod folder.
+
+  ICON NOT SHOWING IN MOD LIST
+  -> Place icon.png anywhere in your Assets/ folder.
+  -> It must be named exactly "icon.png".
+  -> Recommended size: 256x256 pixels.
+
+  NO ASSETS IN MOD PACKAGE
+  -> You must assign assets to an AssetBundle name first.
+  -> Run Build AssetBundles BEFORE Package Mod.
+
+  BUNDLE FAILS TO LOAD
+  -> Your Unity version MUST be exactly 2022.3.62f2.
+  -> Other versions produce incompatible AssetBundles.
+
+  NO SOUND
+  -> Make sure your AudioClip files are assigned to the AssetBundle.
+  -> Check volumeScale is not 0.
+
+  LANGUAGE TEXT SHOWS KEY INSTEAD OF NAME
+  -> Run Generate Language File after setting languageKey.
+  -> Make sure lang_enUS.json is in your mod folder.
+  -> Check that languageKey matches between the .asset and .json.
+
+  MOD DOESN'T LOAD AT ALL
+  -> Check mod.json exists and has valid JSON.
+  -> Check Player.log for [ModLoader] error messages.
+  -> Make sure the mod folder is directly inside StarVortex_Data/Mods/.
+
+  CHECKING LOGS
+  -> Player.log location:
+     Windows: %USERPROFILE%\AppData\LocalLow\<Company>\Star Vortex\Player.log
+  -> Search for "[ModLoader]" to see mod loading messages.
+  -> The in-game Mod Panel also shows load status and errors.
+
+
+================================================================================
+
+  For browsing all game types and methods, use a .NET decompiler
+  (dnSpy, ILSpy, dotPeek) on Assembly-CSharp.dll in the game's
+  Managed folder.
+
+  1 Unity unit = 20 metres. Always keep this in mind.
+
+  Happy modding!
+
+================================================================================

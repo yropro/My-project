@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Nexoria
+  m_EditorClassIdentifier: 
+  languageKey: R20DuEsA
+  faction: Species-XI
+  type: 1000
+  id: 1
+  starMap: {fileID: 11400000, guid: f86023e89ee9fad4086ea17e5dab02f3, type: 2}
+  minPosition: {x: 4, y: -1}
+  maxPosition: {x: 8, y: 1}
+  generationMethod: 1
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 6
+  debrisType: 6
+  nebula: 0
+  combatMusic: 9080
+  arrivalAutoPilot: 11
+  arrivalAutoPilotDialog:
+  - name: 19
+    dialog: Now that... is a big snake!
+  - name: 18
+    dialog: That's what she said!
+  - name: 19
+    dialog: ...
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions:
+  - {fileID: 11400000, guid: 70599559dc56d324d9aa0d329511eb2e, type: 2}
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 44bcd3d6bb2ee0f4a83bb9ed7dd60748, type: 2}
+  - {fileID: 11400000, guid: 44bcd3d6bb2ee0f4a83bb9ed7dd60748, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons:
+  - squadronBase: {fileID: 11400000, guid: 37ed7aba6cc2a2d49af1861e04c09eb4, type: 2}
+    position: {x: 10, y: 0}
+    rotation: 225
+  gatewayShips: 1
+  squadrons: []
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 0}
+  eliteTimer: 0
+  eliteMusic: 0
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 0
+  spreadStrengthDegrade: 1
+  minimumSpread: 0
+  spreadStarDesigns: []

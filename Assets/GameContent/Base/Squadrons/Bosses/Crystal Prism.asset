@@ -1,0 +1,103 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1515019235, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Crystal Prism
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Squadrons/Bosses
+  languageKey: NSTBvXic
+  displayName: Crystal Prism
+  multiplier: 1
+  friendly: 0
+  customDisplayPositions:
+  - index: 0
+    position: {x: 0, y: 0}
+    rotation: 45
+    scale: 0.25
+  - index: 1
+    position: {x: 3, y: 0}
+    rotation: 45
+    scale: 0.25
+  - index: 2
+    position: {x: 2.6, y: 1.5}
+    rotation: 45
+    scale: 0.25
+  - index: 3
+    position: {x: 1.5, y: 2.6}
+    rotation: 45
+    scale: 0.25
+  - index: 4
+    position: {x: 0, y: 3}
+    rotation: 45
+    scale: 0.25
+  - index: 5
+    position: {x: -1.5, y: 2.6}
+    rotation: 45
+    scale: 0.25
+  - index: 6
+    position: {x: -2.6, y: 1.5}
+    rotation: 45
+    scale: 0.25
+  - index: 7
+    position: {x: -3, y: 0}
+    rotation: 45
+    scale: 0.25
+  - index: 8
+    position: {x: -2.6, y: -1.5}
+    rotation: 45
+    scale: 0.25
+  - index: 9
+    position: {x: -1.5, y: -2.6}
+    rotation: 45
+    scale: 0.25
+  - index: 10
+    position: {x: 0, y: -3}
+    rotation: 45
+    scale: 0.25
+  - index: 11
+    position: {x: 1.5, y: -2.6}
+    rotation: 45
+    scale: 0.25
+  - index: 12
+    position: {x: 2.6, y: -1.5}
+    rotation: 45
+    scale: 0.25
+  formation: 9999
+  spiralRadius: 20
+  shipsByLevels:
+  - levelRequired: 1
+    ships:
+    - {fileID: 11400000, guid: 9d0af15dc982aaf44a9c542251bbb86d, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+    - {fileID: 11400000, guid: dab365e735dfa49489b0cc41c4739ba1, type: 2}
+  invulnerableLeader: 0
+  splitSquadron: 0
+  splitLeaderNpc: {fileID: 0}
+  splitTailNpc: {fileID: 0}
+  invulnerableLayers: 0
+  inactiveLayers: 0
+  attachRotation: 0
+  rotateAway: 0
+  rigidAttachment: 1
+  combatFormationDrift: 0
+  respawn: 0
+  respawnMinSeconds: 0
+  respawnMaxSeconds: 0

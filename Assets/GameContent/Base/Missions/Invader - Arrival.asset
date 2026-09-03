@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Invader - Arrival
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: yMzJ40ae
+  displayName: Unwelcome Arrival
+  levelFrom: {fileID: 11400000, guid: fe09a5ed8df811f42a49fc0234040537, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 2
+  description: Species-XI have arrived in the sector.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: ae1c8620a726d9e4e8be294246fa0d0c, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 3
+      dialog: Damn. If they're attacking this far out, it means Earth is already
+        at risk. We need to get back and warn them.
+    - name: 3
+      dialog: We recovered one of their infected seeds. Take it, you might be able
+        to learn something from it.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 8
+    autoPilotDialog:
+    - name: 11
+      dialog: The infected seed you carry can be used to infect a waypoint.
+    - name: 0
+      dialog: That sounds like a terrible idea...
+    - name: 11
+      dialog: It would summon more of them, yes. But only by facing them will you
+        learn to defeat them.
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 1

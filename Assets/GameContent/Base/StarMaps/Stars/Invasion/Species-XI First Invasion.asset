@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1617794041, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Species-XI First Invasion
+  m_EditorClassIdentifier: 
+  minLevel: 1
+  spawnWeight: 0
+  faction: Species-XI
+  allowInvasion: 1
+  invaded: 1
+  background: {fileID: 0}
+  backgroundHue: 6
+  debrisType: 6
+  allowRandomAsteroids: 0
+  nebulaChance: 0.2
+  combatMusic: 9020
+  arrivalMissions: []
+  completeMissions:
+  - {fileID: 11400000, guid: d79772c927c69724e974863768b5e892, type: 2}
+  lootTables:
+  - {fileID: 11400000, guid: 2db4a866208756b46a51320d4ff22b99, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  spawnEnemies: 0
+  squadrons:
+  - {fileID: 11400000, guid: c5c72e6752785e84d8134f4bab26a921, type: 2}
+  - {fileID: 11400000, guid: 3515a15862d392b4cb8b3862b98f5922, type: 2}
+  gatewayShips: 0
+  destroyAllShips: 1
+  autoSpawnCount: 0
+  validAutoSpawnSquadrons: []
+  autoAggroEnemies: 1

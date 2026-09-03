@@ -1,0 +1,112 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1076664692, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Phantom Beacon
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Special
+  languageKey: JHJ73jUH
+  description: Call in friendly Phantom ships to assist you.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps: []
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 1
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  activatableIcons:
+  - faction: Conclave
+    image: {fileID: 0}
+  hueShiftIcon: 0
+  targetFriendly: 0
+  playCooldownSound: 1
+  maxCharges: 0.05
+  duration: 0.4
+  weightedNpcBases:
+  - npcBase: {fileID: 11400000, guid: 251becbe6c21bf744871d10d8f272638, type: 2}
+    weight: 20
+  - npcBase: {fileID: 11400000, guid: cbc9e325d2fdbf6468ca1c6b661804da, type: 2}
+    weight: 20
+  - npcBase: {fileID: 11400000, guid: 657dee6e5928f1e489d6a9381eb5b3d3, type: 2}
+    weight: 15
+  - npcBase: {fileID: 11400000, guid: eb3465a931329f847b4f0fd7c6bc9e34, type: 2}
+    weight: 15
+  - npcBase: {fileID: 11400000, guid: e864aca3cdd0e8b469375d1ac464b9f8, type: 2}
+    weight: 10
+  - npcBase: {fileID: 11400000, guid: 88a5881fa4ae26d4fabe539786fbeebd, type: 2}
+    weight: 10
+  - npcBase: {fileID: 11400000, guid: e6192e43cfdf5b64692c59a3b5849742, type: 2}
+    weight: 10
+  - npcBase: {fileID: 11400000, guid: 325716e59dc23f642a5ea8f80571c363, type: 2}
+    weight: 5
+  jumpType: 0
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 0.25
+    loop: 0
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 0
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  shipSpawner:
+    type: 6
+    category: 600
+    secondCategory: 650
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 20
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    charges: 0
+    maxCharges: 2
+    rechargeSeconds: 0
+    duration: 20
+    cooldown: 30
+    heatPerSecond: 0
+    aimAheadOfTarget: 0
+    isLinked: 0
+    aimSnap: 1
+    health: 1
+    damage: 1
+    critChance: 1
+    critModifier: 1
+    levelOffset: 0
+    shipIndexes: 
+  legendaries: []

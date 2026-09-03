@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Escape Pod
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs
+  languageKey: saCtkx6H
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: d85792a57c0b166439ed667594cecb52, type: 2}
+  faction: Conclave
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 1
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 0
+  difficultyScale: []
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: 9ac9084e607834d43a657e0580328ba0, type: 2}
+    customizers: []
+  extraItems: []

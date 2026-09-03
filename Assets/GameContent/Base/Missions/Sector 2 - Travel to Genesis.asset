@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 2 - Travel to Genesis
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: 4A6TXCsb
+  displayName: Travel to Genesis
+  levelFrom: {fileID: 11400000, guid: ed8aa79433d46b74bb7721dbcd00bca5, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Locate the next sector gateway at Genesis.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: d996154b24eddf84c97e8a798c413bcb, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 12
+      dialog: Thought I'd tag along this time... make sure ya don't get lost. Can't
+        have ya driftin' off into some frozen rock, now can we?
+    - name: 3
+      dialog: Excellent. That'll save time on the rescue mission.
+    - name: 3
+      dialog: Phantoms won't take kindly to our presence. But it's one step closer
+        to Earth.
+    - name: 3
+      dialog: Our next objective is the sector gateway at Genesis.
+    - name: 19
+      dialog: Of course, it won't be as simple as just showing up.
+    - name: 18
+      dialog: It never is...
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 2/Fixed/Genesis
+    requirementQuantity: 1

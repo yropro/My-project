@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1771613176, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Pantheon Rescue
+  m_EditorClassIdentifier: 
+  minLevel: 18
+  spawnWeight: 1
+  faction: Pantheon
+  allowInvasion: 1
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 5
+  debrisType: 1
+  allowRandomAsteroids: 0
+  nebulaChance: 0
+  combatMusic: 1200
+  arrivalMissions:
+  - {fileID: 11400000, guid: ab1f2641bbd0e3a4c9df7f7bd61b233a, type: 2}
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 5d06fb9baa707084580a461155c7d81a, type: 2}
+  - {fileID: 11400000, guid: 5d06fb9baa707084580a461155c7d81a, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  friendlyNPCs:
+  - {fileID: 11400000, guid: 99482a1d98fec4540a2344f5542a9f1f, type: 2}
+  - {fileID: 11400000, guid: edc6f1d58e3827741b473e7b6bf265c9, type: 2}
+  - {fileID: 11400000, guid: 222f0f487644c5b4383863f0b9eb330b, type: 2}
+  totalTime: 45
+  friendlyThreatGeneration: 1
+  rescueSquadrons:
+  - spawnSeconds: 5
+    squadrons: []
+    autoSpawnCount: 1
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 6709f8729421b8041acf8027a7cee083, type: 2}
+    - {fileID: 11400000, guid: b0005b8ef91af1c4d8a31437d8f8d46a, type: 2}
+    - {fileID: 11400000, guid: eb949821f4e7d9d43bca230447cfafd6, type: 2}
+    - {fileID: 11400000, guid: cafa4bc57f007ab43b3facce63f0e25b, type: 2}
+    - {fileID: 11400000, guid: 01f489b13375a4746a8f576fecb47828, type: 2}
+    - {fileID: 11400000, guid: d5da583aaad3038458e2a5a02e0ed3e3, type: 2}
+  - spawnSeconds: 15
+    squadrons: []
+    autoSpawnCount: 2
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 6709f8729421b8041acf8027a7cee083, type: 2}
+    - {fileID: 11400000, guid: b0005b8ef91af1c4d8a31437d8f8d46a, type: 2}
+    - {fileID: 11400000, guid: eb949821f4e7d9d43bca230447cfafd6, type: 2}
+    - {fileID: 11400000, guid: cafa4bc57f007ab43b3facce63f0e25b, type: 2}
+    - {fileID: 11400000, guid: 01f489b13375a4746a8f576fecb47828, type: 2}
+    - {fileID: 11400000, guid: d5da583aaad3038458e2a5a02e0ed3e3, type: 2}
+  - spawnSeconds: 30
+    squadrons: []
+    autoSpawnCount: 2
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 6709f8729421b8041acf8027a7cee083, type: 2}
+    - {fileID: 11400000, guid: b0005b8ef91af1c4d8a31437d8f8d46a, type: 2}
+    - {fileID: 11400000, guid: eb949821f4e7d9d43bca230447cfafd6, type: 2}
+    - {fileID: 11400000, guid: cafa4bc57f007ab43b3facce63f0e25b, type: 2}
+    - {fileID: 11400000, guid: 01f489b13375a4746a8f576fecb47828, type: 2}
+    - {fileID: 11400000, guid: d5da583aaad3038458e2a5a02e0ed3e3, type: 2}

@@ -1,0 +1,125 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -296613625, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Aegis Shield
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Shield
+  languageKey: xWqTdDuv
+  description: A protective shield that will absorb damage for a time.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps:
+  - Sector 2
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 0
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  healthRegen: 0
+  shieldRechargeRate: 8
+  shieldRechargeDelay: -0.045
+  resistance: 0.0075
+  resistances:
+  - damageType: 0
+    color: {r: 3.2958224, g: 3.2958224, b: 3.2958224, a: 1}
+    downColor: {r: 5.992157, g: 0, b: 0.6305195, a: 1}
+    minLevel: 1
+  - damageType: 1
+    color: {r: 1.1662514, g: 3.4956243, b: 6.3396225, a: 1}
+    downColor: {r: 5.992157, g: 0, b: 0.59921515, a: 1}
+    minLevel: 1
+  - damageType: 2
+    color: {r: 4.7323446, g: 1.4129585, b: 6.113208, a: 1}
+    downColor: {r: 5.992157, g: 0, b: 0.59921515, a: 1}
+    minLevel: 1
+  - damageType: 3
+    color: {r: 3.058382, g: 2.414033, b: 1.1973854, a: 1}
+    downColor: {r: 5.992157, g: 0, b: 0.59921515, a: 1}
+    minLevel: 1
+  - damageType: 4
+    color: {r: 5.8352942, g: 1.8196079, b: 1.4117647, a: 1}
+    downColor: {r: 5.992157, g: 0, b: 0.59921515, a: 1}
+    minLevel: 1
+  - damageType: 5
+    color: {r: 1.3490196, g: 5.992157, b: 0.5647059, a: 1}
+    downColor: {r: 5.992157, g: 0, b: 0.59921515, a: 1}
+    minLevel: 1
+  downSound:
+    audioClip: {fileID: 0}
+    volumeScale: 1
+    loop: 0
+    pitchVariance: 0.2
+    volumeVariance: 0.2
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 0
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  upSound:
+    audioClip: {fileID: 0}
+    volumeScale: 1
+    loop: 0
+    pitchVariance: 0.2
+    volumeVariance: 0.2
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 0
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  shield:
+    type: 2
+    category: 50
+    secondCategory: 0
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 20
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    healthRegen: 0
+    healthMax: 0
+    shieldMax: 1650
+    shieldRechargeRate: 125
+    shieldRechargeDelay: 6
+    resistance: 0.1
+    hitEffectType: 1
+    shield: 2000
+    damageType: 4
+    shieldCooldown: 0
+  legendaries:
+  - {fileID: 11400000, guid: 77793dd5cd76ba9418d223a55d024aab, type: 2}

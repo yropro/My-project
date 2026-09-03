@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Arrow
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Friendly
+  languageKey: j3sQmUjM
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 810e65d3abf3dae4eb3012b43ff35484, type: 2}
+  faction: Conclave
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale:
+  - scale: 0
+    value: 0.5
+    calculated: 0.1
+  - scale: 1
+    value: 10
+    calculated: 3.5
+  - scale: 2
+    value: 2
+    calculated: 0.7
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Debris
+  - item: {fileID: 11400000, guid: 9ac9084e607834d43a657e0580328ba0, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 1f8b1250dcf129c4c91e8540ed7a4bdb, type: 2}
+    customizers: []
+  extraItems: []

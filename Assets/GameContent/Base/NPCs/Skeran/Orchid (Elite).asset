@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Orchid (Elite)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Skeran
+  languageKey: iDBlaa6W
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 9edc4b922ee87164797cd948a462af0f, type: 2}
+  faction: Skeran
+  allowGrapple: 1
+  scale: 2
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale:
+  - scale: 1
+    value: 3
+    calculated: 1.8000001
+  - scale: 2
+    value: 3
+    calculated: 1.8000001
+  - scale: 3
+    value: 0.75
+    calculated: 0.15
+  - scale: 4
+    value: 0.6
+    calculated: 0.3
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: a430aad035369cd48abbdf8361e071ae, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Radiation
+  - item: {fileID: 11400000, guid: 4a0fd4e8f412e484dbebb96f666c4f58, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 100580a17189c884c8bff48a12a8cb5b, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 100580a17189c884c8bff48a12a8cb5b, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 7c0a4457df27afa4c8a79a6ff0225a83, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 16c3764d41fc25542a540c4bd418cdfa, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 16c3764d41fc25542a540c4bd418cdfa, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 996038711158f5f4a8d8fe87f4adf323, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: ee0ecf82f0192834291d06e82a3363c2, type: 2}
+    customizers: []
+  extraItems:
+  - {fileID: 11400000, guid: 4344eb9e10582f946824dad47475fac6, type: 2}

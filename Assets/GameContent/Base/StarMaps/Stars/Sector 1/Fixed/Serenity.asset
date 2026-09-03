@@ -1,0 +1,83 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Serenity
+  m_EditorClassIdentifier: 
+  languageKey: 0lTPPaVb
+  faction: Junker
+  type: 500
+  id: 9
+  starMap: {fileID: 11400000, guid: d47f58f9d2812b94981d49d825e446c3, type: 2}
+  minPosition: {x: -2, y: 2}
+  maxPosition: {x: -1.5, y: 3}
+  generationMethod: 1
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 10
+  debrisType: 2
+  nebula: 0
+  combatMusic: 300
+  arrivalAutoPilot: 7
+  arrivalAutoPilotDialog:
+  - name: 19
+    dialog: You can't take the sky from me!
+  - name: 18
+    dialog: What are you talking about?
+  - name: 19
+    dialog: Just something from one of the TV series I kept.
+  - name: 5
+    dialog: I'm going to show you a world without sin.
+  - name: 19
+    dialog: See? He got the reference...
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions:
+  - {fileID: 11400000, guid: 550528c7d3567ab409e74c1843ba2430, type: 2}
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons: []
+  gatewayShips: 1
+  squadrons:
+  - {fileID: 11400000, guid: bc6c70f3feb59c74b860d78f590a806b, type: 2}
+  - {fileID: 11400000, guid: 493041098cf59854fac03e25e82745ee, type: 2}
+  - {fileID: 11400000, guid: 812d152e432396f4d9d0e28b35a51bd9, type: 2}
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 11400000, guid: 3db5cb64246ff7244a1dce4c2b0cfcd6, type: 2}
+  eliteTimer: 30
+  eliteMusic: 350
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 1
+  spreadStrengthDegrade: 0.05
+  minimumSpread: 6
+  spreadStarDesigns:
+  - {fileID: 11400000, guid: d989ab300cdafa24e930f82bc36ebcd1, type: 2}
+  - {fileID: 11400000, guid: 59a47ba970827bd4bafe1ff79c23a3d0, type: 2}
+  - {fileID: 11400000, guid: a3512dc30353b0d4ba2ef5365976db7b, type: 2}
+  - {fileID: 11400000, guid: 19d66edf2db9ee540af7f7c7da6ab9e5, type: 2}
+  - {fileID: 11400000, guid: 326b40d8415a92d4c950e80227a88923, type: 2}

@@ -1,0 +1,99 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Behemoth
+  m_EditorClassIdentifier: 
+  languageKey: qHsIFnwb
+  faction: 
+  serialized: 'Boss#1.96
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-1.5,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Tail 1","k":"","h":"E8","sa":"FF","b":"E6","o":{"x":1.225000023841858,"y":1.0750000476837159},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Wing 2","k":"","h":"F0","sa":"FF","b":"D9","o":{"x":-0.375,"y":1.399999976158142},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran
+    Boss/Tail 1","k":"","h":"E8","sa":"FF","b":"E6","o":{"x":-0.6499999761581421,"y":1.125},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Wing 1","k":"","h":"E6","sa":"FF","b":"F2","o":{"x":-1.125,"y":1.125},"r":285.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran
+    Boss/Shell 3","k":"","h":"EB","sa":"FF","b":"FF","o":{"x":1.1749999523162842,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Wing 2","k":"","h":"F0","sa":"FF","b":"FF","o":{"x":1.475000023841858,"y":0.875},"r":265.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran
+    Boss/Spine 1","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":1.9249999523162842,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Spine 1","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":1.7000000476837159,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Spine 1","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":1.4500000476837159,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Spine 1","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":1.2000000476837159,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Shell 3","k":"","h":"F5","sa":"FF","b":"FF","o":{"x":0.44999998807907107,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Shell 3","k":"","h":"FA","sa":"FF","b":"FF","o":{"x":-0.2750000059604645,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Shell 3","k":"","h":"EB","sa":"FF","b":"FF","o":{"x":-0.9750000238418579,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Core 5","k":"","h":"E8","sa":"FF","b":"FF","o":{"x":2.450000047683716,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Tail 1","k":"","h":"ED","sa":"FF","b":"FF","o":{"x":-1.7999999523162842,"y":0.42500001192092898},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Tail 2","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":0.4000000059604645,"y":0.574999988079071},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":-1.5,"y":0.30000001192092898},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 1","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":-1.975000023841858,"y":0.375},"r":230.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 1","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":-2.25,"y":0.2750000059604645},"r":230.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":-0.574999988079071,"y":0.3499999940395355},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":0.125,"y":0.3499999940395355},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":0.8500000238418579,"y":0.3499999940395355},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 1","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":-0.42500001192092898,"y":1.25},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":1.524999976158142,"y":0.574999988079071},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":0.7250000238418579,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":0.05000000074505806,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"E6","sa":"FF","b":"FF","o":{"x":-0.5249999761581421,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 1

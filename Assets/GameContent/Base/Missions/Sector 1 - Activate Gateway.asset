@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 1 - Activate Gateway
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: yHMo6jar
+  displayName: Activate Gateway
+  levelFrom: {fileID: 11400000, guid: 968774cbeff2b6c43aedd6f2f5022f06, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 11400000, guid: d47f58f9d2812b94981d49d825e446c3, type: 2}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Activate the Sector Gateway at Novus Prime.
+  itemRewards: []
+  rewardFactionUnlocks:
+  - Skeran
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: 6c653a022069d9749b2799cca32fe92a, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 3
+      dialog: Excellent, you can use that keystone in the sector gateway at Novus
+        Prime.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 30
+    requirementTarget: 
+    requirementQuantity: 3
+  - initialDialog:
+    - name: 1
+      dialog: Sector gateway activated.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 8
+    autoPilotDialog:
+    - name: 11
+      dialog: The sector gateway is active. Once more piercing the void... technology
+        older than most who now live, its secrets lost to time.
+    - name: 0
+      dialog: The void? That's where Species-XI came from...
+    - name: 11
+      dialog: Where many things came from, and where many are lost. The gateways
+        will shield you... its light burns bright.
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 3
+      dialog: That... didn't even show up on our sensors.
+    - name: 1
+      dialog: It's like she's out of phase with our reality. She must be from the
+        void.
+    - name: 3
+      dialog: For now our objectives align. We're too large to fit through, but if
+        you proceed, we'll use your signal to triangulate your position and follow.
+    - name: 3
+      dialog: Some good news, we have reverse-engineered the Skeran ships. You can
+        now integrate their parts into your design.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1

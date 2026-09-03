@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Hawthorn
+  m_EditorClassIdentifier: 
+  languageKey: Yv1cnf12
+  faction: Flora
+  serialized: 'Cruiser#0.67
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"D9","o":{"x":-0.5,"y":0.125},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Vanity
+    Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.20000000298023225,"y":0.4000000059604645},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Vanity
+    Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.30000001192092898,"y":0.375},"r":240.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Vine
+    1","k":"","h":"ED","sa":"FF","b":"D9","o":{"x":-0.25,"y":-0.6499999761581421},"r":305.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Leaf
+    1","k":"","h":"E0","sa":"FF","b":"E6","o":{"x":-0.20000000298023225,"y":-0.8500000238418579},"r":110.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Flora/Vine
+    1","k":"","h":"ED","sa":"FF","b":"D9","o":{"x":-0.44999998807907107,"y":0.5249999761581421},"r":75.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Flora/Leaf
+    1","k":"","h":"E6","sa":"FF","b":"E6","o":{"x":-0.17499999701976777,"y":-0.7250000238418579},"r":100.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Flora/Leaf
+    2","k":"","h":"ED","sa":"FF","b":"E6","o":{"x":-0.17499999701976777,"y":-0.6000000238418579},"r":95.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Flora/Leaf
+    2","k":"","h":"F5","sa":"FF","b":"E6","o":{"x":-0.10000000149011612,"y":-0.4749999940395355},"r":80.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Flora/Leaf
+    4","k":"","h":"F2","sa":"FF","b":"BF","o":{"x":-0.10000000149011612,"y":-0.32499998807907107},"r":80.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Cockpit
+    1","k":"","h":"F2","sa":"FF","b":"E6","o":{"x":0.574999988079071,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Flora/Vine
+    2","k":"","h":"ED","sa":"FF","b":"D9","o":{"x":0.10000000149011612,"y":-0.5},"r":140.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Leaf
+    5","k":"","h":"F5","sa":"FF","b":"D9","o":{"x":0.15000000596046449,"y":-0.30000001192092898},"r":355.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Leaf
+    2","k":"","h":"B0","sa":"FF","b":"FF","o":{"x":0.22499999403953553,"y":-0.125},"r":40.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Hull
+    4","k":"","h":"F2","sa":"FF","b":"FF","o":{"x":0.0,"y":0.0},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Flora/Leaf
+    2","k":"","h":"B0","sa":"FF","b":"FF","o":{"x":0.10000000149011612,"y":-0.125},"r":310.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Leaf
+    2","k":"","h":"B0","sa":"FF","b":"FF","o":{"x":0.15000000596046449,"y":0.22499999403953553},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Leaf
+    4","k":"","h":"F5","sa":"FF","b":"D9","o":{"x":-0.44999998807907107,"y":0.30000001192092898},"r":250.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Hull
+    3","k":"","h":"EB","sa":"FF","b":"FF","o":{"x":0.32499998807907107,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Flora/Hull
+    2","k":"","h":"F2","sa":"FF","b":"FF","o":{"x":-0.2750000059604645,"y":-0.20000000298023225},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Flora/Hull
+    3","k":"","h":"E8","sa":"FF","b":"FF","o":{"x":-0.2750000059604645,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"ED","sa":"FF","b":"FF","o":{"x":0.32499998807907107,"y":0.22499999403953553},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"ED","sa":"FF","b":"FF","o":{"x":0.15000000596046449,"y":0.375},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Secondary","k":"","h":"ED","sa":"FF","b":"FF","o":{"x":0.17499999701976777,"y":0.20000000298023225},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"EB","sa":"FF","b":"FF","o":{"x":0.15000000596046449,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 0

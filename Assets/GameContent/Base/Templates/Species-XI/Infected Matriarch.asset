@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Infected Matriarch
+  m_EditorClassIdentifier: 
+  languageKey: zMxygoEi
+  faction: Species-XI
+  serialized: 'Cruiser#0.70
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.22499999403953553,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Vanity
+    Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.0,"y":0.25},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Vanity
+    Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.32499998807907107,"y":0.0},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI/Tentacle
+    1","k":"","h":"8F","sa":"FF","b":"FF","o":{"x":0.4749999940395355,"y":0.02500000037252903},"r":95.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI/Tentacle
+    1","k":"","h":"8F","sa":"FF","b":"FF","o":{"x":-0.4749999940395355,"y":0.02500000037252903},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Species-XI/Tentacle
+    2","k":"","h":"94","sa":"FF","b":"FF","o":{"x":0.3499999940395355,"y":0.4000000059604645},"r":320.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI/Tentacle
+    2","k":"","h":"94","sa":"FF","b":"FF","o":{"x":-0.3499999940395355,"y":-0.4000000059604645},"r":130.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran/Spike
+    1","k":"Shadow","h":"B0","sa":"FF","b":"E6","o":{"x":0.375,"y":0.15000000596046449},"r":145.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran/Spike
+    1","k":"Shadow","h":"B0","sa":"FF","b":"FF","o":{"x":0.17499999701976777,"y":0.3499999940395355},"r":305.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran/Spike
+    1","k":"Shadow","h":"B0","sa":"FF","b":"E6","o":{"x":-0.17499999701976777,"y":0.3499999940395355},"r":230.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran/Spike
+    1","k":"Shadow","h":"B0","sa":"FF","b":"E6","o":{"x":-0.375,"y":0.17499999701976777},"r":35.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran/Hull
+    3","k":"","h":"B2","sa":"FF","b":"FF","o":{"x":0.0,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Cockpit
+    1","k":"Shadow","h":"A8","sa":"FF","b":"FF","o":{"x":0.17499999701976777,"y":0.17499999701976777},"r":135.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran/Cockpit
+    1","k":"Shadow","h":"A8","sa":"FF","b":"FF","o":{"x":-0.17499999701976777,"y":0.17499999701976777},"r":225.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI/Cockpit
+    1","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":0.125,"y":-0.125},"r":225.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Species-XI/Cockpit
+    1","k":"","h":"9E","sa":"FF","b":"FF","o":{"x":-0.125,"y":-0.125},"r":135.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"B2","sa":"FF","b":"FF","o":{"x":0.10000000149011612,"y":0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"B2","sa":"FF","b":"FF","o":{"x":-0.10000000149011612,"y":0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"B2","sa":"FF","b":"FF","o":{"x":0.0,"y":0.22499999403953553},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"B2","sa":"FF","b":"FF","o":{"x":0.0,"y":-0.22499999403953553},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 0

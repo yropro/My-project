@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Baldur (Enraged)
+  m_EditorClassIdentifier: 
+  languageKey: XmOgsDOU
+  faction: 
+  serialized: 'Boss#1.61
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.550000011920929,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 2","k":"","h":"70","sa":"E6","b":"D9","o":{"x":0.574999988079071,"y":-1.1749999523162842},"r":130.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Phantom
+    Boss/Wing 1","k":"","h":"6E","sa":"FF","b":"E6","o":{"x":1.2999999523162842,"y":0.44999998807907107},"r":260.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 2","k":"","h":"70","sa":"E6","b":"D9","o":{"x":-0.925000011920929,"y":1.5750000476837159},"r":235.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Phantom
+    Boss/Join 1","k":"","h":"6E","sa":"CF","b":"FF","o":{"x":0.6499999761581421,"y":-0.4000000059604645},"r":30.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 1","k":"","h":"75","sa":"FF","b":"D9","o":{"x":-0.22499999403953553,"y":0.550000011920929},"r":250.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 1","k":"","h":"75","sa":"FF","b":"D9","o":{"x":-0.22499999403953553,"y":0.3499999940395355},"r":265.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 1","k":"","h":"75","sa":"FF","b":"FF","o":{"x":-0.20000000298023225,"y":0.20000000298023225},"r":275.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Spike 1","k":"","h":"78","sa":"FF","b":"F2","o":{"x":-0.8500000238418579,"y":1.225000023841858},"r":245.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 2","k":"","h":"70","sa":"E6","b":"D9","o":{"x":-0.17499999701976777,"y":1.399999976158142},"r":230.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Phantom
+    Boss/Spike 2","k":"","h":"6E","sa":"FF","b":"FF","o":{"x":-0.3499999940395355,"y":0.949999988079071},"r":265.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Orb 1","k":"","h":"78","sa":"D1","b":"FF","o":{"x":1.2000000476837159,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.8500000238418579,"y":0.42500001192092898},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.675000011920929,"y":0.550000011920929},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Secondary","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.07500000298023224,"y":0.925000011920929},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.675000011920929,"y":-0.2750000059604645},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.675000011920929,"y":0.2750000059604645},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 1

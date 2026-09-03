@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Citadel Armor 3
+  m_EditorClassIdentifier: 
+  languageKey: v11lSpZV
+  faction: 
+  serialized: 'Boss#1.54
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","o":{"x":0.0,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran
+    Boss/Shell 2","k":"","h":"E6","sa":"FF","o":{"x":1.100000023841858,"y":1.100000023841858},"r":315.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Skeran
+    Boss/Shell 2","k":"","h":"E6","sa":"FF","o":{"x":-1.100000023841858,"y":1.100000023841858},"r":45.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"","h":"E6","sa":"FF","o":{"x":0.0,"y":1.649999976158142},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"","h":"E6","sa":"FF","o":{"x":1.649999976158142,"y":0.0},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"","h":"E6","sa":"FF","o":{"x":-1.649999976158142,"y":0.0},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Slots/Special","k":"","h":"E6","sa":"FF","o":{"x":-0.7749999761581421,"y":-0.7749999761581421},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Slots/Special","k":"","h":"E6","sa":"FF","o":{"x":0.7749999761581421,"y":0.7749999761581421},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Slots/Utility","k":"","h":"E6","sa":"FF","o":{"x":0.949999988079071,"y":0.949999988079071},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Slots/Utility","k":"","h":"E6","sa":"FF","o":{"x":0.949999988079071,"y":-0.949999988079071},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Slots/Utility","k":"","h":"E6","sa":"FF","o":{"x":-0.949999988079071,"y":-0.949999988079071},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Slots/Utility","k":"","h":"E6","sa":"FF","o":{"x":-0.949999988079071,"y":0.949999988079071},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}'
+  noMenuSpawn: 1

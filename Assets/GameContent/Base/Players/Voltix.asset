@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1824242386, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Voltix
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Players
+  languageKey: xSsC0NRg
+  description: A high speed Conclave prototype, built to intercept and disable enemies.
+  pilot:
+    xp: 0
+    consumables:
+    - Small Shield Battery
+    - Small Hull Nanobots
+    - Heat Sink
+    upgradeUnlocks:
+    - key: 15
+      level: 1
+    unlockedSecondaryClasses: 0a000000
+  templateBase: {fileID: 11400000, guid: f97ea1ef4411b07419538676f6894a33, type: 2}
+  shieldDamageType: 5
+  equippedItems:
+  - {fileID: 11400000, guid: cae6d2e2f31a0bd449debe9cc0d82702, type: 2}
+  - {fileID: 11400000, guid: efb56a64a6ad66d439dbf22cf9642b91, type: 2}
+  - {fileID: 11400000, guid: e21062526a30ea04bba3da07858c4069, type: 2}
+  - {fileID: 11400000, guid: 31c51535403bd224595f6ad74ecc06e5, type: 2}
+  storedItems:
+  - itemBase: {fileID: 11400000, guid: 244dfef85adf87f40b690959ce18b968, type: 2}
+    quantity: 50
+  - itemBase: {fileID: 11400000, guid: bda9c81cfacb88a48b90c3bbbc370757, type: 2}
+    quantity: 5
+  - itemBase: {fileID: 11400000, guid: 09b5dbb7f29fc8249b059577d5f537ce, type: 2}
+    quantity: 5
+  startingMissions:
+  - {fileID: 11400000, guid: 585a12ead32ad3749946116f469d9ac4, type: 2}
+  skippedStartingMissions:
+  - {fileID: 11400000, guid: 004c322424b70bb44b37d53515c658e5, type: 2}

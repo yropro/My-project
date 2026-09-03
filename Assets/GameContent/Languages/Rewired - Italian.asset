@@ -1,0 +1,94 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1464611097, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Rewired - Italian
+  m_EditorClassIdentifier: 
+  _yes: "S\xEC"
+  _no: No
+  _add: Aggiungi
+  _replace: Sostituisci
+  _remove: Rimuovi
+  _swap: Swap
+  _cancel: Annulla
+  _none: Nessuno
+  _okay: OK
+  _done: Fatto
+  _default: Predefinito
+  _assignControllerWindowTitle: Scegli controller
+  _assignControllerWindowMessage: Premi un pulsante qualsiasi o muovi un asse sul
+    controller che desideri utilizzare.
+  _controllerAssignmentConflictWindowTitle: Assegnazione controller
+  _controllerAssignmentConflictWindowMessage: "{0} \xE8 gi\xE0 assegnato a {1}. Vuoi
+    assegnare invece questo controller a {2}?"
+  _elementAssignmentPrePollingWindowMessage: Prima centra o azzera tutte le levette
+    e gli assi, poi premi un pulsante qualsiasi o attendi la fine del timer.
+  _joystickElementAssignmentPollingWindowMessage: Ora premi un pulsante o muovi un
+    asse per assegnarlo a {0}.
+  _joystickElementAssignmentPollingWindowMessage_fullAxisFieldOnly: Now move an axis
+    to assign it to {0}.
+  _keyboardElementAssignmentPollingWindowMessage: Premi un tasto per assegnarlo a
+    {0}. Puoi anche usare i tasti modificatori. Per assegnare da solo un tasto modificatore,
+    tienilo premuto per 1 secondo.
+  _mouseElementAssignmentPollingWindowMessage: Premi un pulsante del mouse o muovi
+    un asse per assegnarlo a {0}.
+  _mouseElementAssignmentPollingWindowMessage_fullAxisFieldOnly: Move an axis to
+    assign it to {0}.
+  _elementAssignmentConflictWindowMessage: Conflitto di assegnazione
+  _elementAlreadyInUseBlocked: "{0} \xE8 gi\xE0 in uso e non pu\xF2 essere sostituito."
+  _elementAlreadyInUseCanReplace: "{0} \xE8 gi\xE0 in uso. Vuoi sostituirlo?"
+  _elementAlreadyInUseCanReplace_conflictAllowed: "{0} \xE8 gi\xE0 in uso. Vuoi sostituirlo?
+    Puoi anche scegliere di aggiungere comunque l'assegnazione."
+  _mouseAssignmentConflictWindowTitle: Assegnazione mouse
+  _mouseAssignmentConflictWindowMessage: "Il mouse \xE8 gi\xE0 assegnato a {0}. Vuoi
+    assegnare invece il mouse a {1}?"
+  _calibrateControllerWindowTitle: Calibra controller
+  _calibrateAxisStep1WindowTitle: Calibra zero
+  _calibrateAxisStep1WindowMessage: Centra o azzera {0} e premi un pulsante qualsiasi
+    o attendi la fine del timer.
+  _calibrateAxisStep2WindowTitle: Calibra intervallo
+  _calibrateAxisStep2WindowMessage: Muovi {0} per tutta la sua escursione, poi premi
+    un pulsante qualsiasi o attendi la fine del timer.
+  _inputBehaviorSettingsWindowTitle: "Impostazioni di sensibilit\xE0"
+  _restoreDefaultsWindowTitle: Ripristina predefinite
+  _restoreDefaultsWindowMessage_onePlayer: "Questa operazione ripristiner\xE0 la
+    configurazione predefinita dei comandi. Sei sicuro di voler procedere?"
+  _restoreDefaultsWindowMessage_multiPlayer: "Questa operazione ripristiner\xE0 la
+    configurazione predefinita dei comandi per tutti i giocatori. Sei sicuro di voler
+    procedere?"
+  _actionColumnLabel: Azioni
+  _keyboardColumnLabel: Tastiera
+  _mouseColumnLabel: Mouse
+  _controllerColumnLabel: Controller
+  _removeControllerButtonLabel: Rimuovi
+  _calibrateControllerButtonLabel: Calibra
+  _assignControllerButtonLabel: Assegna controller
+  _inputBehaviorSettingsButtonLabel: "Sensibilit\xE0"
+  _doneButtonLabel: Fatto
+  _restoreDefaultsButtonLabel: Ripristina predefinite
+  _playersGroupLabel: 'Giocatori:'
+  _controllerSettingsGroupLabel: 'Controller:'
+  _assignedControllersGroupLabel: 'Controller assegnati:'
+  _settingsGroupLabel: 'Impostazioni:'
+  _mapCategoriesGroupLabel: 'Categorie:'
+  _calibrateWindow_deadZoneSliderLabel: 'Zona morta:'
+  _calibrateWindow_upperDeadZoneSliderLabel: 'Upper Dead Zone:'
+  _calibrateWindow_zeroSliderLabel: 'Zero:'
+  _calibrateWindow_sensitivitySliderLabel: "Sensibilit\xE0:"
+  _calibrateWindow_invertToggleLabel: Inverti
+  _calibrateWindow_calibrateButtonLabel: Calibra
+  _modifierKeys:
+    control: Control
+    alt: Alt
+    shift: Shift
+    command: Command
+    separator: ' + '
+  _customEntries: []

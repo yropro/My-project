@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 1 - Basilisk
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: 2fY7bTi9
+  displayName: Basilisk
+  levelFrom: {fileID: 11400000, guid: b744fd47a2e940c4a9f5fd986a65a25f, type: 2}
+  autoAddStarMapBase: {fileID: 11400000, guid: d47f58f9d2812b94981d49d825e446c3, type: 2}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Find and destroy the Basilisk.
+  itemRewards:
+  - itemBase: {fileID: 11400000, guid: 2a531422ef74e4d41956a88d8b17a51f, type: 2}
+    rarity: 0
+    quantity: 1
+  rewardFactionUnlocks: []
+  rewardAchievement: 110
+  rewardMissions:
+  - {fileID: 11400000, guid: 37c43c828aa6da84b8f701067e8b5e39, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 3
+      dialog: We've located the second keystone. It's held by the Skeran Basilisk.
+    - name: 3
+      dialog: The location has been marked on your navigation panel. Approach carefully
+        and ensure you're prepared.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 10
+    requirementTarget: Bosses/Basilisk
+    requirementQuantity: 1

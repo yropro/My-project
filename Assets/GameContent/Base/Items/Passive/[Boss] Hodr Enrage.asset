@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -636922821, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: '[Boss] Hodr Enrage'
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Passive
+  languageKey: tk9gljfj
+  description: Ship replace on enrage.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps: []
+  forSaleFlagship: 0
+  factionImages: []
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 1
+  showInGlossary: 0
+  noSandbox: 1
+  allowInvisible: 0
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  replaceNpc: {fileID: 11400000, guid: 00f494dfd441cc2409ab9d0a6b7c6a71, type: 2}
+  enrageReplace:
+    type: 9
+    category: 800
+    secondCategory: 0
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 0
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+  legendaries: []

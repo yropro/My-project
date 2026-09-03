@@ -1,0 +1,78 @@
+ManifestFileVersion: 0
+CRC: 1906583385
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 551bafe3ec11f6a85817eda3f255f965
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: f7ceb0cdbb0490ee02091ab59f631a80
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 551bafe3ec11f6a85817eda3f255f965
+HashAppended: 0
+ClassTypes:
+- Class: 114
+  Script: {fileID: 2050711256, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: -1950502710, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: 1138222096, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: 542919359, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: -167438025, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: -508336479, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: -1025891437, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: -1515019235, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: 119305319, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: -1073415679, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 114
+  Script: {fileID: 1069356995, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers:
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.Consumable
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.ConsumableLootTable/ConsumableDrop
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.Customizer
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.EquippableLegendary/ModifierBase
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.EquippableLootTable/RarityChance
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.Item
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.ItemBase/FactionImage
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.Laser
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.NPCBase/CustomScale
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.NPCBase/Equipment
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.ResourceLootTable/ResourceDrop
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.SoundEffectPlayer/SoundEffect
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.SquadronBase/CustomDisplayPosition
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.SquadronBase/ShipsByLevel
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.StaticUpgrade
+- AssemblyName: Assembly-CSharp
+  ClassName: StarVortex.Thruster
+Assets:
+- Assets/Leviathan/Content/LeviathanTest.asset
+Dependencies: []

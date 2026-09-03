@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 2050711256, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Prism Ray
+  m_EditorClassIdentifier: 
+  languageKey: gDdDmjIU
+  key: prismray
+  description: A high damage high range light splitting laser.
+  noDrop: 0
+  factionImages:
+  - faction: Phantom
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  modifiers:
+  - type: 755
+    value: 1
+  - type: 50
+    value: 1
+  - type: 65
+    value: 2
+  - type: 70
+    value: 1
+  - type: 520
+    value: 2
+  - type: 1011
+    value: 1
+  activatableIcons:
+  - faction: Default
+    image: {fileID: 0}
+  playCooldownSound: 0
+  beamPrefab: {fileID: 0}
+  muzzleFlashSprites:
+  - {fileID: 0}
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 0.25
+    loop: 1
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 1
+    minPitch: 0.2
+    maxPitch: 0.5
+    fadeVolume: 1
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.25

@@ -1,0 +1,95 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1464611097, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Rewired - German
+  m_EditorClassIdentifier: 
+  _yes: Ja
+  _no: Nein
+  _add: "Hinzuf\xFCgen"
+  _replace: Ersetzen
+  _remove: Entfernen
+  _swap: Tauschen
+  _cancel: Abbrechen
+  _none: Keine
+  _okay: Okay
+  _done: Fertig
+  _default: Standard
+  _assignControllerWindowTitle: "Controller w\xE4hlen"
+  _assignControllerWindowMessage: "Dr\xFCcke eine beliebige Taste oder bewege eine
+    Achse am Controller, den du verwenden m\xF6chtest."
+  _controllerAssignmentConflictWindowTitle: Controller-Zuordnung
+  _controllerAssignmentConflictWindowMessage: "{0} ist bereits {1} zugeordnet. M\xF6chtest
+    du stattdessen diesen Controller {2} zuweisen?"
+  _elementAssignmentPrePollingWindowMessage: "Zentriere oder setze zuerst alle Sticks
+    und Achsen auf Null und dr\xFCcke eine Taste oder warte, bis der Timer endet."
+  _joystickElementAssignmentPollingWindowMessage: "Dr\xFCcke jetzt eine Taste oder
+    bewege eine Achse, um sie {0} zuzuweisen."
+  _joystickElementAssignmentPollingWindowMessage_fullAxisFieldOnly: Bewege jetzt
+    eine Achse, um sie {0} zuzuweisen.
+  _keyboardElementAssignmentPollingWindowMessage: "Dr\xFCcke eine Taste, um sie {0}
+    zuzuweisen. Auch Modifikatortasten k\xF6nnen verwendet werden. Um nur eine Modifikatortaste
+    zuzuweisen, halte sie 1 Sekunde gedr\xFCckt."
+  _mouseElementAssignmentPollingWindowMessage: "Dr\xFCcke eine Maustaste oder bewege
+    eine Achse, um sie {0} zuzuweisen."
+  _mouseElementAssignmentPollingWindowMessage_fullAxisFieldOnly: Bewege eine Achse,
+    um sie {0} zuzuweisen.
+  _elementAssignmentConflictWindowMessage: Zuordnungskonflikt
+  _elementAlreadyInUseBlocked: '{0} ist bereits in Gebrauch und kann nicht ersetzt
+    werden.'
+  _elementAlreadyInUseCanReplace: "{0} ist bereits in Gebrauch. M\xF6chtest du es
+    ersetzen?"
+  _elementAlreadyInUseCanReplace_conflictAllowed: "{0} ist bereits in Gebrauch. M\xF6chtest
+    du es ersetzen? Du kannst die Zuordnung auch trotzdem hinzuf\xFCgen."
+  _mouseAssignmentConflictWindowTitle: Maus-Zuordnung
+  _mouseAssignmentConflictWindowMessage: "Die Maus ist bereits {0} zugeordnet. M\xF6chtest
+    du die Maus stattdessen {1} zuweisen?"
+  _calibrateControllerWindowTitle: Controller kalibrieren
+  _calibrateAxisStep1WindowTitle: Nullpunkt kalibrieren
+  _calibrateAxisStep1WindowMessage: "Zentriere oder setze {0} auf Null und dr\xFCcke
+    eine Taste oder warte, bis der Timer endet."
+  _calibrateAxisStep2WindowTitle: Bereich kalibrieren
+  _calibrateAxisStep2WindowMessage: "Bewege {0} \xFCber den gesamten Bereich und
+    dr\xFCcke eine Taste oder warte, bis der Timer endet."
+  _inputBehaviorSettingsWindowTitle: Empfindlichkeitseinstellungen
+  _restoreDefaultsWindowTitle: Standard wiederherstellen
+  _restoreDefaultsWindowMessage_onePlayer: Dadurch wird die Standardsteuerung wiederhergestellt.
+    Bist du sicher?
+  _restoreDefaultsWindowMessage_multiPlayer: "Dadurch wird die Standardsteuerung
+    f\xFCr alle Spieler wiederhergestellt. Bist du sicher?"
+  _actionColumnLabel: Aktionen
+  _keyboardColumnLabel: Tastatur
+  _mouseColumnLabel: Maus
+  _controllerColumnLabel: Controller
+  _removeControllerButtonLabel: Entfernen
+  _calibrateControllerButtonLabel: Kalibrieren
+  _assignControllerButtonLabel: Controller zuweisen
+  _inputBehaviorSettingsButtonLabel: Empfindlichkeit
+  _doneButtonLabel: Fertig
+  _restoreDefaultsButtonLabel: Standard wiederherstellen
+  _playersGroupLabel: 'Spieler:'
+  _controllerSettingsGroupLabel: 'Controller:'
+  _assignedControllersGroupLabel: 'Zugewiesene Controller:'
+  _settingsGroupLabel: 'Einstellungen:'
+  _mapCategoriesGroupLabel: 'Kategorien:'
+  _calibrateWindow_deadZoneSliderLabel: 'Totzone:'
+  _calibrateWindow_upperDeadZoneSliderLabel: 'Upper Dead Zone:'
+  _calibrateWindow_zeroSliderLabel: 'Null:'
+  _calibrateWindow_sensitivitySliderLabel: 'Empfindlichkeit:'
+  _calibrateWindow_invertToggleLabel: Umkehren
+  _calibrateWindow_calibrateButtonLabel: Kalibrieren
+  _modifierKeys:
+    control: Strg
+    alt: Alt
+    shift: Shift
+    command: Cmd
+    separator: ' + '
+  _customEntries: []

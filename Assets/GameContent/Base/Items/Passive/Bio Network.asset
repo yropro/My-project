@@ -1,0 +1,86 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 119305319, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Bio Network
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Passive
+  languageKey: 6Yib1a67
+  description: Slowly repair hull damage over time.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps: []
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 0
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  healthRegen: 0.00007
+  maxSpeed: 0
+  turnSpeed: 0
+  damageReduction: 0
+  creditSalvage: 0
+  itemSalvage: 0
+  bonusXp: 0
+  kineticResistance: 0
+  coldResistance: 0
+  corrosiveResistance: 0
+  electricResistance: 0
+  thermalResistance: 0
+  radiationResistance: 0
+  staticUpgrade:
+    type: 9
+    category: 800
+    secondCategory: 0
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 20
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 1
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    healthMax: 0
+    healthRegen: 0.003
+    maxSpeed: 0
+    turnSpeed: 0
+    damageReduction: 0
+    creditSalvage: 0
+    itemSalvage: 0
+    bonusXp: 0
+    kineticResistance: 0
+    coldResistance: 0
+    corrosiveResistance: 0
+    electricResistance: 0
+    thermalResistance: 0
+    radiationResistance: 0
+    threatPerSecond: 0
+  legendaries: []

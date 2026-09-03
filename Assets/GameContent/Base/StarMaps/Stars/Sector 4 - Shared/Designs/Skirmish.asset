@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1617794041, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Skirmish
+  m_EditorClassIdentifier: 
+  minLevel: 43
+  spawnWeight: 200
+  faction: Species-XI
+  allowInvasion: 0
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 99
+  debrisType: 0
+  allowRandomAsteroids: 1
+  nebulaChance: 0.3
+  combatMusic: 9020
+  arrivalMissions: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 7cd74a461fae9c44394b9d481d9ce416, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  spawnEnemies: 0
+  squadrons: []
+  gatewayShips: 3
+  destroyAllShips: 0
+  autoSpawnCount: 6
+  validAutoSpawnSquadrons:
+  - {fileID: 11400000, guid: c5c72e6752785e84d8134f4bab26a921, type: 2}
+  - {fileID: 11400000, guid: aea10bcee6ee52c49901f907fb571999, type: 2}
+  - {fileID: 11400000, guid: 3ba883da5894848438e8791f34a60bc0, type: 2}
+  - {fileID: 11400000, guid: 3515a15862d392b4cb8b3862b98f5922, type: 2}
+  - {fileID: 11400000, guid: 40181da56c5526546873a304ca9731ed, type: 2}
+  - {fileID: 11400000, guid: a2a02dc0af60ebd42ae1f1a1c0e21bde, type: 2}
+  - {fileID: 11400000, guid: 4d93a4390ee4b684bb6223fd2144ef8d, type: 2}
+  - {fileID: 11400000, guid: e15363561c75eff4c88c0ed42f8ad4d4, type: 2}
+  - {fileID: 11400000, guid: b1237b6282d086a4b816d90a60fffdbc, type: 2}
+  autoAggroEnemies: 1

@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Ascendant Front
+  m_EditorClassIdentifier: 
+  languageKey: vD08DBzi
+  faction: Pantheon
+  serialized: 'Destroyer#0.59#0.42#0.10#0.00
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.5,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Vanity
+    Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.02500000037252903,"y":0.44999998807907107},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Fin
+    1","k":"Pantheon","h":"DB","sa":"FF","b":"FF","o":{"x":0.20000000298023225,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Hull
+    3","k":"Pantheon","h":"DB","sa":"FF","b":"FF","o":{"x":-0.125,"y":0.0},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Phantom/Spike
+    1","k":"","h":"FF","sa":"FF","b":"D9","o":{"x":0.6499999761581421,"y":0.22499999403953553},"r":90.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Misc
+    1","k":"Pantheon","h":"DB","sa":"00","b":"E6","o":{"x":0.10000000149011612,"y":-0.17499999701976777},"r":190.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Wing
+    1","k":"Pantheon","h":"D6","sa":"FF","b":"E6","o":{"x":-0.22499999403953553,"y":-0.22499999403953553},"r":40.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Wing
+    4","k":"Pantheon","h":"D9","sa":"FF","b":"F2","o":{"x":0.32499998807907107,"y":0.375},"r":325.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Hull
+    2","k":"Pantheon","h":"DB","sa":"00","b":"FF","o":{"x":0.20000000298023225,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Cockpit
+    4","k":"Pantheon","h":"D6","sa":"FF","b":"FF","o":{"x":0.2750000059604645,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Spike
+    1","k":"Pantheon","h":"DB","sa":"00","b":"D9","o":{"x":-0.3499999940395355,"y":-0.07500000298023224},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Hull
+    1","k":"Pantheon","h":"DB","sa":"FF","b":"FF","o":{"x":-0.32499998807907107,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Fin
+    1","k":"Pantheon","h":"DB","sa":"FF","b":"FF","o":{"x":0.0,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":true}
+
+    {"n":"Conclave/Misc
+    4","k":"Pantheon","h":"DB","sa":"FF","b":"FF","o":{"x":-0.5,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Phantom/Wing
+    2","k":"","h":"D9","sa":"FF","b":"FF","o":{"x":0.17499999701976777,"y":0.550000011920929},"r":230.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Slots/Primary","k":"","h":"DB","sa":"FF","b":"FF","o":{"x":0.32499998807907107,"y":0.44999998807907107},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Secondary","k":"","h":"DB","sa":"FF","b":"FF","o":{"x":-0.125,"y":-0.20000000298023225},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"DB","sa":"FF","b":"FF","o":{"x":-0.2750000059604645,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"DB","sa":"FF","b":"FF","o":{"x":-0.07500000298023224,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 1

@@ -1,0 +1,94 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1464611097, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Rewired - Spanish
+  m_EditorClassIdentifier: 
+  _yes: "S\xED"
+  _no: No
+  _add: "A\xF1adir"
+  _replace: Reemplazar
+  _remove: Quitar
+  _swap: Swap
+  _cancel: Cancelar
+  _none: Ninguno
+  _okay: Aceptar
+  _done: Hecho
+  _default: Predeterminado
+  _assignControllerWindowTitle: Elegir control
+  _assignControllerWindowMessage: "Presiona cualquier bot\xF3n o mueve un eje en
+    el control que quieras usar."
+  _controllerAssignmentConflictWindowTitle: "Asignaci\xF3n de control"
+  _controllerAssignmentConflictWindowMessage: "{0} ya est\xE1 asignado a {1}. \xBFQuieres
+    asignar este control a {2} en su lugar?"
+  _elementAssignmentPrePollingWindowMessage: "Primero centra o deja en cero todas
+    las palancas y ejes, y presiona cualquier bot\xF3n o espera a que termine el
+    temporizador."
+  _joystickElementAssignmentPollingWindowMessage: "Ahora presiona un bot\xF3n o mueve
+    un eje para asignarlo a {0}."
+  _joystickElementAssignmentPollingWindowMessage_fullAxisFieldOnly: Now move an axis
+    to assign it to {0}.
+  _keyboardElementAssignmentPollingWindowMessage: "Presiona una tecla para asignarla
+    a {0}. Tambi\xE9n puedes usar teclas modificadoras. Para asignar una tecla modificadora
+    sola, mantenla presionada durante 1 segundo."
+  _mouseElementAssignmentPollingWindowMessage: "Presiona un bot\xF3n del mouse o
+    mueve un eje para asignarlo a {0}."
+  _mouseElementAssignmentPollingWindowMessage_fullAxisFieldOnly: Move an axis to
+    assign it to {0}.
+  _elementAssignmentConflictWindowMessage: "Conflicto de asignaci\xF3n"
+  _elementAlreadyInUseBlocked: "{0} ya est\xE1 en uso y no se puede reemplazar."
+  _elementAlreadyInUseCanReplace: "{0} ya est\xE1 en uso. \xBFQuieres reemplazarlo?"
+  _elementAlreadyInUseCanReplace_conflictAllowed: "{0} ya est\xE1 en uso. \xBFQuieres
+    reemplazarlo? Tambi\xE9n puedes agregar la asignaci\xF3n de todos modos."
+  _mouseAssignmentConflictWindowTitle: "Asignaci\xF3n del mouse"
+  _mouseAssignmentConflictWindowMessage: "El mouse ya est\xE1 asignado a {0}. \xBFQuieres
+    asignar el mouse a {1} en su lugar?"
+  _calibrateControllerWindowTitle: Calibrar control
+  _calibrateAxisStep1WindowTitle: Calibrar cero
+  _calibrateAxisStep1WindowMessage: "Centra o deja en cero {0} y presiona cualquier
+    bot\xF3n o espera a que termine el temporizador."
+  _calibrateAxisStep2WindowTitle: Calibrar rango
+  _calibrateAxisStep2WindowMessage: "Mueve {0} por todo su rango y luego presiona
+    cualquier bot\xF3n o espera a que termine el temporizador."
+  _inputBehaviorSettingsWindowTitle: Ajustes de sensibilidad
+  _restoreDefaultsWindowTitle: Restablecer valores predeterminados
+  _restoreDefaultsWindowMessage_onePlayer: "Esto restablecer\xE1 la configuraci\xF3n
+    de entrada predeterminada. \xBFSeguro que quieres hacerlo?"
+  _restoreDefaultsWindowMessage_multiPlayer: "Esto restablecer\xE1 la configuraci\xF3n
+    de entrada predeterminada para todos los jugadores. \xBFSeguro que quieres hacerlo?"
+  _actionColumnLabel: Acciones
+  _keyboardColumnLabel: Teclado
+  _mouseColumnLabel: Mouse
+  _controllerColumnLabel: Control
+  _removeControllerButtonLabel: Quitar
+  _calibrateControllerButtonLabel: Calibrar
+  _assignControllerButtonLabel: Asignar control
+  _inputBehaviorSettingsButtonLabel: Sensibilidad
+  _doneButtonLabel: Hecho
+  _restoreDefaultsButtonLabel: Restablecer valores predeterminados
+  _playersGroupLabel: 'Jugadores:'
+  _controllerSettingsGroupLabel: 'Control:'
+  _assignedControllersGroupLabel: 'Controles asignados:'
+  _settingsGroupLabel: 'Ajustes:'
+  _mapCategoriesGroupLabel: "Categor\xEDas:"
+  _calibrateWindow_deadZoneSliderLabel: 'Zona muerta:'
+  _calibrateWindow_upperDeadZoneSliderLabel: 'Upper Dead Zone:'
+  _calibrateWindow_zeroSliderLabel: 'Cero:'
+  _calibrateWindow_sensitivitySliderLabel: 'Sensibilidad:'
+  _calibrateWindow_invertToggleLabel: Invertir
+  _calibrateWindow_calibrateButtonLabel: Calibrar
+  _modifierKeys:
+    control: Control
+    alt: Alt
+    shift: Shift
+    command: Command
+    separator: ' + '
+  _customEntries: []

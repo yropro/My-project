@@ -1,0 +1,83 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 930412197, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Pantheon Warzone
+  m_EditorClassIdentifier: 
+  minLevel: 18
+  spawnWeight: 2
+  faction: Pantheon
+  allowInvasion: 1
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 5
+  debrisType: 1
+  allowRandomAsteroids: 0
+  nebulaChance: 0
+  combatMusic: 1200
+  arrivalMissions:
+  - {fileID: 11400000, guid: ab1f2641bbd0e3a4c9df7f7bd61b233a, type: 2}
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 7cd74a461fae9c44394b9d481d9ce416, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  defaultEnemyFaction: Species-XI
+  factions:
+  - name: Conclave
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 2f7be3f6582452e429e50a1ce0a05023, type: 2}
+    - {fileID: 11400000, guid: 7732ae77b3fc568498b2c73c26af06de, type: 2}
+    - {fileID: 11400000, guid: dcb2a7a3da4937e4a9f85cda0781afbd, type: 2}
+    - {fileID: 11400000, guid: 7e36718fa3b217443a39f7f815899317, type: 2}
+  - name: Species-XI
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 4d93a4390ee4b684bb6223fd2144ef8d, type: 2}
+    - {fileID: 11400000, guid: a2a02dc0af60ebd42ae1f1a1c0e21bde, type: 2}
+    - {fileID: 11400000, guid: 40181da56c5526546873a304ca9731ed, type: 2}
+    - {fileID: 11400000, guid: 3515a15862d392b4cb8b3862b98f5922, type: 2}
+    - {fileID: 11400000, guid: 3ba883da5894848438e8791f34a60bc0, type: 2}
+    - {fileID: 11400000, guid: c5c72e6752785e84d8134f4bab26a921, type: 2}
+    - {fileID: 11400000, guid: aea10bcee6ee52c49901f907fb571999, type: 2}
+  - name: Phantom
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 4ce089437af28f644b105997083cee8d, type: 2}
+    - {fileID: 11400000, guid: 4a083f8471ff0404daa3b70363b2b764, type: 2}
+    - {fileID: 11400000, guid: be5cd6028cac7934d9eff085eebacfec, type: 2}
+    - {fileID: 11400000, guid: 660f180274b7180488b02a3145bb7d16, type: 2}
+    - {fileID: 11400000, guid: 292e43e682e020c44a7bfea0a8154b6a, type: 2}
+    - {fileID: 11400000, guid: 2fa7b17bc27f151439ae878de2e52b7f, type: 2}
+  - name: Pantheon
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 6709f8729421b8041acf8027a7cee083, type: 2}
+    - {fileID: 11400000, guid: b0005b8ef91af1c4d8a31437d8f8d46a, type: 2}
+    - {fileID: 11400000, guid: eb949821f4e7d9d43bca230447cfafd6, type: 2}
+    - {fileID: 11400000, guid: cafa4bc57f007ab43b3facce63f0e25b, type: 2}
+    - {fileID: 11400000, guid: 01f489b13375a4746a8f576fecb47828, type: 2}
+    - {fileID: 11400000, guid: d5da583aaad3038458e2a5a02e0ed3e3, type: 2}
+  - name: Shadow
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 3fdacb2194b0bd6438d3591056feb3d9, type: 2}
+    - {fileID: 11400000, guid: 6ac8ec0951ae7c34bb8f3c27342f6c5e, type: 2}
+    - {fileID: 11400000, guid: a7088d2ea7b8f7e4295432309b1440ec, type: 2}
+    - {fileID: 11400000, guid: eda00e4e674d5674bab1f23fefe878a1, type: 2}
+    - {fileID: 11400000, guid: 8dd0e4e44c9b5ca41957807fad144daa, type: 2}
+  - name: Forgotten
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 87f22a79b7f26a44a8351d9ba246b5ba, type: 2}
+    - {fileID: 11400000, guid: 69b445f1841e4cb488c3734b768de221, type: 2}
+    - {fileID: 11400000, guid: 0eeb87ee5e6d8ee4d91f0b9ea5c90f3f, type: 2}
+    - {fileID: 11400000, guid: 1ff7995f7e7a8b4429aef98b2127d009, type: 2}

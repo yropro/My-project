@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Solara
+  m_EditorClassIdentifier: 
+  languageKey: nJGbpJeH
+  faction: 
+  serialized: 'Boss#1.66
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.5249999761581421,"y":0.4000000059604645},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Skeran
+    Boss/Spine 1","k":"","h":"7D","sa":"FF","b":"D9","o":{"x":1.100000023841858,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave
+    Boss/Join 2","k":"","h":"78","sa":"FF","b":"E6","o":{"x":-0.699999988079071,"y":0.17499999701976777},"r":120.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Skeran
+    Boss/Wing 1","k":"","h":"7D","sa":"FF","b":"FF","o":{"x":-1.75,"y":-0.42500001192092898},"r":90.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Skeran
+    Boss/Spine 1","k":"","h":"7D","sa":"FF","b":"D9","o":{"x":-1.100000023841858,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran
+    Boss/Wing 1","k":"","h":"7D","sa":"FF","b":"FF","o":{"x":1.75,"y":-0.42500001192092898},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Conclave
+    Boss/Join 2","k":"","h":"78","sa":"FF","b":"E6","o":{"x":0.699999988079071,"y":0.17499999701976777},"r":60.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Conclave
+    Boss/Misc","k":"","h":"6E","sa":"FF","b":"E6","o":{"x":-0.2750000059604645,"y":-0.7250000238418579},"r":270.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Conclave
+    Boss/Misc","k":"","h":"6E","sa":"FF","b":"E6","o":{"x":0.2750000059604645,"y":0.7250000238418579},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Skeran
+    Boss/Tail 2","k":"","h":"5E","sa":"FF","b":"FF","o":{"x":-1.125,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran
+    Boss/Tail 2","k":"","h":"5E","sa":"FF","b":"FF","o":{"x":1.125,"y":0.0},"r":90.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran
+    Boss/Tail 2","k":"","h":"5E","sa":"FF","b":"FF","o":{"x":0.0,"y":-1.125},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Phantom
+    Boss/Orb 1","k":"","h":"61","sa":"FF","b":"FF","o":{"x":0.0,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Slots/Primary","k":"","h":"5E","sa":"FF","b":"FF","o":{"x":0.32499998807907107,"y":0.6000000238418579},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}
+
+    {"n":"Slots/Primary","k":"","h":"5E","sa":"FF","b":"FF","o":{"x":-0.32499998807907107,"y":0.6000000238418579},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true}'
+  noMenuSpawn: 1

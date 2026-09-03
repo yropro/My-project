@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1950502710, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Small Shield Battery
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Consumable
+  languageKey: 2qOWZTBM
+  description: Instantly restore some of your ship's shield, then restore more over
+    time.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps:
+  - Sector 1
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  shipEffect: {fileID: 0}
+  tickEffect: {fileID: 0}
+  consumable:
+    type: 1
+    category: 10
+    secondCategory: 0
+    maximumStackSize: 99
+    immutable: 0
+    sellPrice: 10
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    consumableType: 1
+    instant: 200
+    effect: 500
+    duration: 3
+    statusEffectType: 0
+    level: 0

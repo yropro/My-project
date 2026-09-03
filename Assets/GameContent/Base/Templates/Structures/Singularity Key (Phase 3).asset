@@ -1,0 +1,77 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Singularity Key (Phase 3)
+  m_EditorClassIdentifier: 
+  languageKey: h2shwfKj
+  faction: 
+  serialized: 'Boss#1.15
+
+    {"n":"Conclave Boss/Bulk Head 2","k":"","h":"FF","sa":"00","b":"E6","o":{"x":1.274999976158142,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Light 2","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.675000011920929,"y":0.07500000298023224},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Panel","k":"","h":"FF","sa":"00","b":"30","o":{"x":0.6499999761581421,"y":0.44999998807907107},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 1","k":"","h":"FF","sa":"00","b":"E6","o":{"x":1.125,"y":-0.4000000059604645},"r":180.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 1","k":"","h":"FF","sa":"00","b":"E6","o":{"x":0.17499999701976777,"y":0.4000000059604645},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 2","k":"","h":"63","sa":"3B","b":"FF","o":{"x":-0.625,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 1","k":"","h":"FF","sa":"00","b":"E6","o":{"x":-0.2750000059604645,"y":-0.550000011920929},"r":155.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Bulk Head 3","k":"","h":"FF","sa":"00","b":"E6","o":{"x":0.02500000037252903,"y":0.0},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 4","k":"","h":"FF","sa":"00","b":"F2","o":{"x":-0.875,"y":0.925000011920929},"r":90.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 3","k":"","h":"33","sa":"FF","b":"FF","o":{"x":-0.4000000059604645,"y":0.800000011920929},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 3","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.125,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 3","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.949999988079071,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Bulk Head 2","k":"","h":"FF","sa":"00","b":"3B","o":{"x":0.6499999761581421,"y":0.44999998807907107},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 3","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.44999998807907107,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 2","k":"","h":"BA","sa":"FF","b":"FF","o":{"x":0.800000011920929,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Flora
+    Boss/Misc 2","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.125,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 2","k":"","h":"63","sa":"3B","b":"FF","o":{"x":0.02500000037252903,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 4","k":"","h":"FF","sa":"00","b":"F2","o":{"x":0.6499999761581421,"y":-0.925000011920929},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Orb 2","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.44999998807907107,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Core 1","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.949999988079071,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 1

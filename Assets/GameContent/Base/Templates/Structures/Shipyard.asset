@@ -1,0 +1,140 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Shipyard
+  m_EditorClassIdentifier: 
+  languageKey: B6odrDBj
+  faction: 
+  serialized: 'Structure#1.71
+
+    {"n":"Conclave Boss/Join 4","k":"","h":"FF","sa":"FF","o":{"x":1.7999999523162842,"y":-0.3499999940395355},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave
+    Boss/Join 4","k":"","h":"FF","sa":"FF","o":{"x":-1.7999999523162842,"y":-0.3499999940395355},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Panel","k":"","h":"FF","sa":"FF","o":{"x":0.574999988079071,"y":1.125},"r":225.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Panel","k":"","h":"FF","sa":"FF","o":{"x":1.0,"y":0.699999988079071},"r":225.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    2","k":"","h":"FF","sa":"FF","o":{"x":1.225000023841858,"y":1.0499999523162842},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Runway","k":"","h":"FF","sa":"FF","o":{"x":0.0,"y":-0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    2","k":"","h":"FF","sa":"FF","o":{"x":-1.350000023841858,"y":-0.9750000238418579},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    2","k":"","h":"FF","sa":"FF","o":{"x":-0.675000011920929,"y":-0.9750000238418579},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    2","k":"","h":"FF","sa":"FF","o":{"x":0.0,"y":-0.9750000238418579},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    2","k":"","h":"FF","sa":"FF","o":{"x":0.675000011920929,"y":-0.9750000238418579},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave
+    Boss/Join 4","k":"","h":"FF","sa":"FF","o":{"x":-1.0,"y":1.975000023841858},"r":90.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    2","k":"","h":"FF","sa":"FF","o":{"x":1.350000023841858,"y":-0.9750000238418579},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Panel","k":"","h":"FF","sa":"FF","o":{"x":1.350000023841858,"y":-0.574999988079071},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Tower","k":"","h":"FF","sa":"FF","o":{"x":1.350000023841858,"y":-0.2750000059604645},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Bulk
+    Head","k":"","h":"FF","sa":"FF","o":{"x":-1.149999976158142,"y":1.2999999523162842},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Bulk
+    Head","k":"","h":"FF","sa":"FF","o":{"x":0.0,"y":1.2999999523162842},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Panel","k":"","h":"FF","sa":"FF","o":{"x":-1.149999976158142,"y":1.350000023841858},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Panel","k":"","h":"FF","sa":"FF","o":{"x":0.0,"y":1.350000023841858},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Grill","k":"","h":"FF","sa":"FF","o":{"x":0.0,"y":0.8999999761581421},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Join
+    2","k":"","h":"FF","sa":"FF","o":{"x":0.9750000238418579,"y":1.25},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Gas
+    Tank","k":"","h":"FF","sa":"FF","o":{"x":1.100000023841858,"y":1.024999976158142},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Gas
+    Tank","k":"","h":"FF","sa":"FF","o":{"x":1.100000023841858,"y":1.475000023841858},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Light","k":"","h":"FF","sa":"FF","o":{"x":1.5750000476837159,"y":0.6000000238418579},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Wing
+    3","k":"Junker","h":"F2","sa":"FF","o":{"x":0.75,"y":-0.20000000298023225},"r":110.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Wing
+    3","k":"Junker","h":"F2","sa":"FF","o":{"x":0.6000000238418579,"y":0.5},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Light","k":"","h":"FF","sa":"FF","o":{"x":-1.5750000476837159,"y":-0.7749999761581421},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Vent
+    1","k":"Junker","h":"E8","sa":"FF","o":{"x":0.625,"y":0.10000000149011612},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Vent
+    1","k":"Junker","h":"E8","sa":"FF","o":{"x":0.625,"y":0.32499998807907107},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran/Cockpit
+    2","k":"Shadow","h":"9E","sa":"CC","o":{"x":-1.375,"y":-0.4000000059604645},"r":250.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Cockpit
+    3","k":"Junker","h":"DE","sa":"FF","o":{"x":0.925000011920929,"y":0.20000000298023225},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Fin
+    1","k":"Junker","h":"F5","sa":"FF","o":{"x":0.6499999761581421,"y":0.20000000298023225},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran/Hull
+    3","k":"Shadow","h":"9E","sa":"CC","o":{"x":-0.800000011920929,"y":-0.30000001192092898},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran/Wing
+    3","k":"Shadow","h":"AB","sa":"CC","o":{"x":-0.7250000238418579,"y":-0.17499999701976777},"r":280.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran/Wing
+    3","k":"Shadow","h":"AB","sa":"CC","o":{"x":-0.7250000238418579,"y":-0.42500001192092898},"r":80.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Skeran/Tail
+    1","k":"Shadow","h":"9C","sa":"CC","o":{"x":-0.6499999761581421,"y":-0.4000000059604645},"r":270.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Container","k":"","h":"FF","sa":"00","o":{"x":-0.675000011920929,"y":0.5249999761581421},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Container","k":"","h":"EB","sa":"FF","o":{"x":-0.44999998807907107,"y":0.5249999761581421},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Container","k":"","h":"A1","sa":"FF","o":{"x":-0.22499999403953553,"y":0.5249999761581421},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Container","k":"","h":"FF","sa":"00","o":{"x":-1.0499999523162842,"y":0.5},"r":195.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Vent
+    1","k":"Junker","h":"DE","sa":"FF","o":{"x":-1.4500000476837159,"y":0.6000000238418579},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Conclave/Vent
+    1","k":"Junker","h":"E8","sa":"FF","o":{"x":-1.475000023841858,"y":0.42500001192092898},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Claw
+    Arm","k":"","h":"FF","sa":"FF","o":{"x":1.225000023841858,"y":-0.699999988079071},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Claw
+    Arm","k":"","h":"FF","sa":"FF","o":{"x":1.225000023841858,"y":-0.699999988079071},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Drill
+    Arm","k":"","h":"FF","sa":"FF","o":{"x":-1.5750000476837159,"y":0.875},"r":10.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Claw
+    Arm","k":"","h":"FF","sa":"FF","o":{"x":1.225000023841858,"y":-0.699999988079071},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}
+
+    {"n":"Structure/Tower","k":"","h":"FF","sa":"FF","o":{"x":-1.149999976158142,"y":1.024999976158142},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true}'
+  noMenuSpawn: 1

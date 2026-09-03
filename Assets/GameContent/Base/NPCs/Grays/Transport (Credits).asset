@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Transport (Credits)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Grays
+  languageKey: MnUHBeNd
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 1f36053b372bcc349ad8352cdc55f0b3, type: 2}
+  faction: Grays
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1500
+  difficultyScale: []
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Kinetic
+  - item: {fileID: 11400000, guid: 678dd1e4ecccd8e46ad31fa05595c412, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 0a8d1717f4be7eb4a9236cd6ec94a05a, type: 2}
+    customizers:
+    - type: 220
+      value: 8.75
+  extraItems: []

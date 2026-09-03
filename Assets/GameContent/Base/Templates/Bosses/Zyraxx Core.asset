@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Zyraxx Core
+  m_EditorClassIdentifier: 
+  languageKey: dmHtQzmF
+  faction: 
+  serialized: 'Boss#0.32
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.0,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 1","k":"","h":"FF","sa":"FF","b":"9C","o":{"x":-0.05000000074505806,"y":0.25},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Core 4","k":"Shadow","h":"AB","sa":"FF","b":"FF","o":{"x":0.02500000037252903,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Spine 1","k":"Shadow","h":"A8","sa":"FF","b":"FF","o":{"x":0.20000000298023225,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran
+    Boss/Light 2","k":"Shadow","h":"A1","sa":"FF","b":"FF","o":{"x":0.25,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"B0","sa":"FF","b":"FF","o":{"x":0.20000000298023225,"y":0.17499999701976777},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"BD","sa":"FF","b":"FF","o":{"x":0.25,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"B0","sa":"FF","b":"FF","o":{"x":-0.15000000596046449,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 1

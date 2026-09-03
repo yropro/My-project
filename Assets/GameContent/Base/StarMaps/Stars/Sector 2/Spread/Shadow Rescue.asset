@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1771613176, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Shadow Rescue
+  m_EditorClassIdentifier: 
+  minLevel: 18
+  spawnWeight: 1
+  faction: Shadow
+  allowInvasion: 1
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 9
+  debrisType: 5
+  allowRandomAsteroids: 0
+  nebulaChance: 0.5
+  combatMusic: 1100
+  arrivalMissions:
+  - {fileID: 11400000, guid: 3f756e48883aecd45a5049355e9b1483, type: 2}
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 5d06fb9baa707084580a461155c7d81a, type: 2}
+  - {fileID: 11400000, guid: 5d06fb9baa707084580a461155c7d81a, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  friendlyNPCs:
+  - {fileID: 11400000, guid: 99482a1d98fec4540a2344f5542a9f1f, type: 2}
+  - {fileID: 11400000, guid: edc6f1d58e3827741b473e7b6bf265c9, type: 2}
+  - {fileID: 11400000, guid: 222f0f487644c5b4383863f0b9eb330b, type: 2}
+  totalTime: 60
+  friendlyThreatGeneration: 1
+  rescueSquadrons:
+  - spawnSeconds: 5
+    squadrons: []
+    autoSpawnCount: 1
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: a7088d2ea7b8f7e4295432309b1440ec, type: 2}
+    - {fileID: 11400000, guid: 3fdacb2194b0bd6438d3591056feb3d9, type: 2}
+    - {fileID: 11400000, guid: 6ac8ec0951ae7c34bb8f3c27342f6c5e, type: 2}
+  - spawnSeconds: 20
+    squadrons: []
+    autoSpawnCount: 2
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: a7088d2ea7b8f7e4295432309b1440ec, type: 2}
+    - {fileID: 11400000, guid: 3fdacb2194b0bd6438d3591056feb3d9, type: 2}
+    - {fileID: 11400000, guid: 6ac8ec0951ae7c34bb8f3c27342f6c5e, type: 2}
+  - spawnSeconds: 40
+    squadrons: []
+    autoSpawnCount: 2
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 6ac8ec0951ae7c34bb8f3c27342f6c5e, type: 2}
+    - {fileID: 11400000, guid: 8dd0e4e44c9b5ca41957807fad144daa, type: 2}
+    - {fileID: 11400000, guid: 3fdacb2194b0bd6438d3591056feb3d9, type: 2}

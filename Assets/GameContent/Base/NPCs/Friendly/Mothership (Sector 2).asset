@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Mothership (Sector 2)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Friendly
+  languageKey: CBoK8pXS
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 203c640cb22760a4c86ba3d432c3e5c0, type: 2}
+  faction: Conclave
+  allowGrapple: 1
+  scale: 3
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 1
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 1
+  aiBehaviour: 1030
+  difficultyScale:
+  - scale: 0
+    value: 0.05
+    calculated: 0.010000001
+  - scale: 1
+    value: 200
+    calculated: 70
+  - scale: 2
+    value: 100
+    calculated: 35
+  - scale: 3
+    value: 0.5
+    calculated: 0.1
+  - scale: 4
+    value: 0.5
+    calculated: 0.25
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Debris
+  - item: {fileID: 11400000, guid: 9ac9084e607834d43a657e0580328ba0, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 573647fd9d049f54abac0d3e6e08c8d9, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 573647fd9d049f54abac0d3e6e08c8d9, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 573647fd9d049f54abac0d3e6e08c8d9, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c2022e6be5a414f4b9541fbd6898feb2, type: 2}
+    customizers:
+    - type: 350
+      value: 100
+  - item: {fileID: 11400000, guid: c130a1ae9b91d7142a8a768926b41b08, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c130a1ae9b91d7142a8a768926b41b08, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: ee0ecf82f0192834291d06e82a3363c2, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: ee0ecf82f0192834291d06e82a3363c2, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c9e6fd0dedf720c4c892e0d808841380, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c9e6fd0dedf720c4c892e0d808841380, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c47bcedb0ddf654408e6ef01b7a87987, type: 2}
+    customizers: []
+  extraItems: []

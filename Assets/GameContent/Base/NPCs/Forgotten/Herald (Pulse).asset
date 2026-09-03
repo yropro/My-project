@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Herald (Pulse)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Forgotten
+  languageKey: 8f31hRpg
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 13afb92782646464982c6054b93620ad, type: 2}
+  faction: Forgotten
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1020
+  difficultyScale:
+  - scale: 3
+    value: 3.75
+    calculated: 0.75
+  - scale: 4
+    value: 1.5
+    calculated: 0.75
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e7cf2549873571b40b263ca4c354960a, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: 443ebe8f02b0cd74288cd13164333984, type: 2}
+    customizers:
+    - type: 700
+      value: Kinetic
+    - type: 90
+      value: quantumshield
+  - item: {fileID: 11400000, guid: 141bd4ea571a3434daf4d6800708fea8, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 89da62f8222a4764aa81f24e5f8f93e1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 7373da6c128d4314baea074c82aae1fa, type: 2}
+    customizers:
+    - type: 130
+      value: 5
+    - type: 220
+      value: 8
+    - type: 230
+      value: 1.5
+    - type: 90
+      value: prismaticpulse
+    - type: 20
+      value: 
+  - item: {fileID: 11400000, guid: da3c89c8813f5774ca2743c6afe3de94, type: 2}
+    customizers: []
+  extraItems: []

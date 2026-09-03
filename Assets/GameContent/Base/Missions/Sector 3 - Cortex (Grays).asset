@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 3 - Cortex (Grays)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: xmIJl5mO
+  displayName: Take Me to Your Leader
+  levelFrom: {fileID: 11400000, guid: a4107a282bc0a6047bba3122244a1899, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 2
+  description: Locate and destroy the Elite Cortex used by the Grays.
+  itemRewards: []
+  rewardFactionUnlocks:
+  - Grays
+  rewardAchievement: 6500
+  rewardMissions: []
+  prerequisiteMissions: []
+  steps:
+  - initialDialog:
+    - name: 3
+      dialog: So... this is where they've been hiding. We're a long way from Mars...
+    - name: 12
+      dialog: Aye, and dug in deep from the looks of it. There's a Cortex hiding
+        in there.
+    - name: 3
+      dialog: That flagship of theirs is the root of it. Take it out, and we cut
+        off their reach.
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 10
+    requirementTarget: Grays/Cortex (Elite)
+    requirementQuantity: 1

@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Moth
+  m_EditorClassIdentifier: 
+  languageKey: sdGdANji
+  faction: Skeran
+  serialized: 'Frigate#0.32#0.24#0.00#0.00
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.125,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Cockpit
+    2","k":"","h":"F0","sa":"CC","b":"FF","o":{"x":0.2750000059604645,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Hull
+    3","k":"","h":"ED","sa":"CC","b":"BF","o":{"x":0.05000000074505806,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Wing
+    3","k":"","h":"ED","sa":"CC","b":"D9","o":{"x":-0.02500000037252903,"y":0.125},"r":260.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Skeran/Tail
+    1","k":"","h":"E3","sa":"CC","b":"FF","o":{"x":-0.10000000149011612,"y":0.10000000149011612},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":true}
+
+    {"n":"Slots/Primary","k":"","h":"F5","sa":"CC","b":"FF","o":{"x":0.15000000596046449,"y":-0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Secondary","k":"","h":"F7","sa":"CC","b":"FF","o":{"x":0.02500000037252903,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Utility","k":"","h":"E8","sa":"CC","b":"FF","o":{"x":0.15000000596046449,"y":0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 0

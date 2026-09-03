@@ -1,0 +1,65 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Zyraxx (Armor 1)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Bosses
+  languageKey: gzB7py0f
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: c15312bf8cc3d09408d656a55498a7cf, type: 2}
+  faction: Shadow
+  allowGrapple: 1
+  scale: 3
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 0
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 5000
+  difficultyScale:
+  - scale: 0
+    value: 4
+    calculated: 0.7
+  - scale: 1
+    value: 5
+    calculated: 3
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables: []
+  equippedItems:
+  - item: {fileID: 11400000, guid: 9456c6eefff22ae4a8ac9031f21813d1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: c4387f0a94dd76745b3024e4f6ff9c5f, type: 2}
+    customizers:
+    - type: 90
+      value: basilisklaser
+    - type: 200
+      value: 150
+    - type: 220
+      value: 20
+  - item: {fileID: 11400000, guid: afc149f0b0b6eb84789b607b957af2d2, type: 2}
+    customizers:
+    - type: 310
+      value: 5
+    - type: 220
+      value: 10
+    - type: 100
+      value: 1
+    - type: 300
+      value: 0.25
+    - type: 110
+      value: 0.25
+  - item: {fileID: 11400000, guid: 9a2683b43831b6c49bdd9c7ff15070cb, type: 2}
+    customizers: []
+  extraItems: []

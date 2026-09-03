@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1028655690, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Intercept
+  m_EditorClassIdentifier: 
+  minLevel: 10
+  spawnWeight: 50
+  faction: Skeran
+  allowInvasion: 1
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 99
+  debrisType: 0
+  allowRandomAsteroids: 1
+  nebulaChance: 0
+  combatMusic: 100
+  arrivalMissions: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  autoSpawnCount: 4
+  validAutoSpawnSquadrons:
+  - {fileID: 11400000, guid: 0ad3b46acc75f1841a5cc15429a85184, type: 2}
+  - {fileID: 11400000, guid: 66f242fe7a95312469ff376fbc5042ee, type: 2}
+  - {fileID: 11400000, guid: 363c5b1dacfad6343b1d77f46071b04e, type: 2}
+  - {fileID: 11400000, guid: 2633ec482834b104e93d6f8b85373505, type: 2}
+  - {fileID: 11400000, guid: 935819d4a3e3449409aeb809f76d5705, type: 2}
+  - {fileID: 11400000, guid: 4e4b2684fca5f684c82289b4e9a22563, type: 2}
+  - {fileID: 11400000, guid: 083d110284d35e24cb3dd1c34c18924e, type: 2}
+  interceptSquadron: {fileID: 11400000, guid: 7c6e7554e9aeed049875c47fab7f5f1c, type: 2}
+  interceptTimer: 60

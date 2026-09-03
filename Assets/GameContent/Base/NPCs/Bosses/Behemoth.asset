@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Behemoth
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Bosses
+  languageKey: zIXoafRS
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: efc1ccf467941594e843378370fd6751, type: 2}
+  faction: Skeran
+  allowGrapple: 1
+  scale: 3
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1010
+  difficultyScale:
+  - scale: 0
+    value: 7.5
+    calculated: 1.3125
+  - scale: 1
+    value: 10
+    calculated: 6
+  - scale: 2
+    value: 7
+    calculated: 4.2000003
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e949bb9957866494fbc8c70b5146e950, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Radiation
+  - item: {fileID: 11400000, guid: 9456c6eefff22ae4a8ac9031f21813d1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: feaa5a15f823a5a439d0ee723024ae2a, type: 2}
+    customizers:
+    - type: 20
+      value: 
+  - item: {fileID: 11400000, guid: 96016f64992a29f449e6b09a65ec5acc, type: 2}
+    customizers:
+    - type: 1100
+      value: 10
+    - type: 1000
+      value: 
+  - item: {fileID: 11400000, guid: 16c3764d41fc25542a540c4bd418cdfa, type: 2}
+    customizers:
+    - type: 100
+      value: 4
+    - type: 220
+      value: 25
+    - type: 640
+      value: 10
+  extraItems: []

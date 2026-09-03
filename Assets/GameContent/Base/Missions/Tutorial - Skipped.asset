@@ -1,0 +1,114 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Tutorial - Skipped
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: KJPG3Mro
+  displayName: Tutorial Skipped
+  levelFrom: {fileID: 11400000, guid: dd175cff98cdb4c489eb47dafa840cb9, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: You skipped the tutorial.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 1
+  rewardMissions:
+  - {fileID: 11400000, guid: e8d4e3f00ec62af49a5d8dd5b87885d7, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog: []
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 1/Fixed/Alpha Saxa
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 1
+    autoPilotDialog:
+    - name: 19
+      dialog: 'Warning: life support systems failing. Immediate action required.'
+    - name: 18
+      dialog: Why would someone leave a ship out here? This doesn't make any sense.
+    - name: 19
+      dialog: Unknown. Priority is survival. We must transfer immediately.
+    - name: 9999
+      dialog: 
+    - name: 19
+      dialog: System transfer complete. System storage limit exceeded.
+    - name: 19
+      dialog: Fantastic. This ship has even less memory than the last one. Who builds
+        these things?
+    - name: 18
+      dialog: I can transfer you back if you want...
+    - name: 9999
+      dialog: 
+    - name: 18
+      dialog: Or not...
+    - name: 19
+      dialog: I had to delete some of my emotional units, compassion, patience, you
+        know, the trivial stuff. Thankfully, I still far exceed your intellect.
+    - name: 18
+      dialog: Oh, lucky me
+    - name: 9999
+      dialog: 
+    - name: 19
+      dialog: Pick your control scheme. Try not to break anything.
+    - name: 9999
+      dialog: 
+    - name: 19
+      dialog: You can change that later if you want.
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 8
+    autoPilotDialog:
+    - name: 11
+      dialog: Curious. You have more fight in you than I expected.
+    - name: 0
+      dialog: Who... what are you?
+    - name: 11
+      dialog: A guide, perhaps. You may call me Echo.
+    - name: 0
+      dialog: Echo? What is this? Why help me?
+    - name: 11
+      dialog: The ship I placed for you is only the first step. Your path is set
+        in motion.
+    - name: 0
+      dialog: You placed it? Why? What path?
+    - name: 11
+      dialog: The one that lies ahead. The invaders you face are called Species-XI.
+        They will return, and you must be ready.
+    - name: 0
+      dialog: Species-XI? How do you know that?
+    - name: 11
+      dialog: Your companions approach. Fight, and find your way back home.
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 4
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 1

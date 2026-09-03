@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Eagle (Outcast)
+  m_EditorClassIdentifier: 
+  languageKey: I69CxXEG
+  faction: Outcast
+  serialized: 'Destroyer#0.43#0.32#0.05#0.00
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"D9","o":{"x":-0.15000000596046449,"y":0.25},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Vanity
+    Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.17499999701976777,"y":0.4000000059604645},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Spike
+    1","k":"","h":"A6","sa":"FF","b":"E6","o":{"x":-0.05000000074505806,"y":0.44999998807907107},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Conclave/Wing
+    3","k":"Outcast","h":"A6","sa":"FF","b":"CC","o":{"x":-0.07500000298023224,"y":0.15000000596046449},"r":350.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Spike
+    1","k":"","h":"A6","sa":"FF","b":"FF","o":{"x":0.10000000149011612,"y":0.20000000298023225},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Conclave/Wing
+    1","k":"Outcast","h":"B5","sa":"FF","b":"FF","o":{"x":0.0,"y":0.30000001192092898},"r":290.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave/Hull
+    1","k":"Outcast","h":"A6","sa":"FF","b":"FF","o":{"x":-0.02500000037252903,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Cockpit
+    1","k":"Outcast","h":"BD","sa":"FF","b":"E6","o":{"x":0.32499998807907107,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Fin
+    1","k":"Outcast","h":"BD","sa":"FF","b":"FF","o":{"x":0.0,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":true}
+
+    {"n":"Slots/Primary","k":"","h":"AD","sa":"FF","b":"FF","o":{"x":0.07500000298023224,"y":0.22499999403953553},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"AD","sa":"FF","b":"FF","o":{"x":-0.02500000037252903,"y":0.3499999940395355},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Secondary","k":"","h":"AD","sa":"FF","b":"FF","o":{"x":0.17499999701976777,"y":0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"AD","sa":"FF","b":"FF","o":{"x":0.05000000074505806,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"AD","sa":"FF","b":"FF","o":{"x":-0.07500000298023224,"y":0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"AD","sa":"FF","b":"FF","o":{"x":-0.07500000298023224,"y":-0.10000000149011612},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Utility","k":"","h":"AD","sa":"FF","b":"FF","o":{"x":-0.125,"y":0.4749999940395355},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 0

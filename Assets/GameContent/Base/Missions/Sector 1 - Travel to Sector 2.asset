@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -459321786, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sector 1 - Travel to Sector 2
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Missions
+  languageKey: 9zjbfvq0
+  displayName: Travel to Sector 2
+  levelFrom: {fileID: 11400000, guid: 968774cbeff2b6c43aedd6f2f5022f06, type: 2}
+  autoAddStarMapBase: {fileID: 0}
+  sectorStarMapBase: {fileID: 0}
+  npcDisplayOverride: {fileID: 0}
+  category: 1
+  description: Travel through the gateway to Sector 2.
+  itemRewards: []
+  rewardFactionUnlocks: []
+  rewardAchievement: 0
+  rewardMissions:
+  - {fileID: 11400000, guid: 752555d495b34564687765ed766d3d77, type: 2}
+  prerequisiteMissions: []
+  steps:
+  - initialDialog: []
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 0
+    requirementTarget: Sector 2/Fixed/Asgard
+    requirementQuantity: 1
+  - initialDialog:
+    - name: 19
+      dialog: This place feels cold... Well, I can't actually feel, but the temperature
+        readings are abysmally low.
+    - name: 18
+      dialog: Isn't all space cold?
+    - name: 19
+      dialog: Cold-er. Everything's relative, remember?
+    - name: 19
+      dialog: Here comes the old guy...
+    autoPilotMapping: 0
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 999
+    requirementTarget: 
+    requirementQuantity: 1
+  - initialDialog: []
+    autoPilotMapping: 4
+    autoPilotDialog: []
+    inputTutorialStep: 0
+    situationalTutorial: 0
+    requirementType: 1000
+    requirementTarget: 
+    requirementQuantity: 0

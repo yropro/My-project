@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1589387733, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Schematics
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Schematics
+  languageKey: ywhILXyc
+  description: Stores modifiers and remains intact when transferring them to other
+    items.
+  designNotes: 
+  minimumLevel: 12
+  forSaleStarMaps:
+  - Sector 1
+  - Sector 2
+  - Sector 3
+  - Sector 4 - Phase 1
+  - Sector 4 - Phase 2
+  forSaleFlagship: 0
+  factionImages:
+  - faction: White
+    image: {fileID: 0}
+  - faction: Black
+    image: {fileID: 0}
+  - faction: Yellow
+    image: {fileID: 0}
+  - faction: Green
+    image: {fileID: 0}
+  - faction: Teal
+    image: {fileID: 0}
+  - faction: Blue
+    image: {fileID: 0}
+  - faction: Purple
+    image: {fileID: 0}
+  - faction: Pink
+    image: {fileID: 0}
+  - faction: Red
+    image: {fileID: 0}
+  - faction: Orange
+    image: {fileID: 0}
+  - faction: Gold
+    image: {fileID: 0}
+  - faction: Silver
+    image: {fileID: 0}
+  - faction: Bronze
+    image: {fileID: 0}
+  - faction: Star
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 0
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 0
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  schematics:
+    type: 10
+    category: 0
+    secondCategory: 0
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 25
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0

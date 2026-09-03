@@ -1,0 +1,73 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1108395927, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Tartarus
+  m_EditorClassIdentifier: 
+  languageKey: LNahHPg9
+  faction: Shadow
+  type: 500
+  id: 7
+  starMap: {fileID: 11400000, guid: 9e3ab6eea230fa54393b796ea5184e14, type: 2}
+  minPosition: {x: 1.5, y: 1.25}
+  maxPosition: {x: 2, y: 1.75}
+  generationMethod: 1
+  alwaysVisible: 0
+  autoComplete: 0
+  noExtraLinks: 0
+  allowInvasion: 0
+  invaded: 0
+  links: 
+  background: {fileID: 0}
+  backgroundHue: 9
+  debrisType: 5
+  nebula: 0
+  combatMusic: 1100
+  arrivalAutoPilot: 7
+  arrivalAutoPilotDialog:
+  - name: 8
+    dialog: The Phantom's secrets are ours now. Leave... or be buried with them.
+  arrivalSkipAutoPilot: 0
+  fleeDialog: []
+  arrivalMissions:
+  - {fileID: 11400000, guid: 3f756e48883aecd45a5049355e9b1483, type: 2}
+  completeAutoPilot: 0
+  completeAutoPilotDialog: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: d0bf833df8514cd4da88a7b444341c9e, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  structures: []
+  positionedSquadrons: []
+  gatewayShips: 1
+  squadrons:
+  - {fileID: 11400000, guid: 3fdacb2194b0bd6438d3591056feb3d9, type: 2}
+  - {fileID: 11400000, guid: eda00e4e674d5674bab1f23fefe878a1, type: 2}
+  - {fileID: 11400000, guid: 8dd0e4e44c9b5ca41957807fad144daa, type: 2}
+  friendly: {fileID: 0}
+  totalTime: 0
+  friendlyThreatGeneration: 0
+  rescueSquadrons: []
+  eliteSquadron: {fileID: 11400000, guid: 49588a4cd22a47243a2b79731f149b60, type: 2}
+  eliteTimer: 30
+  eliteMusic: 1150
+  starmapGateway: {fileID: 0}
+  starmapGatewayStarId: 0
+  starmapGatewayPosition: {x: 0, y: 0}
+  starmapGatewayCharged: 0
+  spreadStrength: 1
+  spreadStrengthDegrade: 0.05
+  minimumSpread: 6
+  spreadStarDesigns:
+  - {fileID: 11400000, guid: 9b4e2d9e085e44b42a1e8ed6333cc6e7, type: 2}
+  - {fileID: 11400000, guid: f3d0c2f8f299e4046ab758c54e1dec03, type: 2}
+  - {fileID: 11400000, guid: d8fa0662f158e5c49bcccb3b64fb226c, type: 2}

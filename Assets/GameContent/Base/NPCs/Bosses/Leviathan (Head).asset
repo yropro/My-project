@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Leviathan (Head)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Bosses
+  languageKey: XUWyY9Gr
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: c624742fbbbc72243a56288cb9778957, type: 2}
+  faction: Species-XI
+  allowGrapple: 1
+  scale: 3
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1010
+  difficultyScale:
+  - scale: 0
+    value: 5
+    calculated: 0.875
+  - scale: 1
+    value: 2.5
+    calculated: 1.5
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e949bb9957866494fbc8c70b5146e950, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  - {fileID: 11400000, guid: 57f4bca0de3ae1648acd0ee7217e7f71, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: 9456c6eefff22ae4a8ac9031f21813d1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 3b5a18579ab612d428367c3061e8cae1, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: b9bac1fb18389814386add55f4624860, type: 2}
+    customizers:
+    - type: 200
+      value: 150
+    - type: 220
+      value: 60
+    - type: 360
+      value: 45
+    - type: 490
+      value: 
+  - item: {fileID: 11400000, guid: 813b3146c1a8d724194237d2062165bf, type: 2}
+    customizers:
+    - type: 10
+      value: 
+    - type: 210
+      value: 1
+    - type: 200
+      value: 200
+    - type: 130
+      value: 5
+    - type: 230
+      value: 1
+    - type: 220
+      value: 20
+    - type: 20
+      value: 
+  extraItems: []

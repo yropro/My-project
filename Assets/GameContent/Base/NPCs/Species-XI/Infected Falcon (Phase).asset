@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Infected Falcon (Phase)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Species-XI
+  languageKey: UX1e5Qpo
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: da0f244a83819fc4ba8b57a53f7f17c6, type: 2}
+  faction: Species-XI
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1000
+  difficultyScale:
+  - scale: 0
+    value: 1.2
+    calculated: 0.21000001
+  - scale: 1
+    value: 1.5
+    calculated: 0.90000004
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e7cf2549873571b40b263ca4c354960a, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: 2fa64367eb07eb4468d8861180b6eb03, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 573647fd9d049f54abac0d3e6e08c8d9, type: 2}
+    customizers:
+    - type: 220
+      value: 8.75
+  - item: {fileID: 11400000, guid: 8a91fcd2a7bde9049922173187af4604, type: 2}
+    customizers:
+    - type: 10
+      value: 
+    - type: 120
+      value: 5
+    - type: 130
+      value: 12
+  - item: {fileID: 11400000, guid: 023b4b1ba60172f46bc570b8b2442873, type: 2}
+    customizers:
+    - type: 200
+      value: 250
+  - item: {fileID: 11400000, guid: da3c89c8813f5774ca2743c6afe3de94, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 291f12b8d1ede314a8d29730421c91d1, type: 2}
+    customizers: []
+  extraItems: []

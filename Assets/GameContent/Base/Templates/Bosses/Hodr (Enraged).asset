@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Hodr (Enraged)
+  m_EditorClassIdentifier: 
+  languageKey: 2NHmdCAx
+  faction: 
+  serialized: 'Boss#1.96
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.574999988079071,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Orb 2","k":"","h":"D9","sa":"FF","b":"FF","o":{"x":0.8999999761581421,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 2","k":"","h":"D9","sa":"FF","b":"BF","o":{"x":0.5249999761581421,"y":-1.1749999523162842},"r":105.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Join 1","k":"","h":"D9","sa":"ED","b":"FF","o":{"x":0.75,"y":-0.6499999761581421},"r":40.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 1","k":"","h":"DE","sa":"FF","b":"FF","o":{"x":-0.20000000298023225,"y":-0.32499998807907107},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Wing 1","k":"","h":"D6","sa":"FF","b":"D9","o":{"x":-0.800000011920929,"y":-1.25},"r":85.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Spike 1","k":"","h":"D6","sa":"FF","b":"CC","o":{"x":0.625,"y":-1.774999976158142},"r":30.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Phantom
+    Boss/Spike 1","k":"","h":"D6","sa":"FF","b":"E6","o":{"x":0.824999988079071,"y":1.600000023841858},"r":310.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Spike 1","k":"","h":"D6","sa":"FF","b":"FF","o":{"x":0.949999988079071,"y":-1.3250000476837159},"r":75.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Phantom
+    Boss/Spike 2","k":"","h":"E0","sa":"D9","b":"FF","o":{"x":-0.20000000298023225,"y":0.9750000238418579},"r":255.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.9750000238418579,"y":0.5249999761581421},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.824999988079071,"y":0.675000011920929},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Secondary","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.22499999403953553,"y":0.875},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.675000011920929,"y":0.4749999940395355},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"FF","sa":"00","b":"FF","o":{"x":0.675000011920929,"y":-0.4749999940395355},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 1

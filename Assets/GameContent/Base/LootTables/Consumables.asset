@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1138222096, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Consumables
+  m_EditorClassIdentifier: 
+  resourcePath: Base/LootTables
+  consumableDrops:
+  - consumableItemBase: {fileID: 11400000, guid: 4aa502b50b38fda45a45b034240be9c3, type: 2}
+    minLevel: 5
+    maxLevel: 100
+    chance: 1
+  - consumableItemBase: {fileID: 11400000, guid: 09b5dbb7f29fc8249b059577d5f537ce, type: 2}
+    minLevel: 1
+    maxLevel: 14
+    chance: 2
+  - consumableItemBase: {fileID: 11400000, guid: bda9c81cfacb88a48b90c3bbbc370757, type: 2}
+    minLevel: 1
+    maxLevel: 14
+    chance: 2
+  - consumableItemBase: {fileID: 11400000, guid: f5def92e402c6fc4f8fbf691a90fda03, type: 2}
+    minLevel: 15
+    maxLevel: 29
+    chance: 2
+  - consumableItemBase: {fileID: 11400000, guid: b70813f7ec8b14b44ae82b7bea0ba0dc, type: 2}
+    minLevel: 15
+    maxLevel: 29
+    chance: 2
+  - consumableItemBase: {fileID: 11400000, guid: 0df5ec02ccce9434396f2c263386cd12, type: 2}
+    minLevel: 30
+    maxLevel: 100
+    chance: 2
+  - consumableItemBase: {fileID: 11400000, guid: 7f7018b79477b394597738dfdc6e8822, type: 2}
+    minLevel: 30
+    maxLevel: 100
+    chance: 2
+  - consumableItemBase: {fileID: 11400000, guid: 637b7fe2cc7268a44a08482523b7a722, type: 2}
+    minLevel: 1
+    maxLevel: 100
+    chance: 0.5
+  - consumableItemBase: {fileID: 11400000, guid: 9aa204b4c0098184f879e782f7880372, type: 2}
+    minLevel: 1
+    maxLevel: 100
+    chance: 0.5
+  - consumableItemBase: {fileID: 11400000, guid: 7b5c456ad536aff44a6190bb5c543e9f, type: 2}
+    minLevel: 1
+    maxLevel: 100
+    chance: 0.5
+  - consumableItemBase: {fileID: 11400000, guid: b9dd98235a86ce845b3c62dafbda6055, type: 2}
+    minLevel: 1
+    maxLevel: 100
+    chance: 0.5
+  - consumableItemBase: {fileID: 11400000, guid: c0fb5ff229ed89a4190b384f29ea7d38, type: 2}
+    minLevel: 1
+    maxLevel: 100
+    chance: 0.5

@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1617794041, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Outcast Skirmish (Mine)
+  m_EditorClassIdentifier: 
+  minLevel: 1
+  spawnWeight: 1
+  faction: Outcast
+  allowInvasion: 1
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 9
+  debrisType: 5
+  allowRandomAsteroids: 0
+  nebulaChance: 0.3
+  combatMusic: 200
+  arrivalMissions:
+  - {fileID: 11400000, guid: 7706d1e1bd9d89347be5396ce1777b0a, type: 2}
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 7cd74a461fae9c44394b9d481d9ce416, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  spawnEnemies: 0
+  squadrons:
+  - {fileID: 11400000, guid: cb1e6b1b8b9bbf24fb53cde358075e1f, type: 2}
+  gatewayShips: 2
+  destroyAllShips: 0
+  autoSpawnCount: 3
+  validAutoSpawnSquadrons:
+  - {fileID: 11400000, guid: 4ad7f68cf7893274690bb9f3a4ef802a, type: 2}
+  - {fileID: 11400000, guid: d08cb992a559b494b82bb0501df067a2, type: 2}
+  autoAggroEnemies: 0

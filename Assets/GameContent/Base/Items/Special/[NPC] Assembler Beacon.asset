@@ -1,0 +1,96 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1076664692, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: '[NPC] Assembler Beacon'
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/Special
+  languageKey: AhT4bzQR
+  description: Assembler version of Conclave Beacon for NPC.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps: []
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 1
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 0
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 11400000, guid: 5bc001b2bcf57e54a912d6f3cb82eb27, type: 2}
+  gameObjectPrefab: {fileID: 0}
+  activatableIcons: []
+  hueShiftIcon: 0
+  targetFriendly: 0
+  playCooldownSound: 1
+  maxCharges: 0
+  duration: 0
+  weightedNpcBases:
+  - npcBase: {fileID: 11400000, guid: c6783a05219bc13488875264bfd0bbc6, type: 2}
+    weight: 100
+  jumpType: 0
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 1
+    loop: 0
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 0
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  shipSpawner:
+    type: 6
+    category: 600
+    secondCategory: 650
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 0
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 0
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    charges: 0
+    maxCharges: 5
+    rechargeSeconds: 0
+    duration: 99999
+    cooldown: 0
+    heatPerSecond: 0
+    aimAheadOfTarget: 0
+    isLinked: 0
+    aimSnap: 1
+    health: 1
+    damage: 1
+    critChance: 1
+    critModifier: 1
+    levelOffset: 0
+    shipIndexes: 
+  legendaries: []

@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Sovereign Tail
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Pantheon
+  languageKey: Q9nIgbmW
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: d169f493fda35844f9c8e4395a2fcf82, type: 2}
+  faction: Pantheon
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 5000
+  difficultyScale:
+  - scale: 1
+    value: 0.33
+    calculated: 0.19800001
+  - scale: 0
+    value: 0.75
+    calculated: 0.13125
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: 1334d1ec1bdae244db293e54bb49f939, type: 2}
+  - {fileID: 11400000, guid: 2a99d03191bf1cd4f92769ae5f41e746, type: 2}
+  - {fileID: 11400000, guid: 56c20011e3d6528469a3cc50212dcda2, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: cae6d2e2f31a0bd449debe9cc0d82702, type: 2}
+    customizers:
+    - type: 700
+      value: Cold
+  - item: {fileID: 11400000, guid: 678dd1e4ecccd8e46ad31fa05595c412, type: 2}
+    customizers: []
+  extraItems: []

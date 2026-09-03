@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 930412197, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Warzone
+  m_EditorClassIdentifier: 
+  minLevel: 6
+  spawnWeight: 75
+  faction: Skeran
+  allowInvasion: 1
+  invaded: 0
+  background: {fileID: 0}
+  backgroundHue: 99
+  debrisType: 0
+  allowRandomAsteroids: 1
+  nebulaChance: 0
+  combatMusic: 130
+  arrivalMissions: []
+  completeMissions: []
+  lootTables:
+  - {fileID: 11400000, guid: 7cd74a461fae9c44394b9d481d9ce416, type: 2}
+  - {fileID: 11400000, guid: 21fc836dac5fc9340a838550a2109574, type: 2}
+  defaultEnemyFaction: Species-XI
+  factions:
+  - name: Conclave
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 2f7be3f6582452e429e50a1ce0a05023, type: 2}
+    - {fileID: 11400000, guid: 7732ae77b3fc568498b2c73c26af06de, type: 2}
+    - {fileID: 11400000, guid: dcb2a7a3da4937e4a9f85cda0781afbd, type: 2}
+    - {fileID: 11400000, guid: 7e36718fa3b217443a39f7f815899317, type: 2}
+  - name: Species-XI
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 4d93a4390ee4b684bb6223fd2144ef8d, type: 2}
+    - {fileID: 11400000, guid: a2a02dc0af60ebd42ae1f1a1c0e21bde, type: 2}
+    - {fileID: 11400000, guid: 40181da56c5526546873a304ca9731ed, type: 2}
+    - {fileID: 11400000, guid: 3515a15862d392b4cb8b3862b98f5922, type: 2}
+    - {fileID: 11400000, guid: 3ba883da5894848438e8791f34a60bc0, type: 2}
+    - {fileID: 11400000, guid: c5c72e6752785e84d8134f4bab26a921, type: 2}
+    - {fileID: 11400000, guid: aea10bcee6ee52c49901f907fb571999, type: 2}
+  - name: Skeran
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 0ad3b46acc75f1841a5cc15429a85184, type: 2}
+    - {fileID: 11400000, guid: 66f242fe7a95312469ff376fbc5042ee, type: 2}
+    - {fileID: 11400000, guid: 363c5b1dacfad6343b1d77f46071b04e, type: 2}
+    - {fileID: 11400000, guid: 2633ec482834b104e93d6f8b85373505, type: 2}
+    - {fileID: 11400000, guid: 935819d4a3e3449409aeb809f76d5705, type: 2}
+    - {fileID: 11400000, guid: 4e4b2684fca5f684c82289b4e9a22563, type: 2}
+    - {fileID: 11400000, guid: 083d110284d35e24cb3dd1c34c18924e, type: 2}
+  - name: Junker
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: bc6c70f3feb59c74b860d78f590a806b, type: 2}
+    - {fileID: 11400000, guid: 493041098cf59854fac03e25e82745ee, type: 2}
+    - {fileID: 11400000, guid: 812d152e432396f4d9d0e28b35a51bd9, type: 2}
+    - {fileID: 11400000, guid: 7911a2968c8c3654691c7107da445d88, type: 2}
+    - {fileID: 11400000, guid: 7f152d7ebef328147b2a9cd3a315f7d4, type: 2}
+    - {fileID: 11400000, guid: e985bc98466ba4a4d8eb60fa65c31788, type: 2}
+  - name: Outcast
+    autoSpawnCount: 3
+    validAutoSpawnSquadrons:
+    - {fileID: 11400000, guid: 4ad7f68cf7893274690bb9f3a4ef802a, type: 2}
+    - {fileID: 11400000, guid: d08cb992a559b494b82bb0501df067a2, type: 2}
+    - {fileID: 11400000, guid: e23d638a6d64f5c40ac63f238a649b43, type: 2}
+    - {fileID: 11400000, guid: cb1e6b1b8b9bbf24fb53cde358075e1f, type: 2}

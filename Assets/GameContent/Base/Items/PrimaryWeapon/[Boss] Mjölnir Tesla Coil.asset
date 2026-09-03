@@ -1,0 +1,110 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -167438025, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: "[Boss] Mj\xF6lnir Tesla Coil"
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Items/PrimaryWeapon
+  languageKey: kTDDk2E2
+  description: Fires an electric bolt that jumps between targets.
+  designNotes: 
+  minimumLevel: 1
+  forSaleStarMaps: []
+  forSaleFlagship: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  npcUseOnly: 1
+  showInGlossary: 0
+  noSandbox: 0
+  allowInvisible: 0
+  globalLootWeight: 10
+  npcPlayerAlternative: {fileID: 11400000, guid: e21062526a30ea04bba3da07858c4069, type: 2}
+  gameObjectPrefab: {fileID: 0}
+  activatableIcons:
+  - faction: Conclave
+    image: {fileID: 0}
+  hueShiftIcon: 0
+  targetFriendly: 0
+  playCooldownSound: 0
+  beamPrefab: {fileID: 0}
+  customBeamDisplay: {fileID: 0}
+  muzzleFlashSprites: []
+  soundEffect:
+    audioClip: {fileID: 0}
+    volumeScale: 0.15
+    loop: 1
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 1
+    minPitch: 0
+    maxPitch: 0.75
+    fadeVolume: 1
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.25
+  statusEffectChance: 0
+  critChance: 0
+  maxRange: 0
+  chainTargets: 0
+  laser:
+    type: 4
+    category: 350
+    secondCategory: 0
+    maximumStackSize: 1
+    immutable: 0
+    sellPrice: 0
+    nameOverwrite: 
+    dropVersion: 
+    itemBasePath: 
+    faction: 
+    quantity: 1
+    rarity: 0
+    cargoIndex: 0
+    newlyAdded: 0
+    scanned: 0
+    favourite: 0
+    legendaryKey: 
+    level: 1
+    turnable: 1
+    unique: 0
+    alwaysEnabled: 0
+    customizers: []
+    durability: 0
+    invisible: 0
+    charges: 0
+    maxCharges: 0
+    rechargeSeconds: 0
+    duration: 0
+    cooldown: 0
+    heatPerSecond: 8
+    aimAheadOfTarget: 0
+    isLinked: 0
+    aimSnap: 1
+    damageType: 3
+    statusEffectChance: 0.2
+    damage: 75
+    critChance: 0.1
+    critModifier: 1
+    maxRange: 12
+    chainable: 0
+    chainTargets: 0
+    chainDamage: 0
+    chainRange: 0
+    snapEulerAngle: 360
+    changeRate: 3
+    snapChange: 0
+    hitObstructions: 1
+    piercing: 0
+    delayDamageTick: 0
+    globalLastHit: 0
+  legendaries: []

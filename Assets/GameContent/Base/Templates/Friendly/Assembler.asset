@@ -1,0 +1,123 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -790506516, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Assembler
+  m_EditorClassIdentifier: 
+  languageKey: OrPDF9if
+  faction: 
+  serialized: 'Boss#1.82
+
+    {"n":"Slots/Thruster","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.949999988079071,"y":1.024999976158142},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 4","k":"","h":"F5","sa":"FF","b":"D9","o":{"x":-1.625,"y":0.7250000238418579},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Conclave
+    Boss/Wing","k":"","h":"F7","sa":"FF","b":"E6","o":{"x":-1.2000000476837159,"y":1.2000000476837159},"r":165.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Structure/Runway","k":"","h":"FF","sa":"FF","b":"F2","o":{"x":0.22499999403953553,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 4","k":"","h":"F2","sa":"FF","b":"E6","o":{"x":2.0250000953674318,"y":0.0},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Structure/Panel","k":"","h":"F5","sa":"FF","b":"FF","o":{"x":1.475000023841858,"y":-0.25},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Wing
+    3","k":"Junker","h":"F2","sa":"FF","b":"FF","o":{"x":0.8999999761581421,"y":-0.20000000298023225},"r":110.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Wing
+    3","k":"Junker","h":"F2","sa":"FF","b":"FF","o":{"x":0.75,"y":0.5},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Vent
+    1","k":"Junker","h":"E8","sa":"FF","b":"FF","o":{"x":0.7749999761581421,"y":0.10000000149011612},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Vent
+    1","k":"Junker","h":"E8","sa":"FF","b":"FF","o":{"x":0.7749999761581421,"y":0.32499998807907107},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Cockpit
+    2","k":"Shadow","h":"6E","sa":"CC","b":"FF","o":{"x":-0.699999988079071,"y":-0.3499999940395355},"r":250.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Cockpit
+    3","k":"Junker","h":"DE","sa":"FF","b":"FF","o":{"x":1.0750000476837159,"y":0.20000000298023225},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Fin
+    1","k":"Junker","h":"F5","sa":"FF","b":"FF","o":{"x":0.800000011920929,"y":0.20000000298023225},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Hull
+    3","k":"Shadow","h":"73","sa":"CC","b":"FF","o":{"x":-0.125,"y":-0.25},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Wing
+    3","k":"Shadow","h":"69","sa":"CC","b":"FF","o":{"x":-0.05000000074505806,"y":-0.125},"r":280.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Wing
+    3","k":"Shadow","h":"69","sa":"CC","b":"FF","o":{"x":-0.05000000074505806,"y":-0.375},"r":80.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Skeran/Tail
+    1","k":"Shadow","h":"73","sa":"CC","b":"FF","o":{"x":0.02500000037252903,"y":-0.3499999940395355},"r":270.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Container","k":"","h":"FF","sa":"00","b":"FF","o":{"x":-0.07500000298023224,"y":0.5},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Container","k":"","h":"EB","sa":"FF","b":"FF","o":{"x":0.15000000596046449,"y":0.5},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Container","k":"","h":"A1","sa":"FF","b":"FF","o":{"x":0.375,"y":0.5},"r":180.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Container","k":"","h":"FF","sa":"00","b":"FF","o":{"x":-0.44999998807907107,"y":0.4749999940395355},"r":195.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Vent
+    1","k":"Junker","h":"DE","sa":"FF","b":"FF","o":{"x":-1.149999976158142,"y":-0.17499999701976777},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave/Vent
+    1","k":"Junker","h":"E8","sa":"FF","b":"FF","o":{"x":-1.149999976158142,"y":0.02500000037252903},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Wing","k":"","h":"F5","sa":"FF","b":"E6","o":{"x":0.5,"y":1.350000023841858},"r":165.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":true}
+
+    {"n":"Conclave
+    Boss/Join 2","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.0499999523162842,"y":0.800000011920929},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Structure/Tower","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":2.0999999046325685,"y":0.0},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Misc","k":"","h":"FA","sa":"FF","b":"FF","o":{"x":1.7000000476837159,"y":0.8999999761581421},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Structure/Panel","k":"","h":"F0","sa":"FF","b":"F2","o":{"x":-1.0750000476837159,"y":0.44999998807907107},"r":270.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Structure/Drill
+    Arm","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-1.0750000476837159,"y":0.44999998807907107},"r":10.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":false,"sn":true,"br":true}
+
+    {"n":"Conclave
+    Boss/Join 2","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-1.125,"y":-0.875},"r":90.0,"sc":{"x":1.0,"y":-1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Join 2","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.15000000596046449,"y":0.800000011920929},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Structure/Gas
+    Tank","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":0.6499999761581421,"y":0.8999999761581421},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Conclave
+    Boss/Misc","k":"","h":"F2","sa":"FF","b":"FF","o":{"x":-0.32499998807907107,"y":1.0750000476837159},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":true,"sn":true,"br":false}
+
+    {"n":"Structure/Claw
+    Arm","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.5,"y":-0.2750000059604645},"r":270.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":true}
+
+    {"n":"Slots/Primary","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":1.75,"y":0.925000011920929},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Primary","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.75,"y":-1.149999976158142},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Special","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-0.699999988079071,"y":1.125},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-1.25,"y":-1.25},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}
+
+    {"n":"Slots/Automatic
+    Special","k":"","h":"FF","sa":"FF","b":"FF","o":{"x":-1.25,"y":1.25},"r":0.0,"sc":{"x":1.0,"y":1.0,"z":1.0},"m":false,"sn":true,"br":false}'
+  noMenuSpawn: 1

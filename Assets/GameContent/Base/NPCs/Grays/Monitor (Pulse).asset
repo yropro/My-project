@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Monitor (Pulse)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Grays
+  languageKey: eJtzdqZY
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 9a6b6dccd4e247741a9fa53be75092e9, type: 2}
+  faction: Grays
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1002
+  difficultyScale:
+  - scale: 2
+    value: 0.5
+    calculated: 0.3
+  - scale: 1
+    value: 0.5
+    calculated: 0.3
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e7cf2549873571b40b263ca4c354960a, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: d8db3bd0032803c4db1e0a1c1c4ef570, type: 2}
+    customizers:
+    - type: 700
+      value: Kinetic
+  - item: {fileID: 11400000, guid: 678dd1e4ecccd8e46ad31fa05595c412, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 0a8d1717f4be7eb4a9236cd6ec94a05a, type: 2}
+    customizers:
+    - type: 220
+      value: 8.75
+  - item: {fileID: 11400000, guid: 31c51535403bd224595f6ad74ecc06e5, type: 2}
+    customizers:
+    - type: 220
+      value: 8
+    - type: 230
+      value: 1.5
+    - type: 20
+      value: 
+  - item: {fileID: 11400000, guid: 023b4b1ba60172f46bc570b8b2442873, type: 2}
+    customizers:
+    - type: 200
+      value: 250
+  extraItems: []

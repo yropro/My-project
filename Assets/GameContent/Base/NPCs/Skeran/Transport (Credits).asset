@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Transport (Credits)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Skeran
+  languageKey: JW1JPBbC
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 4a1be4e3f2210b34ca9e0ea254bb48fb, type: 2}
+  faction: Skeran
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1500
+  difficultyScale: []
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  - {fileID: 11400000, guid: 6c9bc191c13e08042b27701511e5b468, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: 4a0fd4e8f412e484dbebb96f666c4f58, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 100580a17189c884c8bff48a12a8cb5b, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 996038711158f5f4a8d8fe87f4adf323, type: 2}
+    customizers: []
+  extraItems: []

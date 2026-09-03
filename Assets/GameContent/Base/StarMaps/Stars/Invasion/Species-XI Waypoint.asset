@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -263786268, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Species-XI Waypoint
+  m_EditorClassIdentifier: 
+  minLevel: 1
+  spawnWeight: 0
+  faction: Species-XI
+  allowInvasion: 1
+  invaded: 1
+  background: {fileID: 0}
+  backgroundHue: 6
+  debrisType: 6
+  allowRandomAsteroids: 0
+  nebulaChance: 0.2
+  combatMusic: 9020
+  arrivalMissions: []
+  completeMissions:
+  - {fileID: 11400000, guid: d79772c927c69724e974863768b5e892, type: 2}
+  lootTables: []
+  structures:
+  - structureName: Waypoint (Infected)
+    position: {x: 2, y: -2}

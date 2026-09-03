@@ -1,0 +1,73 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 2034333587, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Overcharge Thruster
+  m_EditorClassIdentifier: 
+  languageKey: A9P9ysE6
+  key: overchargedthruster
+  description: A rocket thruster that has been overcharged for higher performance.
+  noDrop: 0
+  factionImages:
+  - faction: Conclave
+    image: {fileID: 0}
+  containerPrefab: {fileID: 0}
+  gameObjectPrefab: {fileID: 0}
+  modifiers:
+  - type: 20
+    value: 1
+  - type: 22
+    value: 1
+  - type: 500
+    value: 2
+  - type: 1011
+    value: 1
+  boostTrailPrefab: {fileID: 0}
+  boostInvulnerabilitySprite: {fileID: 0}
+  thrusterSound:
+    audioClip: {fileID: 0}
+    volumeScale: 0.1
+    loop: 1
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 1
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  boostSound:
+    audioClip: {fileID: 0}
+    volumeScale: 0.1
+    loop: 1
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 1
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5
+  dodgeSound:
+    audioClip: {fileID: 0}
+    volumeScale: 0.5
+    loop: 0
+    pitchVariance: 0
+    volumeVariance: 0
+    fadePitch: 0
+    minPitch: 0.2
+    maxPitch: 1
+    fadeVolume: 0
+    minVolume: 0
+    maxVolume: 1
+    fadeSeconds: 0.5

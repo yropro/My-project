@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1515019235, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Firefly (Cannon)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/Squadrons/Skeran
+  languageKey: L41RNxEN
+  displayName: Fireflies
+  multiplier: 1
+  friendly: 0
+  customDisplayPositions: []
+  formation: 0
+  spiralRadius: 20
+  shipsByLevels:
+  - levelRequired: 1
+    ships:
+    - {fileID: 11400000, guid: ebc26457f146eef4786c8a821f1299b2, type: 2}
+    - {fileID: 11400000, guid: ebc26457f146eef4786c8a821f1299b2, type: 2}
+  - levelRequired: 6
+    ships:
+    - {fileID: 11400000, guid: ebc26457f146eef4786c8a821f1299b2, type: 2}
+  - levelRequired: 13
+    ships:
+    - {fileID: 11400000, guid: ebc26457f146eef4786c8a821f1299b2, type: 2}
+  - levelRequired: 45
+    ships:
+    - {fileID: 11400000, guid: ebc26457f146eef4786c8a821f1299b2, type: 2}
+  - levelRequired: 75
+    ships:
+    - {fileID: 11400000, guid: ebc26457f146eef4786c8a821f1299b2, type: 2}
+    - {fileID: 11400000, guid: ebc26457f146eef4786c8a821f1299b2, type: 2}
+  - levelRequired: 90
+    ships:
+    - {fileID: 11400000, guid: ebc26457f146eef4786c8a821f1299b2, type: 2}
+  invulnerableLeader: 0
+  splitSquadron: 0
+  splitLeaderNpc: {fileID: 0}
+  splitTailNpc: {fileID: 0}
+  invulnerableLayers: 0
+  inactiveLayers: 0
+  attachRotation: 0
+  rotateAway: 0
+  rigidAttachment: 0
+  combatFormationDrift: 1
+  respawn: 0
+  respawnMinSeconds: 0
+  respawnMaxSeconds: 0

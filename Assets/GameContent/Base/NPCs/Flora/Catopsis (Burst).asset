@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1826862844, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
+  m_Name: Catopsis (Burst)
+  m_EditorClassIdentifier: 
+  resourcePath: Base/NPCs/Flora
+  languageKey: QZjIHSPt
+  friendlyDisplayPosition: []
+  templateBase: {fileID: 11400000, guid: 9a2a74d9171470b49840862484bf8ff3, type: 2}
+  faction: Flora
+  allowGrapple: 1
+  scale: 1
+  attachStructure: 
+  attachBossRange: 0
+  grantXp: 1
+  immovable: 0
+  disableMinibars: 0
+  disableExplosion: 0
+  fixedPhases: 0
+  aiBehaviour: 1005
+  difficultyScale: []
+  echoPartPrefab: {fileID: 0}
+  echoPartDialog: []
+  lootTables:
+  - {fileID: 11400000, guid: e7cf2549873571b40b263ca4c354960a, type: 2}
+  - {fileID: 11400000, guid: efacc5aa43d85a14f98f03b27e21f69b, type: 2}
+  - {fileID: 11400000, guid: 3f5aee32fcbf1cb4ebea4eb5f82492f1, type: 2}
+  equippedItems:
+  - item: {fileID: 11400000, guid: 779d27b4945cc2047a61d3722e0c6b65, type: 2}
+    customizers:
+    - type: 700
+      value: Corrosive
+  - item: {fileID: 11400000, guid: 8446ae2c2887e90489777346b40c985d, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 80115876adb53c945a4ed2a0d98e3685, type: 2}
+    customizers:
+    - type: 220
+      value: 8.75
+  - item: {fileID: 11400000, guid: 80115876adb53c945a4ed2a0d98e3685, type: 2}
+    customizers:
+    - type: 220
+      value: 8.75
+  - item: {fileID: 11400000, guid: 9a5372281c3b15a43a11828002c3f613, type: 2}
+    customizers:
+    - type: 200
+      value: 100
+  - item: {fileID: 11400000, guid: e11bc4111d9e5d5478af1986a703b98d, type: 2}
+    customizers: []
+  - item: {fileID: 11400000, guid: 90f52001f3394e8458fa473ac1ab7e76, type: 2}
+    customizers: []
+  extraItems: []
