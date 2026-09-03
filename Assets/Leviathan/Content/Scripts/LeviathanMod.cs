@@ -21,8 +21,8 @@ public class LeviathanMod : IStarVortexMod
     public const Upgrade.Key GrowthUpgrade =
         (Upgrade.Key)81;
 
-    public const Upgrade.Key ConstrictorUpgrade = 
-        (Upgrade.Key)82;
+    public const Upgrade.Key PredatorUpgrade =
+        (Upgrade.Key)83;
 
     private static GameObject controllerObject;
 
@@ -32,8 +32,8 @@ public class LeviathanMod : IStarVortexMod
     {
         Debug.Log("[Leviathan] Native skill-class build Init");
 
-        // Register Growth into the game's native Upgrade array and rebuild
-        // Upgrade's key lookup before any UI or Pilot code can request it.
+        // Register Leviathan skills into the game's native Upgrade array and rebuild
+        // Upgrade's key lookup before any UI or Pilot code can request them.
         LeviathanSkillSystem.Register();
 
         harmony.PatchAll();
