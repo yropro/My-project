@@ -21,6 +21,9 @@ public class LeviathanMod : IStarVortexMod
     public const Upgrade.Key GrowthUpgrade =
         (Upgrade.Key)81;
 
+    public const Upgrade.Key ConstrictorUpgrade = 
+        (Upgrade.Key)82;
+
     private static GameObject controllerObject;
 
     public static LeviathanController Controller { get; private set; }
