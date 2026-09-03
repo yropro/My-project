@@ -17,6 +17,7 @@ public static class LeviathanSkillSystem
 {
     private const int GrowthValuePerRank = 3;
     private const int GrowthLevels = 5;
+    private const int ConstrictorLevels = 5;
     private const int PredatorLevels = 5;
 
     private static readonly FieldInfo UpgradesField =
@@ -57,6 +58,7 @@ public static class LeviathanSkillSystem
         );
 
     public static Upgrade Growth { get; private set; }
+    public static Upgrade Constrictor { get; private set; }
     public static Upgrade Predator { get; private set; }
 
     public static void Register()
@@ -91,6 +93,16 @@ public static class LeviathanSkillSystem
             GrowthValuePerRank,     // UI value: +3
             GrowthLevels,
             "Growth"
+        );
+
+        Constrictor = EnsureUpgrade(
+            upgrades,
+            LeviathanMod.ConstrictorUpgrade,
+            0,                      // requiredLevel
+            false,                  // percentage
+            0,                      // behavior is described by the skill text
+            ConstrictorLevels,
+            "Constrictor"
         );
 
         Predator = EnsureUpgrade(
@@ -214,12 +226,17 @@ public static class LeviathanSkillSystem
             new object[] { LeviathanMod.GrowthUpgrade }
         );
 
+        object constrictor = GetUpgradeMethod.Invoke(
+            null,
+            new object[] { LeviathanMod.ConstrictorUpgrade }
+        );
+
         object predator = GetUpgradeMethod.Invoke(
             null,
             new object[] { LeviathanMod.PredatorUpgrade }
         );
 
-        if (growth == null || predator == null)
+        if (growth == null || constrictor == null || predator == null)
         {
             throw new Exception(
                 "[Leviathan] Upgrade lookup rebuilt without all Leviathan skills."
@@ -227,7 +244,7 @@ public static class LeviathanSkillSystem
         }
 
         Debug.Log(
-            "[Leviathan] Native Upgrade lookup rebuilt with Growth and Predator."
+            "[Leviathan] Native Upgrade lookup rebuilt with Growth, Constrictor and Predator."
         );
     }
 }
@@ -333,6 +350,7 @@ public static class LeviathanSkillUI
     {
         if (panel == null ||
             LeviathanSkillSystem.Growth == null ||
+            LeviathanSkillSystem.Constrictor == null ||
             LeviathanSkillSystem.Predator == null)
             return;
 
@@ -422,6 +440,7 @@ public static class LeviathanSkillUI
     {
         if (core == null ||
             LeviathanSkillSystem.Growth == null ||
+            LeviathanSkillSystem.Constrictor == null ||
             LeviathanSkillSystem.Predator == null)
             return;
 
@@ -499,7 +518,12 @@ public static class LeviathanSkillUI
             new object[] { LeviathanSkillSystem.Predator }
         ) as UpgradeDisplay;
 
-        return new UpgradeDisplay[] { growth, predator };
+        UpgradeDisplay constrictor = AddUpgradeMethod.Invoke(
+            display,
+            new object[] { LeviathanSkillSystem.Constrictor }
+        ) as UpgradeDisplay;
+
+        return new UpgradeDisplay[] { growth, predator, constrictor };
     }
 
     private static bool IsClassUnlocked(Pilot pilot)
@@ -691,6 +715,8 @@ public static class LeviathanSkillUI
             index = 0;
         else if (selected == LeviathanMod.PredatorUpgrade)
             index = 1;
+        else if (selected == LeviathanMod.ConstrictorUpgrade)
+            index = 2;
 
         if (index >= 0 &&
             index < skillDisplays.Length &&
@@ -766,6 +792,12 @@ public static class LeviathanUpgradeGetNamePatch
             return false;
         }
 
+        if (__0 == LeviathanMod.ConstrictorUpgrade)
+        {
+            __result = "Constrictor";
+            return false;
+        }
+
         return true;
     }
 }
@@ -801,6 +833,13 @@ public static class LeviathanUpgradeGetDescriptionPatch
             return false;
         }
 
+        if (__0 == LeviathanMod.ConstrictorUpgrade)
+        {
+            __result =
+                "Leviathan body segments deal contact damage using the equipped Assault weapon.";
+            return false;
+        }
+
         return true;
     }
 }
@@ -822,6 +861,7 @@ public static class LeviathanUpgradeIsFreePatch
         ref bool __result)
     {
         if (__0 != LeviathanMod.GrowthUpgrade &&
+            __0 != LeviathanMod.ConstrictorUpgrade &&
             __0 != LeviathanMod.PredatorUpgrade)
         {
             return true;
@@ -980,7 +1020,7 @@ public static class LeviathanCoreUpgradesClassPatch
 }
 
 // Temporary Leviathan skill icon fallback. UpgradeDisplay otherwise leaves the
-// prefab icon unchanged because keys 81/83 are absent from its serialized array.
+// prefab icon unchanged because keys 81/82/83 are absent from its serialized array.
 [HarmonyPatch]
 public static class LeviathanSkillIconPatch
 {
@@ -1031,6 +1071,8 @@ public static class LeviathanSkillIconPatch
         Upgrade.Key fallbackKey;
 
         if (leviathanKey == LeviathanMod.GrowthUpgrade)
+            fallbackKey = Upgrade.Key.GladiatorHullLeech;
+        else if (leviathanKey == LeviathanMod.ConstrictorUpgrade)
             fallbackKey = Upgrade.Key.GladiatorHullLeech;
         else if (leviathanKey == LeviathanMod.PredatorUpgrade)
             fallbackKey = Upgrade.Key.GladiatorEventHorizon;

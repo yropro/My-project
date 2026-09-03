@@ -10,10 +10,10 @@ using UnityEngine;
 // Constrictor
 // =============================================================================
 //
-// While an Assault weapon (ram / scythe / blades) is equipped, its own passive
-// contact damage and lunge are suppressed and its blades are hidden. Instead,
-// every Leviathan body segment touching an enemy deals contact damage derived
-// from that exact weapon.
+// While an Assault weapon (ram / scythe / blades) is being used as a Leviathan
+// skill source, its physical blades and native blade damage are suppressed.
+// Constrictor replaces passive contact damage; Predator may retain the native
+// StartAttack/Lunge lifecycle while replacing the active hit.
 //
 // Baseline anchor: two frigate-scale segments touching a target are equivalent
 // to two scythe blades touching it in the weapon's non-lunge state. Passive
@@ -157,9 +157,15 @@ public static class LeviathanConstrictor
             return;
         }
 
+        // Assault becomes an invisible Leviathan stat source when either
+        // Constrictor or Predator is active. Only Constrictor rank controls the
+        // passive contact-damage calculation below.
         int rank = GetRank(player);
+        int predatorRank = GetPredatorRank(player);
 
-        if (rank < 1)
+        if (LeviathanMod.Controller == null ||
+            LeviathanMod.Controller.GetActiveSectionCount(player) < 5 ||
+            (rank < 1 && predatorRank < 1))
         {
             ReleaseSuppression();
             return;
@@ -174,6 +180,12 @@ public static class LeviathanConstrictor
         }
 
         ApplySuppression(src);
+
+        // Predator-only still hides/disables the physical Assault weapon, but
+        // there is no replacement passive contact damage until Constrictor is
+        // actually ranked.
+        if (rank < 1)
+            return;
 
         if (!player.IsVisible() ||
             player.IsDisabled() ||
@@ -590,6 +602,12 @@ public static class LeviathanConstrictor
         return suppressed != null && suppressed == assault;
     }
 
+    public static void EnsureHidden(Assault assault)
+    {
+        if (IsSuppressed(assault))
+            SetBladesVisible(assault, false);
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================
@@ -602,6 +620,31 @@ public static class LeviathanConstrictor
             ? 0
             : pilot.GetUpgradeLevel(ConstrictorUpgrade);
     }
+
+    private static int GetPredatorRank(GameShip player)
+    {
+        Pilot pilot = GameShip.GetPlayerSourcePilot(player);
+
+        return pilot == null
+            ? 0
+            : pilot.GetUpgradeLevel(LeviathanMod.PredatorUpgrade);
+    }
+
+    public static bool ShouldSuppressNativeAssaultStart(Assault assault)
+    {
+        if (!IsSuppressed(assault))
+            return false;
+
+        // If Predator exists, the native StartAttack -> GameShip.Lunge path is
+        // deliberately retained because Predator converts that lunge. Without
+        // Predator, Constrictor owns the weapon and the native Assault lunge is
+        // disabled along with the blade damage/visuals.
+        GameShip player = WorldController.instance == null
+            ? null
+            : WorldController.instance.GetCurrentPlayerShip();
+
+        return player != null && GetPredatorRank(player) < 1;
+    }
 }
 
 // =============================================================================
@@ -609,18 +652,17 @@ public static class LeviathanConstrictor
 // =============================================================================
 
 /// <summary>
-/// Assault.UpdateAssault gates both StartAttack (the lunge) and DoDamageTick
-/// (passive blade contact) behind one visibility/slot check. Skipping it kills
-/// both while leaving base.FixedUpdate and UpdateDrift to keep the Activatable
-/// state coherent. Assault.active is only the held-button flag, so nothing
-/// latches when the attack never starts.
+/// Keep Assault.UpdateAssault alive so Predator can reuse the native activation,
+/// cooldown and StartAttack -> GameShip.Lunge lifecycle. Only the physical
+/// blade/ram damage is suppressed here; Constrictor supplies passive contact
+/// damage and Predator supplies active lunge damage.
 /// </summary>
 [HarmonyPatch]
-public static class LeviathanAssaultSuppressPatch
+public static class LeviathanConstrictorSuppressBladeDamagePatch
 {
     public static MethodBase TargetMethod()
     {
-        return AccessTools.Method(typeof(Assault), "UpdateAssault");
+        return AccessTools.Method(typeof(Assault), "DoDamageTick");
     }
 
     public static bool Prefix(Assault __instance)
@@ -628,3 +670,30 @@ public static class LeviathanAssaultSuppressPatch
         return !LeviathanConstrictor.IsSuppressed(__instance);
     }
 }
+
+/// <summary>
+/// Constrictor by itself disables the Assault's native lunge. If Predator is
+/// ranked, StartAttack is allowed through because Predator converts that same
+/// native lunge path into its Leviathan attack.
+/// </summary>
+[HarmonyPatch]
+public static class LeviathanConstrictorSuppressNativeLungePatch
+{
+    public static MethodBase TargetMethod()
+    {
+        return AccessTools.Method(typeof(Assault), "StartAttack");
+    }
+
+    public static bool Prefix(Assault __instance)
+    {
+        return !LeviathanConstrictor.ShouldSuppressNativeAssaultStart(__instance);
+    }
+
+    public static void Postfix(Assault __instance)
+    {
+        // Native StartAttack may touch blade/trail presentation. Reassert the
+        // Leviathan-hidden state after the native activation path has run.
+        LeviathanConstrictor.EnsureHidden(__instance);
+    }
+}
+

@@ -3,6 +3,7 @@ using StarVortex;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using static StarVortex.Damageable;
@@ -43,28 +44,21 @@ public static class LeviathanPredatorRuntime
     private static readonly FieldInfo BladesField =
         AccessTools.Field(typeof(Assault), "blades");
 
+    // NetCombat.RouteDamage's first parameter is the game's internal
+    // IDamageable interface, which cannot safely be named from a mod assembly.
+    // Resolve the DamageData[] overload by shape, as Constrictor does.
     private static readonly MethodInfo RouteDamageMethod =
-        AccessTools.Method(
-            typeof(NetCombat),
-            "RouteDamage",
-            new Type[]
-            {
-                typeof(IDamageable),
-                typeof(Damageable.DamageType),
-                typeof(DamageData[]),
-                typeof(float),
-                typeof(bool),
-                typeof(Vector2),
-                typeof(GameShip),
-                typeof(bool),
-                typeof(float),
-                typeof(Activatable),
-                typeof(float),
-                typeof(float),
-                typeof(bool),
-                typeof(float)
-            }
-        );
+        typeof(NetCombat)
+            .GetMethods(
+                BindingFlags.Static |
+                BindingFlags.Public |
+                BindingFlags.NonPublic
+            )
+            .FirstOrDefault(
+                m => m.Name == "RouteDamage" &&
+                     m.GetParameters().Length == 14 &&
+                     m.GetParameters()[2].ParameterType == typeof(DamageData[])
+            );
 
     private static Assault startingAssault;
     private static Assault activeAssault;
@@ -432,7 +426,7 @@ public static class LeviathanPredatorRuntime
             null,
             new object[]
             {
-                (IDamageable)target,
+                target,
                 activeAssault.damageType,
                 predatorPacket,
                 statusEffectChance,

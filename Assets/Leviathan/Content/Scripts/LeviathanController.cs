@@ -69,6 +69,8 @@ public class LeviathanController : MonoBehaviour
         // From this point onward, retain the original SetPlayerShip ordering:
         // a different player ship always clears the old Leviathan state before
         // we attempt to resolve the new Pilot.
+        LeviathanPredatorRuntime.Cancel();
+        LeviathanConstrictor.Reset();
         RestorePlayerMass();
 
         currentPlayer = player;
@@ -172,6 +174,9 @@ public class LeviathanController : MonoBehaviour
 
     private void TearDownLeviathanForRefresh(GameShip player)
     {
+        LeviathanPredatorRuntime.CancelForPlayer(player);
+        LeviathanConstrictor.Reset();
+
         List<GameShip> oldSegments = segments
             .Where(x => x != null && x != player)
             .ToList();
@@ -232,11 +237,16 @@ public class LeviathanController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        LeviathanConstrictor.Tick(currentPlayer);
+        LeviathanPredatorRuntime.FixedTick();
         ApplyHighSpeedResistance();
     }
 
     public void ClearPlayerShip()
     {
+        LeviathanPredatorRuntime.Cancel();
+        LeviathanConstrictor.Reset();
+
         if (growthRefreshCoroutine != null)
         {
             StopCoroutine(growthRefreshCoroutine);
@@ -569,6 +579,11 @@ public class LeviathanController : MonoBehaviour
         if (currentPlayer == null || builtForUpgradeLevel < 1)
             return;
 
+        // Native weapon lunges should not be damped by the Leviathan cruising
+        // resistance curve. Predator explicitly uses GameShip.Lunge.
+        if (LeviathanPredatorRuntime.IsPredatorLunging(currentPlayer))
+            return;
+
         Rigidbody2D body = currentPlayer.GetRigidBody();
 
         if (body == null)
@@ -603,6 +618,71 @@ public class LeviathanController : MonoBehaviour
             Vector2.zero,
             decelerationPerSecond * Time.fixedDeltaTime
         );
+    }
+
+    public bool IsLeviathanSegment(GameShip ship)
+    {
+        return ship != null && segments.Contains(ship);
+    }
+
+    public int GetActiveSectionCount(GameShip player)
+    {
+        if (player == null ||
+            player != currentPlayer ||
+            builtForUpgradeLevel < 1)
+        {
+            return 0;
+        }
+
+        // Head/player + every active body segment + tail.
+        return 1 + segments.Count;
+    }
+
+    public float GetActiveSectionSizeValue(GameShip player)
+    {
+        if (player == null ||
+            player != currentPlayer ||
+            builtForUpgradeLevel < 1)
+        {
+            return 0f;
+        }
+
+        float value = GetSectionSizeValue(player);
+
+        foreach (GameShip segment in segments)
+        {
+            if (segment != null)
+                value += GetSectionSizeValue(segment);
+        }
+
+        return value;
+    }
+
+    private static float GetSectionSizeValue(GameShip ship)
+    {
+        if (ship == null)
+            return 0f;
+
+        // Ship.Class values in the native assembly:
+        // 3 Frigate, 4 Destroyer, 5 Cruiser, 6 Battleship,
+        // 7 Dreadnought, 8 Boss. Predator caps size contribution at 1.5.
+        int shipClass = (int)ship.GetShipClass();
+
+        switch (shipClass)
+        {
+            case 4:
+                return 1.20f;
+            case 5:
+                return 1.30f;
+            case 6:
+                return 1.40f;
+            case 7:
+            case 8:
+                return 1.50f;
+            case 3:
+            default:
+                return 1.00f;
+        }
     }
 
     private void ResizeCustomTemplateSlots(int count)
