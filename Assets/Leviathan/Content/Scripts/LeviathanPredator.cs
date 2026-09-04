@@ -12,8 +12,8 @@ using static StarVortex.Damageable;
 /// Predator converts the player's normal Assault activation into a heavier,
 /// shorter Leviathan lunge. Movement/cooldown still use the native Assault and
 /// GameShip systems; this class only scales those native values and replaces
-/// the Assault blade damage during the lunge with one head-contact hit per
-/// target.
+/// the Assault blade damage during the lunge with one native-Ram-hitbox contact
+/// hit per target.
 /// </summary>
 public static class LeviathanPredatorRuntime
 {
@@ -35,11 +35,11 @@ public static class LeviathanPredatorRuntime
     private static readonly FieldInfo ParentShipField =
         AccessTools.Field(typeof(Equippable), "parentShip");
 
-    private static readonly FieldInfo ObjectColliderField =
-        AccessTools.Field(typeof(Damageable), "objectCollider");
-
     private static readonly FieldInfo LungeTimerField =
         AccessTools.Field(typeof(GameShip), "lungeTimer");
+
+    private static readonly FieldInfo AttackTimerField =
+        AccessTools.Field(typeof(Assault), "attackTimer");
 
     private static readonly FieldInfo BladesField =
         AccessTools.Field(typeof(Assault), "blades");
@@ -63,6 +63,16 @@ public static class LeviathanPredatorRuntime
     private static Assault startingAssault;
     private static Assault activeAssault;
     private static GameShip activePlayer;
+
+    // Predator contact detection uses the actual native Corrosive Ram blade
+    // prefab/collider rather than the player's hull collider. The probe is
+    // instantiated only for an active Predator lunge and all visuals are hidden.
+    private static AssaultItemBase ramHitboxItemBase;
+    private static Assault ramHitboxTemplate;
+    private static GameObject ramHitboxObject;
+    private static Collider2D ramHitboxCollider;
+    private static Vector3 ramHitboxBaseScale;
+    private static bool warnedNoRamHitbox;
 
     private static readonly HashSet<GameShip> hitTargets =
         new HashSet<GameShip>();
@@ -119,6 +129,8 @@ public static class LeviathanPredatorRuntime
         activeAssault = assault;
         activePlayer = player;
         hitTargets.Clear();
+
+        BuildRamHitboxProbe(player);
 
         Debug.Log(
             "[Leviathan] Predator lunge armed. Rank = " +
@@ -180,7 +192,10 @@ public static class LeviathanPredatorRuntime
         }
 
         if (IsPredatorLunging(activePlayer))
-            ScanHeadContacts();
+        {
+            UpdateRamHitboxProbePose();
+            ScanRamHitboxContacts();
+        }
     }
 
     public static void CancelForPlayer(GameShip player)
@@ -191,6 +206,7 @@ public static class LeviathanPredatorRuntime
 
     public static void Cancel()
     {
+        DestroyRamHitboxProbe();
         startingAssault = null;
         activeAssault = null;
         activePlayer = null;
@@ -291,24 +307,214 @@ public static class LeviathanPredatorRuntime
         return Mathf.Clamp(rank, 1, 5) * CritChancePerRank;
     }
 
-    private static void ScanHeadContacts()
+    private static void BuildRamHitboxProbe(GameShip player)
+    {
+        DestroyRamHitboxProbe();
+
+        if (player == null)
+            return;
+
+        AssaultItemBase itemBase = FindRamHitboxItemBase();
+
+        if (itemBase == null ||
+            itemBase.assault == null ||
+            itemBase.blade == null)
+        {
+            WarnNoRamHitbox(
+                "Could not find a native Ram AssaultItemBase/blade prefab; " +
+                "Predator contact damage is disabled for this lunge."
+            );
+            return;
+        }
+
+        GameObject probe = UnityEngine.Object.Instantiate(
+            itemBase.blade,
+            player.transform
+        );
+
+        if (probe == null)
+        {
+            WarnNoRamHitbox(
+                "Could not instantiate the native Ram blade prefab; " +
+                "Predator contact damage is disabled for this lunge."
+            );
+            return;
+        }
+
+        Collider2D collider =
+            probe.GetComponentInChildren<Collider2D>(true);
+
+        if (collider == null)
+        {
+            UnityEngine.Object.Destroy(probe);
+
+            WarnNoRamHitbox(
+                "Native Ram blade prefab had no Collider2D; " +
+                "Predator contact damage is disabled for this lunge."
+            );
+            return;
+        }
+
+        probe.name = "Leviathan Predator Ram Hitbox";
+
+        ramHitboxItemBase = itemBase;
+        ramHitboxTemplate = itemBase.assault;
+        ramHitboxObject = probe;
+        ramHitboxCollider = collider;
+        ramHitboxBaseScale = probe.transform.localScale;
+
+        // Keep the exact native Ram object/collider/layer, but make the probe
+        // completely invisible. Collider2D itself is not a Renderer, so it
+        // remains available to PhysicsController.OverlapCollider.
+        Renderer[] renderers =
+            probe.GetComponentsInChildren<Renderer>(true);
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+                renderers[i].enabled = false;
+        }
+
+        SwishTrail[] swishes =
+            probe.GetComponentsInChildren<SwishTrail>(true);
+
+        for (int i = 0; i < swishes.Length; i++)
+        {
+            if (swishes[i] != null)
+                swishes[i].enabled = false;
+        }
+
+        ramHitboxCollider.enabled = true;
+        UpdateRamHitboxProbePose();
+
+        Debug.Log(
+            "[Leviathan] Predator using native Ram collider from '" +
+            itemBase.name + "'."
+        );
+    }
+
+    private static AssaultItemBase FindRamHitboxItemBase()
+    {
+        if (ramHitboxItemBase != null &&
+            ramHitboxItemBase.assault != null &&
+            ramHitboxItemBase.blade != null)
+        {
+            return ramHitboxItemBase;
+        }
+
+        AssaultItemBase[] itemBases =
+            Resources.FindObjectsOfTypeAll<AssaultItemBase>();
+
+        AssaultItemBase firstRam = null;
+
+        for (int i = 0; i < itemBases.Length; i++)
+        {
+            AssaultItemBase itemBase = itemBases[i];
+
+            if (itemBase == null ||
+                itemBase.assault == null ||
+                itemBase.blade == null ||
+                itemBase.assault.variant != Assault.Variant.Ram)
+            {
+                continue;
+            }
+
+            if (firstRam == null)
+                firstRam = itemBase;
+
+            // Corrosive Ram is the exact native geometry requested for
+            // Predator. If assets are renamed/localized this still selects by
+            // the Assault data rather than display text.
+            if (itemBase.assault.damageType == DamageType.Corrosive)
+            {
+                ramHitboxItemBase = itemBase;
+                return ramHitboxItemBase;
+            }
+        }
+
+        // There is currently one native Ram geometry. This fallback keeps the
+        // system working if the Corrosive damage assignment changes in a later
+        // game build while still using a genuine Ram blade collider.
+        ramHitboxItemBase = firstRam;
+        return ramHitboxItemBase;
+    }
+
+    private static void UpdateRamHitboxProbePose()
+    {
+        if (ramHitboxObject == null ||
+            ramHitboxCollider == null ||
+            ramHitboxTemplate == null ||
+            activePlayer == null)
+        {
+            return;
+        }
+
+        float attackProgress = 0f;
+
+        if (activeAssault != null &&
+            AttackTimerField != null &&
+            activeAssault.Duration > 0.0001f)
+        {
+            object timerValue = AttackTimerField.GetValue(activeAssault);
+
+            if (timerValue is float)
+            {
+                attackProgress = Mathf.Clamp01(
+                    (float)timerValue / activeAssault.Duration
+                );
+            }
+        }
+
+        // This is Assault.RamPunch(t) verbatim:
+        // 0 -> 1 over the first 40% of the attack, then 1 -> 0 over 60%,
+        // using the native smoothstep curve x*x*(3 - 2*x).
+        float punch = NativeRamPunch(attackProgress);
+
+        // Native Assault.GetBladeRadius(): shield world radius + mountOffset.
+        float bladeRadius =
+            activePlayer.GetShieldWorldRadius() + ramHitboxTemplate.mountOffset;
+
+        // Native RamForwardFactor is 1.0 at the base Ram duplicate rank. We are
+        // borrowing Corrosive Ram's physical hitbox, not its legendary duplicate
+        // behavior, so use the normal one-Ram position.
+        float forward =
+            bladeRadius + ramHitboxTemplate.mountOffset * punch;
+
+        Vector3 scale =
+            ramHitboxBaseScale * (1f + 0.5f * punch);
+
+        Transform transform = ramHitboxObject.transform;
+        transform.localPosition = new Vector3(forward, 0f, 0f);
+        transform.localRotation = Quaternion.identity;
+        transform.localScale = scale;
+    }
+
+    private static float NativeRamPunch(float t)
+    {
+        if (t <= 0f || t >= 1f)
+            return 0f;
+
+        float x = t >= 0.4f
+            ? (1f - t) / 0.6f
+            : t / 0.4f;
+
+        x = Mathf.Clamp01(x);
+        return x * x * (3f - 2f * x);
+    }
+
+    private static void ScanRamHitboxContacts()
     {
         if (activePlayer == null ||
             activeAssault == null ||
-            ObjectColliderField == null ||
+            ramHitboxCollider == null ||
+            !ramHitboxCollider.enabled ||
             PhysicsController.instance == null)
         {
             return;
         }
 
-        Collider2D headCollider =
-            ObjectColliderField.GetValue(activePlayer) as Collider2D;
-
-        if (headCollider == null || !headCollider.enabled)
-            return;
-
         Collider2D[] overlaps =
-            PhysicsController.instance.OverlapCollider(headCollider);
+            PhysicsController.instance.OverlapCollider(ramHitboxCollider);
 
         if (overlaps == null)
             return;
@@ -317,7 +523,11 @@ public static class LeviathanPredatorRuntime
         {
             Collider2D other = overlaps[i];
 
-            if (other == null || other == headCollider)
+            // PhysicsController uses a shared null-terminated overlap buffer.
+            if (other == null)
+                break;
+
+            if (other == ramHitboxCollider)
                 continue;
 
             GameShip target = other.GetComponentInParent<GameShip>();
@@ -333,13 +543,37 @@ public static class LeviathanPredatorRuntime
                 continue;
             }
 
-            // A target is consumed the first time the head contacts it during
-            // this lunge. Multiple colliders/contact frames cannot multi-hit it.
+            // Same one-hit-per-target rule as before; only the detection volume
+            // changed from the broad player hull collider to native Ram geometry.
             hitTargets.Add(target);
 
-            Vector2 point = other.ClosestPoint(activePlayer.transform.position);
+            Vector2 point = other.ClosestPoint(
+                ramHitboxCollider.bounds.center
+            );
+
             DealPredatorHit(target, point);
         }
+    }
+
+    private static void DestroyRamHitboxProbe()
+    {
+        ramHitboxCollider = null;
+        ramHitboxTemplate = null;
+
+        if (ramHitboxObject != null)
+            UnityEngine.Object.Destroy(ramHitboxObject);
+
+        ramHitboxObject = null;
+        ramHitboxBaseScale = Vector3.one;
+    }
+
+    private static void WarnNoRamHitbox(string message)
+    {
+        if (warnedNoRamHitbox)
+            return;
+
+        warnedNoRamHitbox = true;
+        Debug.LogError("[Leviathan] " + message);
     }
 
     private static void DealPredatorHit(GameShip target, Vector2 hitPoint)
