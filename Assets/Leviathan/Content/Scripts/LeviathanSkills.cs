@@ -15,10 +15,11 @@ using UnityEngine.UI;
 /// </summary>
 public static class LeviathanSkillSystem
 {
-    private const int GrowthValuePerRank = 3;
-    private const int GrowthLevels = 5;
+    private const int GrowthValuePerRank = LeviathanGrowth.BodySegmentsPerRank;
+    private const int GrowthLevels = LeviathanGrowth.MaxRank;
     private const int ConstrictorLevels = 5;
     private const int PredatorLevels = 5;
+    private const int BehemothLevels = 5;
 
     private static readonly FieldInfo UpgradesField =
         AccessTools.Field(typeof(Upgrade), "upgrades");
@@ -60,6 +61,7 @@ public static class LeviathanSkillSystem
     public static Upgrade Growth { get; private set; }
     public static Upgrade Constrictor { get; private set; }
     public static Upgrade Predator { get; private set; }
+    public static Upgrade Behemoth { get; private set; }
 
     public static void Register()
     {
@@ -113,6 +115,16 @@ public static class LeviathanSkillSystem
             0,                      // behavior is described by the skill text
             PredatorLevels,
             "Predator"
+        );
+
+        Behemoth = EnsureUpgrade(
+            upgrades,
+            LeviathanMod.BehemothUpgrade,
+            0,                      // requiredLevel
+            false,                  // percentage
+            0,                      // behavior is described by the skill text
+            BehemothLevels,
+            "Behemoth"
         );
 
         UpgradesField.SetValue(null, upgrades.ToArray());
@@ -236,7 +248,15 @@ public static class LeviathanSkillSystem
             new object[] { LeviathanMod.PredatorUpgrade }
         );
 
-        if (growth == null || constrictor == null || predator == null)
+        object behemoth = GetUpgradeMethod.Invoke(
+            null,
+            new object[] { LeviathanMod.BehemothUpgrade }
+        );
+
+        if (growth == null ||
+            constrictor == null ||
+            predator == null ||
+            behemoth == null)
         {
             throw new Exception(
                 "[Leviathan] Upgrade lookup rebuilt without all Leviathan skills."
@@ -244,7 +264,7 @@ public static class LeviathanSkillSystem
         }
 
         Debug.Log(
-            "[Leviathan] Native Upgrade lookup rebuilt with Growth, Constrictor and Predator."
+            "[Leviathan] Native Upgrade lookup rebuilt with Growth, Constrictor, Predator and Behemoth."
         );
     }
 }
@@ -351,7 +371,8 @@ public static class LeviathanSkillUI
         if (panel == null ||
             LeviathanSkillSystem.Growth == null ||
             LeviathanSkillSystem.Constrictor == null ||
-            LeviathanSkillSystem.Predator == null)
+            LeviathanSkillSystem.Predator == null ||
+            LeviathanSkillSystem.Behemoth == null)
             return;
 
         GameShip ship = GetShipFromArgs(rebuildArgs);
@@ -441,7 +462,8 @@ public static class LeviathanSkillUI
         if (core == null ||
             LeviathanSkillSystem.Growth == null ||
             LeviathanSkillSystem.Constrictor == null ||
-            LeviathanSkillSystem.Predator == null)
+            LeviathanSkillSystem.Predator == null ||
+            LeviathanSkillSystem.Behemoth == null)
             return;
 
         GameShip ship = CoreShipField?.GetValue(core) as GameShip;
@@ -523,7 +545,18 @@ public static class LeviathanSkillUI
             new object[] { LeviathanSkillSystem.Constrictor }
         ) as UpgradeDisplay;
 
-        return new UpgradeDisplay[] { growth, predator, constrictor };
+        UpgradeDisplay behemoth = AddUpgradeMethod.Invoke(
+            display,
+            new object[] { LeviathanSkillSystem.Behemoth }
+        ) as UpgradeDisplay;
+
+        return new UpgradeDisplay[]
+        {
+            growth,
+            predator,
+            constrictor,
+            behemoth
+        };
     }
 
     private static bool IsClassUnlocked(Pilot pilot)
@@ -717,6 +750,8 @@ public static class LeviathanSkillUI
             index = 1;
         else if (selected == LeviathanMod.ConstrictorUpgrade)
             index = 2;
+        else if (selected == LeviathanMod.BehemothUpgrade)
+            index = 3;
 
         if (index >= 0 &&
             index < skillDisplays.Length &&
@@ -798,6 +833,12 @@ public static class LeviathanUpgradeGetNamePatch
             return false;
         }
 
+        if (__0 == LeviathanMod.BehemothUpgrade)
+        {
+            __result = "Behemoth";
+            return false;
+        }
+
         return true;
     }
 }
@@ -821,7 +862,13 @@ public static class LeviathanUpgradeGetDescriptionPatch
         if (__0 == LeviathanMod.GrowthUpgrade)
         {
             __result =
-                "Adds 3 Leviathan body segments and increases mass by 40% per rank.";
+                "Adds " +
+                LeviathanGrowth.BodySegmentsPerRank.ToString() +
+                " Leviathan body segments per rank. Each body segment adds " +
+                LeviathanGrowth.HullPerSegment.ToString("0") +
+                " maximum hull, with the tail also counting as a segment; mass increases by " +
+                (LeviathanGrowth.MassBonusPerRank * 100f).ToString("0") +
+                "% per rank.";
             return false;
         }
 
@@ -837,6 +884,14 @@ public static class LeviathanUpgradeGetDescriptionPatch
         {
             __result =
                 "Leviathan body segments deal contact damage using the equipped Assault weapon.";
+            return false;
+        }
+
+        if (__0 == LeviathanMod.BehemothUpgrade)
+        {
+            __result =
+                "Leviathan body segments transfer 50% of incoming damage. " +
+                "Behemoth reduces transferred damage by 5 percentage points per rank.";
             return false;
         }
 
@@ -862,7 +917,8 @@ public static class LeviathanUpgradeIsFreePatch
     {
         if (__0 != LeviathanMod.GrowthUpgrade &&
             __0 != LeviathanMod.ConstrictorUpgrade &&
-            __0 != LeviathanMod.PredatorUpgrade)
+            __0 != LeviathanMod.PredatorUpgrade &&
+            __0 != LeviathanMod.BehemothUpgrade)
         {
             return true;
         }
@@ -1020,7 +1076,7 @@ public static class LeviathanCoreUpgradesClassPatch
 }
 
 // Temporary Leviathan skill icon fallback. UpgradeDisplay otherwise leaves the
-// prefab icon unchanged because keys 81/82/83 are absent from its serialized array.
+// prefab icon unchanged because keys 81-84 are absent from its serialized array.
 [HarmonyPatch]
 public static class LeviathanSkillIconPatch
 {
@@ -1076,6 +1132,8 @@ public static class LeviathanSkillIconPatch
             fallbackKey = Upgrade.Key.GladiatorHullLeech;
         else if (leviathanKey == LeviathanMod.PredatorUpgrade)
             fallbackKey = Upgrade.Key.GladiatorEventHorizon;
+        else if (leviathanKey == LeviathanMod.BehemothUpgrade)
+            fallbackKey = Upgrade.Key.GladiatorHullLeech;
         else
             return;
 

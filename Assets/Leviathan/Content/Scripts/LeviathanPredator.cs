@@ -17,20 +17,82 @@ using static StarVortex.Damageable;
 /// </summary>
 public static class LeviathanPredatorRuntime
 {
-    // Damage relative to one aggregate native Assault lunge contact. Native
-    // Assault divides its packet by blade count, so we multiply blade count
-    // back out before applying these values.
-    private const float PredatorDamageRank1 = 1.50f;
-    private const float PredatorDamagePerAdditionalRank = 0.125f;
+    // =========================================================================
+    // BALANCE TUNING
+    // =========================================================================
+    // Arrays are Rank 1 -> Rank 5. These are the main Predator feel/balance knobs.
 
-    // Each point of section-size value above the Growth-1 / all-Frigate
-    // baseline of 5.0 adds 8%. At Growth 5 with seventeen max-size (1.5)
-    // sections this is 2.64x; Predator 5 then reaches 5.28x reference damage.
-    private const float BaselineSectionValue = 5.0f;
+    // Damage relative to one aggregate native Assault lunge contact, before the
+    // Leviathan section-size multiplier is applied.
+    private static readonly float[] DamageMultiplierByRank =
+    {
+        1.50f,  // Rank 1
+        1.625f, // Rank 2
+        1.75f,  // Rank 3
+        1.875f, // Rank 4
+        2.00f   // Rank 5
+    };
+
+    // Fraction of the native Assault lunge distance.
+    private static readonly float[] LungeDistanceMultiplierByRank =
+    {
+        0.70f, // Rank 1
+        0.75f, // Rank 2
+        0.80f, // Rank 3
+        0.85f, // Rank 4
+        0.90f  // Rank 5
+    };
+
+    // Multiplier on native lunge duration. Larger = slower at the same distance.
+    // 1.25 duration means 80% of the previous Predator movement speed.
+    private static readonly float[] LungeDurationMultiplierByRank =
+    {
+        1.6f, // Rank 1
+        1.5f, // Rank 2
+        1.3f, // Rank 3
+        1.3f, // Rank 4
+        1.2f  // Rank 5
+    };
+
+    // Multiplier on the equipped Assault weapon's native cooldown.
+    private static readonly float[] CooldownMultiplierByRank =
+    {
+        2.15f, // Rank 1
+        2.00f, // Rank 2
+        1.85f, // Rank 3
+        1.70f, // Rank 4
+        1.55f  // Rank 5
+    };
+
+    // Flat crit chance added to the equipped Assault weapon.
+    private static readonly float[] CritChanceBonusByRank =
+    {
+        0.05f, // Rank 1
+        0.08f, // Rank 2
+        0.11f, // Rank 3
+        0.14f, // Rank 4
+        0.17f  // Rank 5
+    };
+
+    // Growth / ship-size damage scaling.
+    // Every active section uses the MAIN SHIP's class value. Individual body
+    // segment classes are intentionally ignored.
+    private const float FrigateSectionValue = 1.00f;
+    private const float DestroyerSectionValue = 1.20f;
+    private const float CruiserSectionValue = 1.30f;
+    private const float BattleshipSectionValue = 1.40f;
+    private const float DreadnoughtSectionValue = 1.50f;
+
+    // Growth rank 1 / Frigate remains the no-bonus baseline.
+    private static readonly float BaselineSectionValue =
+        (LeviathanGrowth.GetBodySegmentCountForRank(1) + 2) *
+        FrigateSectionValue;
+
     private const float SectionValueDamageStep = 0.08f;
 
-    // Flat native crit-chance bonus per Predator rank.
-    private const float CritChancePerRank = 0.02f;
+    // =========================================================================
+    // NATIVE / MECHANICAL CONSTANTS
+    // =========================================================================
 
     private static readonly FieldInfo ParentShipField =
         AccessTools.Field(typeof(Equippable), "parentShip");
@@ -119,12 +181,13 @@ public static class LeviathanPredatorRuntime
         if (GetLungeTimer(player) > 0f)
             return false;
 
-        float movementFactor = GetLungeMovementFactor(rank);
+        float distanceMultiplier = GetLungeDistanceMultiplier(rank);
+        float durationMultiplier = GetLungeDurationMultiplier(rank);
 
-        // Keep native Assault.Duration unchanged. Shortening distance therefore
-        // shortens speed by the same factor while keeping animation/state timing
-        // perfectly aligned with vanilla Assault.StartAttack/EndAttack.
-        distance *= movementFactor;
+        // Distance and duration are independent balance knobs. Speed is therefore:
+        // distanceMultiplier / durationMultiplier relative to native Assault.
+        distance *= distanceMultiplier;
+        duration *= durationMultiplier;
 
         activeAssault = assault;
         activePlayer = player;
@@ -135,8 +198,12 @@ public static class LeviathanPredatorRuntime
         Debug.Log(
             "[Leviathan] Predator lunge armed. Rank = " +
             rank +
-            ", distance/speed = " +
-            movementFactor.ToString("0.00") +
+            ", distance = " +
+            distanceMultiplier.ToString("0.00") +
+            "x, duration = " +
+            durationMultiplier.ToString("0.00") +
+            "x, speed = " +
+            (distanceMultiplier / durationMultiplier).ToString("0.00") +
             "x."
         );
 
@@ -223,19 +290,7 @@ public static class LeviathanPredatorRuntime
 
     public static float GetCooldownMultiplier(int rank)
     {
-        switch (Mathf.Clamp(rank, 1, 5))
-        {
-            case 1:
-                return 1.75f;
-            case 2:
-                return 1.60f;
-            case 3:
-                return 1.45f;
-            case 4:
-                return 1.35f;
-            default:
-                return 1.25f;
-        }
+        return GetRankValue(CooldownMultiplierByRank, rank);
     }
 
     private static bool TryGetPredatorContext(
@@ -262,7 +317,8 @@ public static class LeviathanPredatorRuntime
 
         if (pilot == null ||
             pilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade) < 1 ||
-            LeviathanMod.Controller.GetActiveSectionCount(player) < 5)
+            LeviathanMod.Controller.GetActiveSectionCount(player) <
+                LeviathanGrowth.GetBodySegmentCountForRank(1) + 2)
         {
             return false;
         }
@@ -278,33 +334,30 @@ public static class LeviathanPredatorRuntime
             WorldController.instance.GetCurrentPlayerShip() == player;
     }
 
-    private static float GetLungeMovementFactor(int rank)
+    private static float GetLungeDistanceMultiplier(int rank)
     {
-        switch (Mathf.Clamp(rank, 1, 5))
-        {
-            case 1:
-                return 0.70f;
-            case 2:
-                return 0.75f;
-            case 3:
-                return 0.80f;
-            case 4:
-                return 0.85f;
-            default:
-                return 0.90f;
-        }
+        return GetRankValue(LungeDistanceMultiplierByRank, rank);
+    }
+
+    private static float GetLungeDurationMultiplier(int rank)
+    {
+        return GetRankValue(LungeDurationMultiplierByRank, rank);
     }
 
     private static float GetPredatorDamageMultiplier(int rank)
     {
-        int effectiveRank = Mathf.Clamp(rank, 1, 5);
-        return PredatorDamageRank1 +
-            (effectiveRank - 1) * PredatorDamagePerAdditionalRank;
+        return GetRankValue(DamageMultiplierByRank, rank);
     }
 
     private static float GetPredatorCritBonus(int rank)
     {
-        return Mathf.Clamp(rank, 1, 5) * CritChancePerRank;
+        return GetRankValue(CritChanceBonusByRank, rank);
+    }
+
+    private static float GetRankValue(float[] values, int rank)
+    {
+        int index = Mathf.Clamp(rank, 1, values.Length) - 1;
+        return values[index];
     }
 
     private static void BuildRamHitboxProbe(GameShip player)
@@ -610,12 +663,17 @@ public static class LeviathanPredatorRuntime
         Array.Copy(nativePacket, predatorPacket, nativePacket.Length);
 
         int bladeCount = GetNativeBladeCount(activeAssault);
-        float sectionValue = LeviathanMod.Controller == null
-            ? BaselineSectionValue
-            : LeviathanMod.Controller.GetActiveSectionSizeValue(activePlayer);
 
-        if (sectionValue <= 0f)
-            sectionValue = BaselineSectionValue;
+        int sectionCount = LeviathanMod.Controller == null
+            ? 0
+            : LeviathanMod.Controller.GetActiveSectionCount(activePlayer);
+
+        if (sectionCount <= 0)
+            sectionCount =
+                LeviathanGrowth.GetBodySegmentCountForRank(1) + 2;
+
+        float headSectionValue = GetHeadSectionValue(activePlayer);
+        float sectionValue = sectionCount * headSectionValue;
 
         float sizeMultiplier = Mathf.Max(
             1f,
@@ -682,6 +740,10 @@ public static class LeviathanPredatorRuntime
             target.GetName() +
             ". Rank = " +
             rank +
+            ", sections = " +
+            sectionCount.ToString() +
+            ", head size = " +
+            headSectionValue.ToString("0.00") +
             ", section value = " +
             sectionValue.ToString("0.00") +
             ", size scale = " +
@@ -692,6 +754,30 @@ public static class LeviathanPredatorRuntime
             crit.ToString() +
             "."
         );
+    }
+
+    private static float GetHeadSectionValue(GameShip player)
+    {
+        if (player == null)
+            return FrigateSectionValue;
+
+        int shipClass = (int)player.GetShipClass();
+
+        switch (shipClass)
+        {
+            case 4:
+                return DestroyerSectionValue;
+            case 5:
+                return CruiserSectionValue;
+            case 6:
+                return BattleshipSectionValue;
+            case 7:
+            case 8:
+                return DreadnoughtSectionValue;
+            case 3:
+            default:
+                return FrigateSectionValue;
+        }
     }
 
     private static int GetNativeBladeCount(Assault assault)

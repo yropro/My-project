@@ -6,23 +6,7 @@ using UnityEngine;
 
 public class LeviathanController : MonoBehaviour
 {
-    // Rank progression. Five skill ranks, three new body segments per rank.
-    // Rank 1 = 1-3, rank 2 = 1-6, ... rank 5 = 1-15, then tail.
-    private const int BodySegmentsPerRank = 3;
-    private const int MaxLeviathanRank = 5;
-
-    // Effective mass of the player/head. +40% per Leviathan rank.
-    // Rank 1 = 1.4x, rank 5 = 3.0x.
-    private const float MassBonusPerRank = 0.40f;
-
-    // Leviathan-only high-speed resistance.
-    // No extra resistance below 40% of the ship's normal MaxSpeed.
-    // Above that point resistance grows quadratically.
-    private const float ResistanceStartFraction = 0.40f;
-
-    // At the theoretical MaxSpeed, subtract this fraction of MaxSpeed
-    // from velocity per second. This is deliberately easy to tune.
-    private const float ResistanceStrength = 0.65f;
+    // Growth balance knobs live in LeviathanGrowth.cs.
 
     private readonly HashSet<GameShip> segments =
         new HashSet<GameShip>();
@@ -405,9 +389,9 @@ public class LeviathanController : MonoBehaviour
 
         // LeviathanTest is authored as a fixed 17-slot pool:
         // [head, body1 ... body15, tail].
-        // Skill rank simply exposes the first rank * 3 body slots.
+        // Growth exposes the first N authored body slots for the current rank.
         const int expectedShipCount =
-            1 + (BodySegmentsPerRank * MaxLeviathanRank) + 1;
+            1 + LeviathanGrowth.MaxBodySegmentsInPrefab + 1;
 
         if (ships.Count != expectedShipCount)
         {
@@ -424,14 +408,14 @@ public class LeviathanController : MonoBehaviour
         int effectiveRank = Mathf.Clamp(
             upgradeLevel,
             1,
-            MaxLeviathanRank
+            LeviathanGrowth.MaxRank
         );
 
         int desiredBodyCount =
-            effectiveRank * BodySegmentsPerRank;
+            LeviathanGrowth.GetBodySegmentCountForRank(effectiveRank);
 
         int maxBodyCount =
-            BodySegmentsPerRank * MaxLeviathanRank;
+            LeviathanGrowth.MaxBodySegmentsInPrefab;
 
         int firstUnusedBodyIndex = 1 + desiredBodyCount;
         int unusedBodyCount = maxBodyCount - desiredBodyCount;
@@ -568,8 +552,7 @@ public class LeviathanController : MonoBehaviour
 
     private static float GetMassMultiplier(int upgradeLevel)
     {
-        int effectiveRank = Mathf.Clamp(upgradeLevel, 0, MaxLeviathanRank);
-        return 1f + effectiveRank * MassBonusPerRank;
+        return LeviathanGrowth.GetMassMultiplier(upgradeLevel);
     }
 
     private void ApplyHighSpeedResistance()
@@ -596,7 +579,7 @@ public class LeviathanController : MonoBehaviour
 
         Vector2 velocity = body.velocity;
         float speed = velocity.magnitude;
-        float resistanceStart = maxSpeed * ResistanceStartFraction;
+        float resistanceStart = maxSpeed * LeviathanGrowth.ResistanceStartFraction;
 
         if (speed <= resistanceStart)
             return;
@@ -611,7 +594,7 @@ public class LeviathanController : MonoBehaviour
         // as actual speed approaches the ship's theoretical MaxSpeed.
         float resistanceFactor = t * t;
         float decelerationPerSecond =
-            maxSpeed * ResistanceStrength * resistanceFactor;
+            maxSpeed * LeviathanGrowth.ResistanceStrength * resistanceFactor;
 
         body.velocity = Vector2.MoveTowards(
             velocity,
@@ -638,52 +621,29 @@ public class LeviathanController : MonoBehaviour
         return 1 + segments.Count;
     }
 
-    public float GetActiveSectionSizeValue(GameShip player)
+    public int GetActiveLeviathanSegmentCount(GameShip player)
     {
         if (player == null ||
             player != currentPlayer ||
             builtForUpgradeLevel < 1)
         {
-            return 0f;
+            return 0;
         }
 
-        float value = GetSectionSizeValue(player);
-
-        foreach (GameShip segment in segments)
-        {
-            if (segment != null)
-                value += GetSectionSizeValue(segment);
-        }
-
-        return value;
+        // Every attached Leviathan section after the head: bodies + tail.
+        return segments.Count;
     }
 
-    private static float GetSectionSizeValue(GameShip ship)
+    public int GetActiveBodySegmentCount(GameShip player)
     {
-        if (ship == null)
-            return 0f;
+        int segmentCount = GetActiveLeviathanSegmentCount(player);
 
-        // Ship.Class values in the native assembly:
-        // 3 Frigate, 4 Destroyer, 5 Cruiser, 6 Battleship,
-        // 7 Dreadnought, 8 Boss. Predator caps size contribution at 1.5.
-        int shipClass = (int)ship.GetShipClass();
-
-        switch (shipClass)
-        {
-            case 4:
-                return 1.20f;
-            case 5:
-                return 1.30f;
-            case 6:
-                return 1.40f;
-            case 7:
-            case 8:
-                return 1.50f;
-            case 3:
-            default:
-                return 1.00f;
-        }
+        // One attached segment is always the tail while Growth is active.
+        return segmentCount > 0
+            ? segmentCount - 1
+            : 0;
     }
+
 
     private void ResizeCustomTemplateSlots(int count)
     {

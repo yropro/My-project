@@ -45,29 +45,54 @@ public static class LeviathanConstrictor
         get { return LeviathanMod.ConstrictorUpgrade; }
     }
 
-    // ---- Tuning -------------------------------------------------------------
+    // =========================================================================
+    // BALANCE TUNING
+    // =========================================================================
+    // Arrays are Rank 1 -> Rank 5.
 
-    // Contacts that equal "one weapon's worth" of contact damage. Frigate-scale.
-    private const float BaselineContacts = 2f;
+    // Overall passive contact-damage multiplier.
+    private static readonly float[] DamageMultiplierByRank =
+    {
+        1.00f, // Rank 1
+        1.25f, // Rank 2
+        1.50f, // Rank 3
+        1.75f, // Rank 4
+        2.00f  // Rank 5
+    };
 
-    // Every contact past the second contributes this fraction of the previous.
-    private const float ContactDecay = 0.6f;
+    // Fraction of the equipped Assault weapon's status chance used by Constrictor.
+    private static readonly float[] StatusProcFractionByRank =
+    {
+        0.20f, // Rank 1
+        0.25f, // Rank 2
+        0.30f, // Rank 3
+        0.35f, // Rank 4
+        0.40f  // Rank 5
+    };
 
-    // Contacts beyond this add < 1% and are skipped. 0.6^10 is ~0.006.
+    // Number of full-value segment contacts before decay starts.
+    private const int FullWeightContacts = 2;
+
+    // Every contact after FullWeightContacts contributes this fraction of the
+    // previous contact.
+    private const float ContactDecay = 0.60f;
+
+    // Contacts that equal one aggregate weapon's worth of passive contact damage.
+    private const float BaselineContacts = 2.00f;
+
+    // Contacts beyond this are ignored. With 0.60 decay, later contacts are tiny.
     private const int MaxRankedContacts = 12;
 
-    // Damage scalar: rank 1 = 1.00, rank 5 = 2.00.
-    private const float DamageScalarBase = 1.00f;
-    private const float DamageScalarPerRank = 0.25f;
+    // =========================================================================
+    // NATIVE / MECHANICAL CONSTANTS
+    // =========================================================================
 
-    // Status proc fraction, replacing Assault's flat 0.2 passive damper.
-    // Rank 1 = 0.20, rank 5 = 0.40.
-    private const float ProcFractionBase = 0.20f;
-    private const float ProcFractionPerRank = 0.05f;
+    // Assault's own per-tick fraction of listed Damage. Keep at 0.2 for native
+    // Assault.GetDamageData parity.
+    private const float EngineTickFraction = 0.20f;
 
-    // Assault's own per-tick fraction of listed Damage. Not a tuning knob --
-    // this mirrors GetDamageData and must stay at 0.2 for parity.
-    private const float EngineTickFraction = 0.2f;
+    // Base interval passed through the player's BeamTickRate modifier.
+    private const float BaseContactTickRate = 0.20f;
 
     // ---- Native access ------------------------------------------------------
 
@@ -164,7 +189,8 @@ public static class LeviathanConstrictor
         int predatorRank = GetPredatorRank(player);
 
         if (LeviathanMod.Controller == null ||
-            LeviathanMod.Controller.GetActiveSectionCount(player) < 5 ||
+            LeviathanMod.Controller.GetActiveSectionCount(player) <
+                LeviathanGrowth.GetBodySegmentCountForRank(1) + 2 ||
             (rank < 1 && predatorRank < 1))
         {
             ReleaseSuppression();
@@ -197,7 +223,7 @@ public static class LeviathanConstrictor
         float tickRate = player.ApplyModifier(
             Modifier.Type.BeamTickRate,
             Item.Category.None,
-            0.2f,
+            BaseContactTickRate,
             true
         );
 
@@ -326,11 +352,8 @@ public static class LeviathanConstrictor
         int rank,
         float tickRate)
     {
-        float damageScalar =
-            DamageScalarBase + DamageScalarPerRank * (rank - 1);
-
-        float procFraction =
-            ProcFractionBase + ProcFractionPerRank * (rank - 1);
+        float damageScalar = GetRankValue(DamageMultiplierByRank, rank);
+        float procFraction = GetRankValue(StatusProcFractionByRank, rank);
 
         float baseCritChance = src.GetCritChance();
         float baseCritModifier = src.GetCritModifier();      // never scaled
@@ -367,10 +390,12 @@ public static class LeviathanConstrictor
 
                 LastHits[key] = Time.fixedTime;
 
-                // Hits 1 and 2 are full; each subsequent hit is 0.6 of the last.
-                float weight = i < 2
+                float weight = i < FullWeightContacts
                     ? 1f
-                    : Mathf.Pow(ContactDecay, i - 1);
+                    : Mathf.Pow(
+                        ContactDecay,
+                        i - FullWeightContacts + 1
+                    );
 
                 bool crit = Modifier.CritRoll(baseCritChance * weight, target);
 
@@ -611,6 +636,12 @@ public static class LeviathanConstrictor
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    private static float GetRankValue(float[] values, int rank)
+    {
+        int index = Mathf.Clamp(rank, 1, values.Length) - 1;
+        return values[index];
+    }
 
     private static int GetRank(GameShip player)
     {
