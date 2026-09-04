@@ -29,6 +29,8 @@ public class LeviathanMod : IStarVortexMod
 
     public const Upgrade.Key BehemothUpgrade =
         (Upgrade.Key)84;
+    public const Upgrade.Key StarfireUpgrade =
+        (Upgrade.Key)85;
 
     private static GameObject controllerObject;
 

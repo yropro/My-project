@@ -20,6 +20,7 @@ public static class LeviathanSkillSystem
     private const int ConstrictorLevels = 5;
     private const int PredatorLevels = 5;
     private const int BehemothLevels = 5;
+    private const int StarfireLevels = 5;
 
     private static readonly FieldInfo UpgradesField =
         AccessTools.Field(typeof(Upgrade), "upgrades");
@@ -62,6 +63,7 @@ public static class LeviathanSkillSystem
     public static Upgrade Constrictor { get; private set; }
     public static Upgrade Predator { get; private set; }
     public static Upgrade Behemoth { get; private set; }
+    public static Upgrade Starfire { get; private set; }
 
     public static void Register()
     {
@@ -125,6 +127,16 @@ public static class LeviathanSkillSystem
             0,                      // behavior is described by the skill text
             BehemothLevels,
             "Behemoth"
+        );
+
+        Starfire = EnsureUpgrade(
+            upgrades,
+            LeviathanMod.StarfireUpgrade,
+            0,                      // requiredLevel
+            false,                  // percentage
+            0,                      // behavior is described by the skill text
+            StarfireLevels,
+            "Starfire"
         );
 
         UpgradesField.SetValue(null, upgrades.ToArray());
@@ -253,10 +265,16 @@ public static class LeviathanSkillSystem
             new object[] { LeviathanMod.BehemothUpgrade }
         );
 
+        object starfire = GetUpgradeMethod.Invoke(
+            null,
+            new object[] { LeviathanMod.StarfireUpgrade }
+        );
+
         if (growth == null ||
             constrictor == null ||
             predator == null ||
-            behemoth == null)
+            behemoth == null ||
+            starfire == null)
         {
             throw new Exception(
                 "[Leviathan] Upgrade lookup rebuilt without all Leviathan skills."
@@ -264,7 +282,7 @@ public static class LeviathanSkillSystem
         }
 
         Debug.Log(
-            "[Leviathan] Native Upgrade lookup rebuilt with Growth, Constrictor, Predator and Behemoth."
+            "[Leviathan] Native Upgrade lookup rebuilt with Growth, Constrictor, Predator, Behemoth and Starfire."
         );
     }
 }
@@ -372,7 +390,8 @@ public static class LeviathanSkillUI
             LeviathanSkillSystem.Growth == null ||
             LeviathanSkillSystem.Constrictor == null ||
             LeviathanSkillSystem.Predator == null ||
-            LeviathanSkillSystem.Behemoth == null)
+            LeviathanSkillSystem.Behemoth == null ||
+            LeviathanSkillSystem.Starfire == null)
             return;
 
         GameShip ship = GetShipFromArgs(rebuildArgs);
@@ -463,7 +482,8 @@ public static class LeviathanSkillUI
             LeviathanSkillSystem.Growth == null ||
             LeviathanSkillSystem.Constrictor == null ||
             LeviathanSkillSystem.Predator == null ||
-            LeviathanSkillSystem.Behemoth == null)
+            LeviathanSkillSystem.Behemoth == null ||
+            LeviathanSkillSystem.Starfire == null)
             return;
 
         GameShip ship = CoreShipField?.GetValue(core) as GameShip;
@@ -550,12 +570,18 @@ public static class LeviathanSkillUI
             new object[] { LeviathanSkillSystem.Behemoth }
         ) as UpgradeDisplay;
 
+        UpgradeDisplay starfire = AddUpgradeMethod.Invoke(
+            display,
+            new object[] { LeviathanSkillSystem.Starfire }
+        ) as UpgradeDisplay;
+
         return new UpgradeDisplay[]
         {
             growth,
             predator,
             constrictor,
-            behemoth
+            behemoth,
+            starfire
         };
     }
 
@@ -752,6 +778,8 @@ public static class LeviathanSkillUI
             index = 2;
         else if (selected == LeviathanMod.BehemothUpgrade)
             index = 3;
+        else if (selected == LeviathanMod.StarfireUpgrade)
+            index = 4;
 
         if (index >= 0 &&
             index < skillDisplays.Length &&
@@ -839,6 +867,12 @@ public static class LeviathanUpgradeGetNamePatch
             return false;
         }
 
+        if (__0 == LeviathanMod.StarfireUpgrade)
+        {
+            __result = "Starfire";
+            return false;
+        }
+
         return true;
     }
 }
@@ -895,6 +929,15 @@ public static class LeviathanUpgradeGetDescriptionPatch
             return false;
         }
 
+        if (__0 == LeviathanMod.StarfireUpgrade)
+        {
+            __result =
+                "Transforms one equipped Torch Primary weapon into a broad Starfire breath. " +
+                "Other equipped Torches are suppressed. Rank increases breath length and width " +
+                "while reducing heat generation.";
+            return false;
+        }
+
         return true;
     }
 }
@@ -918,7 +961,8 @@ public static class LeviathanUpgradeIsFreePatch
         if (__0 != LeviathanMod.GrowthUpgrade &&
             __0 != LeviathanMod.ConstrictorUpgrade &&
             __0 != LeviathanMod.PredatorUpgrade &&
-            __0 != LeviathanMod.BehemothUpgrade)
+            __0 != LeviathanMod.BehemothUpgrade &&
+            __0 != LeviathanMod.StarfireUpgrade)
         {
             return true;
         }
@@ -1076,7 +1120,7 @@ public static class LeviathanCoreUpgradesClassPatch
 }
 
 // Temporary Leviathan skill icon fallback. UpgradeDisplay otherwise leaves the
-// prefab icon unchanged because keys 81-84 are absent from its serialized array.
+// prefab icon unchanged because keys 81-85 are absent from its serialized array.
 [HarmonyPatch]
 public static class LeviathanSkillIconPatch
 {
@@ -1134,6 +1178,8 @@ public static class LeviathanSkillIconPatch
             fallbackKey = Upgrade.Key.GladiatorEventHorizon;
         else if (leviathanKey == LeviathanMod.BehemothUpgrade)
             fallbackKey = Upgrade.Key.GladiatorHullLeech;
+        else if (leviathanKey == LeviathanMod.StarfireUpgrade)
+            fallbackKey = Upgrade.Key.GladiatorEventHorizon;
         else
             return;
 
