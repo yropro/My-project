@@ -32,6 +32,9 @@ public class LeviathanMod : IStarVortexMod
     public const Upgrade.Key StarfireUpgrade =
         (Upgrade.Key)85;
 
+    public const Upgrade.Key StellarConverterUpgrade =
+        (Upgrade.Key)86;
+
     private static GameObject controllerObject;
 
     public static LeviathanController Controller { get; private set; }

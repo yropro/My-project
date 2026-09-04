@@ -9,8 +9,8 @@ using static StarVortex.Damageable;
 
 /// <summary>
 /// Starfire transforms one equipped Torch Primary weapon into a broad Leviathan
-/// breath attack. The first equipped Torch in native slot order is the source;
-/// all other equipped Torches are suppressed while Starfire is active.
+/// breath attack. The first equipped Primary Torch in native slot order is the source;
+/// all other equipped Primary Torches are suppressed while Starfire is active.
 ///
 /// The source Torch remains the source of truth for native damage packet
 /// construction, damage type, legendary/customizer behavior, native
@@ -235,6 +235,13 @@ public static class LeviathanStarfireRuntime
         out int rank)
     {
         player = GetParentShip(torch);
+
+        if (!IsPrimaryTorch(torch, player))
+        {
+            rank = 0;
+            return false;
+        }
+
         return TryGetStarfireRank(player, out rank);
     }
 
@@ -251,19 +258,52 @@ public static class LeviathanStarfireRuntime
         if (player == null || player.slots == null)
             return null;
 
-        // Deliberately deterministic and simple: first equipped Torch in the
-        // game's own slot ordering owns Starfire. Other Torches are suppressed.
         for (int i = 0; i < player.slots.Length; i++)
         {
-            if (player.slots[i] == null)
-                continue;
+            Slot slot = player.slots[i];
 
-            Torch torch = player.slots[i].equippable as Torch;
-            if (torch != null)
+            if (slot == null ||
+                slot.type != Item.Type.PrimaryWeapon ||
+                slot.equippable == null)
+            {
+                continue;
+            }
+
+            Torch torch = slot.equippable as Torch;
+
+            if (torch != null && torch.type == Item.Type.PrimaryWeapon)
                 return torch;
         }
 
         return null;
+    }
+
+    private static bool IsPrimaryTorch(Torch torch, GameShip player)
+    {
+        if (torch == null ||
+            player == null ||
+            player.slots == null ||
+            torch.type != Item.Type.PrimaryWeapon)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < player.slots.Length; i++)
+        {
+            Slot slot = player.slots[i];
+
+            if (slot == null ||
+                slot.type != Item.Type.PrimaryWeapon ||
+                slot.equippable == null)
+            {
+                continue;
+            }
+
+            if (ReferenceEquals(slot.equippable, torch))
+                return true;
+        }
+
+        return false;
     }
 
     private static bool IsSourceTorch(Torch torch, GameShip player)
@@ -289,11 +329,11 @@ public static class LeviathanStarfireRuntime
         if (torch == null)
             return;
 
-        GameShip player = GetParentShip(torch);
+        GameShip player;
         int rank;
         int id = torch.GetInstanceID();
 
-        if (!TryGetStarfireRank(player, out rank))
+        if (!TryGetStarfireContext(torch, out player, out rank))
         {
             // If this Torch was previously touched by Starfire, restore only the
             // components Starfire itself suppressed. Do this once on transition,
@@ -539,7 +579,7 @@ public static class LeviathanStarfireRuntime
 
         if (!IsSourceTorch(torch, player))
         {
-            // Extra equipped Torches are completely suppressed by Starfire; they
+            // Extra equipped Primary Torches are completely suppressed by Starfire; they
             // should not silently add heat for beams the player cannot use.
             args[amountIndex] = 0f;
             return;
