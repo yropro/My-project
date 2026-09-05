@@ -170,16 +170,16 @@ public static class LeviathanStarfireRuntime
                      m.GetParameters()[2].ParameterType == typeof(DamageData[])
             );
 
-    private static readonly HashSet<int> TouchedTorchIds =
-        new HashSet<int>();
+    private static readonly HashSet<Torch> TouchedTorches =
+        new HashSet<Torch>();
 
-    private static readonly HashSet<int> FullySuppressedTorchIds =
-        new HashSet<int>();
+    private static readonly HashSet<Torch> FullySuppressedTorches =
+        new HashSet<Torch>();
 
-    // Source Torch instance id -> first native damage-attempt time for the current
+    // Source Torch instance -> first native damage-attempt time for the current
     // charge cycle. Cleared once native charge falls back to zero.
-    private static readonly Dictionary<int, float> StartupBeginTimes =
-        new Dictionary<int, float>();
+    private static readonly Dictionary<Torch, float> StartupBeginTimes =
+        new Dictionary<Torch, float>();
 
     private static bool warnedNoSpikeFields;
     private static bool warnedNoSpikeObject;
@@ -331,16 +331,14 @@ public static class LeviathanStarfireRuntime
 
         GameShip player;
         int rank;
-        int id = torch.GetInstanceID();
-
         if (!TryGetStarfireContext(torch, out player, out rank))
         {
             // If this Torch was previously touched by Starfire, restore only the
             // components Starfire itself suppressed. Do this once on transition,
             // rather than forcing native component state every frame.
-            if (TouchedTorchIds.Remove(id))
+            if (TouchedTorches.Remove(torch))
             {
-                if (FullySuppressedTorchIds.Remove(id))
+                if (FullySuppressedTorches.Remove(torch))
                     SetSpikeSuppressed(GetMainSpike(torch), false);
 
                 SetSpikeSuppressed(GetMirrorSpike(torch), false);
@@ -349,7 +347,7 @@ public static class LeviathanStarfireRuntime
             return;
         }
 
-        TouchedTorchIds.Add(id);
+        TouchedTorches.Add(torch);
 
         bool source = IsSourceTorch(torch, player);
         object mainSpike = GetMainSpike(torch);
@@ -357,7 +355,7 @@ public static class LeviathanStarfireRuntime
 
         if (!source)
         {
-            FullySuppressedTorchIds.Add(id);
+            FullySuppressedTorches.Add(torch);
             SetSpikeSuppressed(mainSpike, true);
             SetSpikeSuppressed(mirrorSpike, true);
             return;
@@ -366,7 +364,7 @@ public static class LeviathanStarfireRuntime
         // If equipment changes made a previously-suppressed Torch become the new
         // source, restore its main spike once. Otherwise leave native main-spike
         // enabled/disabled state untouched.
-        if (FullySuppressedTorchIds.Remove(id))
+        if (FullySuppressedTorches.Remove(torch))
             SetSpikeSuppressed(mainSpike, false);
 
         // Starfire is exactly one breath. The source Torch's normal spike stays at
@@ -674,7 +672,7 @@ public static class LeviathanStarfireRuntime
 
         // A fully discharged Torch begins a new Starfire startup cycle next time.
         if (torch != null && ReadCharge(torch) <= 0.0001f)
-            StartupBeginTimes.Remove(torch.GetInstanceID());
+            StartupBeginTimes.Remove(torch);
     }
 
     private static float ReadCharge(Torch torch)
@@ -692,13 +690,12 @@ public static class LeviathanStarfireRuntime
         if (delay <= 0f || torch == null)
             return false;
 
-        int id = torch.GetInstanceID();
         float started;
 
-        if (!StartupBeginTimes.TryGetValue(id, out started))
+        if (!StartupBeginTimes.TryGetValue(torch, out started))
         {
             started = Time.time;
-            StartupBeginTimes[id] = started;
+            StartupBeginTimes[torch] = started;
         }
 
         return Time.time - started < delay;
