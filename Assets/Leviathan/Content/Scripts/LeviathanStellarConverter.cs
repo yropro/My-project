@@ -574,8 +574,14 @@ public static class LeviathanStellarConverter
         );
     }
 
-    public static void ScaleMaxRange(BeamWeapon beamWeapon, ref float value)
+    public static void ScaleBeamMaxRange(Beam beam, ref float value)
     {
+        if (beam == null || BeamParentWeaponField == null)
+            return;
+
+        BeamWeapon beamWeapon =
+            BeamParentWeaponField.GetValue(beam) as BeamWeapon;
+
         int rank;
 
         if (!IsFiringSource(beamWeapon, out rank))
@@ -979,17 +985,15 @@ public static class LeviathanStellarConverterDebuffChancePatch
     }
 }
 
-[HarmonyPatch]
+[HarmonyPatch(typeof(Beam), "GetMaxRange")]
 public static class LeviathanStellarConverterRangePatch
 {
-    public static MethodBase TargetMethod()
+    public static void Postfix(Beam __instance, ref float __result)
     {
-        return AccessTools.PropertyGetter(typeof(BeamWeapon), "MaxRange");
-    }
-
-    public static void Postfix(BeamWeapon __instance, ref float __result)
-    {
-        LeviathanStellarConverter.ScaleMaxRange(__instance, ref __result);
+        LeviathanStellarConverter.ScaleBeamMaxRange(
+            __instance,
+            ref __result
+        );
     }
 }
 
