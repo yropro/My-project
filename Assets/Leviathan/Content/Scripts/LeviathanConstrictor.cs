@@ -34,13 +34,17 @@ using UnityEngine;
 // +5% per rank. Growth's added high-speed resistance is reduced from 10% at
 // Rank 1 to 60% at Rank 5.
 //
-// Crit modifier is never scaled: expected crit damage is base * (1 + c*m), so
-// scaling base, c and m together would decay the crit contribution cubically
-// while base decays linearly.
+// Constrictor can also grant additive crit chance and additive crit damage via
+// rank arrays in BALANCE TUNING. These stack on top of the equipped Assault's
+// native modified crit stats; both arrays default to zero.
 //
 // Constrictor inherits the equipped Assault's native damage type, DamageVsX,
 // status, crit, on-crit, Conduit and on-kill traits. Native knockback and
 // Gladiator hull leech are intentionally excluded for usability/balance.
+//
+// Constrictor contact detection also has a tunable radial padding around each
+// real section collider. This affects hit detection only; physical colliders and
+// visuals are never resized.
 //
 // Growth / ship-size scaling mirrors Predator's tuning model: every active
 // Leviathan section uses the MAIN SHIP's class value, with Growth Rank 1 +
@@ -69,11 +73,39 @@ public static class LeviathanConstrictor
     // Overall passive contact-damage multiplier.
     private static readonly float[] DamageMultiplierByRank =
     {
-        1.90f, // Rank 1
-        2.00f, // Rank 2
-        2.10f, // Rank 3
-        2.20f, // Rank 4
-        2.30f  // Rank 5
+        3.40f, // Rank 1
+        4.00f, // Rank 2
+        4.45f, // Rank 3
+        4.55f, // Rank 4
+        5.00f  // Rank 5
+    };
+
+    // ADDITIVE crit chance granted by Constrictor, on top of the equipped
+    // Assault weapon's fully modified native crit chance.
+    //
+    // 0.05f = +5 percentage points crit chance.
+    // Left at 0 by default so adding these knobs does not change current balance.
+    private static readonly float[] CritChanceBonusByRank =
+    {
+        0.05f, // Rank 1
+        0.0725f, // Rank 2
+        0.10f, // Rank 3
+        0.15f, // Rank 4
+        0.20f  // Rank 5
+    };
+
+    // ADDITIVE crit damage modifier granted by Constrictor, on top of the
+    // equipped Assault weapon's fully modified native crit damage modifier.
+    //
+    // 0.10f = +10 percentage points crit damage.
+    // Left at 0 by default so adding these knobs does not change current balance.
+    private static readonly float[] CritDamageBonusByRank =
+    {
+        0.00f, // Rank 1
+        0.00f, // Rank 2
+        0.00f, // Rank 3
+        0.00f, // Rank 4
+        0.00f  // Rank 5
     };
 
     // Fraction of the equipped Assault weapon's status chance used by Constrictor.
@@ -99,31 +131,54 @@ public static class LeviathanConstrictor
 
     // Native Vanguard-style handling modifiers. These are deliberately separate
     // knobs even though they currently share the same value.
-    private const float AccelerationBonusPerRank = 0.05f;
-    private const float BoostBonusPerRank = 0.05f;
-    private const float TurnSpeedBonusPerRank = 0.05f;
-    private const float ManeuverabilityBonusPerRank = 0.05f;
+    private const float AccelerationBonusPerRank = 0.03f;
+    private const float BoostBonusPerRank = 0.035f;
+    private const float TurnSpeedBonusPerRank = 0.03f;
+    private const float ManeuverabilityBonusPerRank = 0.02f;
 
     // Growth / ship-size damage scaling. This deliberately mirrors Predator's
     // knob layout so both Leviathan Assault skills are easy to tune together.
     //
     // Every active section uses the MAIN SHIP's class value. Individual body
     // segment classes are intentionally ignored.
-    private const float FrigateSectionValue = 1.00f;
-    private const float DestroyerSectionValue = 1.20f;
-    private const float CruiserSectionValue = 1.30f;
-    private const float BattleshipSectionValue = 1.40f;
-    private const float DreadnoughtSectionValue = 1.50f;
+    private const float FrigateSectionValue = 1.50f;
+    private const float DestroyerSectionValue = 2.00f;
+    private const float CruiserSectionValue = 2.30f;
+    private const float BattleshipSectionValue = 2.60f;
+    private const float DreadnoughtSectionValue = 2.90f;
 
     // Growth Rank 1 / Frigate is the no-bonus baseline.
     private static readonly float BaselineSectionValue =
         (LeviathanGrowth.GetBodySegmentCountForRank(1) + 2) *
         FrigateSectionValue;
 
-    // Each section-value point above baseline adds this much Constrictor damage.
-    // Predator currently uses 0.08; Constrictor starts lower because its total
-    // output already scales when multiple sections physically touch a target.
-    private const float SectionValueDamageStep = 0.20f;
+    // BONUS DAMAGE FROM TOTAL LEVIATHAN SIZE / LENGTH.
+    //
+    // This is the main "bonus damage per segment-value" knob.
+    //
+    // Formula:
+    //   totalSectionValue = activeSectionCount * mainShipClassSectionValue
+    //   bonusValue        = totalSectionValue - BaselineSectionValue
+    //   damageMultiplier  = 1 + (bonusValue * DamageBonusPerSectionValue)
+    //
+    // Example: 0.20f means every 1.0 section-value above baseline adds +20%
+    // multiplicative Constrictor damage to every contact hit.
+    //
+    // This is based on ALL active Leviathan sections, not only sections currently
+    // touching the target. Touching-section scaling is handled separately by
+    // FullWeightContacts and ContactDecay below.
+    private const float DamageBonusPerSectionValue = 0.30f;
+
+    // CONTACT DETECTION PADDING.
+    //
+    // Constrictor does NOT resize the real physics colliders. Instead, each
+    // section collider is treated as though its contact radius extends this
+    // much farther for Constrictor hit detection only.
+    //
+    // 0.20f = +20% of that collider's bounding radius in every direction.
+    // This helps tolerate small multiplayer / interpolation position errors
+    // without changing visuals, physical collision, or ship spacing.
+    private const float ContactHitboxRadiusPadding = 0.10f;
 
     // Number of full-value segment contacts before decay starts.
     private const int FullWeightContacts = 2;
@@ -221,6 +276,12 @@ public static class LeviathanConstrictor
     // same (section, target) pair more than once.
     private static readonly HashSet<GameShip> SectionTargets =
         new HashSet<GameShip>();
+
+    // Broad-phase buffer for padded contact checks. Physics2D.Distance performs
+    // the exact shape-to-shape test afterward, so this circle is only a cheap
+    // candidate search and does not define the final Constrictor hit shape.
+    private static readonly Collider2D[] ProximityBuffer =
+        new Collider2D[256];
 
     private static readonly Damageable.DamageData[] DamageBuffer =
         new Damageable.DamageData[8];
@@ -341,7 +402,7 @@ public static class LeviathanConstrictor
 
         List<Squadron.SquadronShip> ships = player.squadron.ships;
 
-        if (ships == null || PhysicsController.instance == null)
+        if (ships == null)
             return;
 
         // Index 0 is the player head. Body segments and tail follow in chain
@@ -372,25 +433,57 @@ public static class LeviathanConstrictor
                     continue;
                 }
 
-                // PhysicsController returns a single shared buffer that the next
-                // overlap call overwrites, so consume every result before querying
-                // the next collider in this compound section footprint.
-                Collider2D[] hits =
-                    PhysicsController.instance.OverlapCollider(collider);
+                // Preserve the real collider shape, but allow Constrictor contact
+                // slightly beyond it. bounds.extents.magnitude is the collider's
+                // bounding radius; 20% of that radius becomes uniform radial
+                // padding around the actual Collider2D shape.
+                Bounds bounds = collider.bounds;
+                float colliderRadius = bounds.extents.magnitude;
+                float padding =
+                    colliderRadius * ContactHitboxRadiusPadding;
 
-                for (int h = 0; h < hits.Length; h++)
+                // Broad phase: find anything close enough to possibly be within
+                // the padded shape. The exact acceptance test below uses
+                // Physics2D.Distance against the real colliders.
+                float queryRadius = colliderRadius + padding;
+                int hitCount = Physics2D.OverlapCircleNonAlloc(
+                    bounds.center,
+                    queryRadius,
+                    ProximityBuffer
+                );
+
+                for (int h = 0; h < hitCount; h++)
                 {
-                    Collider2D hit = hits[h];
+                    Collider2D hit = ProximityBuffer[h];
 
-                    if (!hit)
-                        break;                  // null terminator, not a guard
+                    if (!hit ||
+                        hit == collider ||
+                        !hit.enabled ||
+                        !hit.gameObject.activeInHierarchy)
+                    {
+                        continue;
+                    }
+
+                    ColliderDistance2D separation =
+                        Physics2D.Distance(collider, hit);
+
+                    // distance <= 0 means the real colliders overlap already.
+                    // Otherwise allow a gap up to the configured radial padding.
+                    if (!separation.isValid ||
+                        separation.distance > padding)
+                    {
+                        continue;
+                    }
 
                     GameObject obj = hit.gameObject.CompareTag("Shield")
                         ? hit.transform.parent.gameObject
                         : hit.gameObject;
 
-                    if (obj.CompareTag("Container") || obj.CompareTag("Projectile"))
+                    if (obj.CompareTag("Container") ||
+                        obj.CompareTag("Projectile"))
+                    {
                         continue;
+                    }
 
                     GameShip target;
 
@@ -475,6 +568,8 @@ public static class LeviathanConstrictor
         float damageScalar = GetRankValue(DamageMultiplierByRank, rank);
         float procFraction = GetRankValue(StatusProcFractionByRank, rank);
         float growthSizeScalar = GetGrowthSizeDamageMultiplier(player);
+        float critChanceBonus = GetRankValue(CritChanceBonusByRank, rank);
+        float critDamageBonus = GetRankValue(CritDamageBonusByRank, rank);
         string weaponName = src.GetName(false, false);
 
         for (int t = 0; t < ContactTargets.Count; t++)
@@ -519,9 +614,13 @@ public static class LeviathanConstrictor
                 // Native Assault rolls its live crit chance separately for every
                 // blade contact. Do the same so OnCritCritChance can affect later
                 // section hits during the same Constrictor tick.
+                float critChance =
+                    src.GetCritChance() +
+                    critChanceBonus;
+
                 bool crit =
                     Modifier.CritRoll(
-                        src.GetCritChance() * weight,
+                        critChance * weight,
                         target
                     );
 
@@ -531,7 +630,10 @@ public static class LeviathanConstrictor
                 if (crit && player && player.health > 0f)
                     ApplyNativeOnCritEffects(src, player);
 
-                float critModifier = src.GetCritModifier();
+                float critModifier =
+                    src.GetCritModifier() +
+                    critDamageBonus;
+
                 float mul = crit ? (1f + critModifier) : 1f;
 
                 mul *= EngineTickFraction;
@@ -994,7 +1096,7 @@ public static class LeviathanConstrictor
             1f,
             1f +
                 (sectionValue - BaselineSectionValue) *
-                SectionValueDamageStep
+                DamageBonusPerSectionValue
         );
     }
 
@@ -1124,7 +1226,7 @@ public static class LeviathanConstrictorNativeHandlingPatch
 [HarmonyPatch]
 public static class LeviathanConstrictorAirResistancePatch
 {
-    private struct ResistanceState
+    public struct ResistanceState
     {
         public Rigidbody2D body;
         public Vector2 velocityBefore;

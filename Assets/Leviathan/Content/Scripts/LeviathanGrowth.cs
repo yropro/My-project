@@ -15,7 +15,7 @@ public static class LeviathanGrowth
 
     // Flat maximum hull granted by each attached Leviathan segment.
     // "Segment" means body + tail; the head is not counted.
-    public const float HullPerSegment = 100.0f;
+    public const float HullPerSegment = 125.0f;
 
     // Effective mass of the player/head per Growth rank.
     public const float MassBonusPerRank = 0.25f;
@@ -29,11 +29,34 @@ public static class LeviathanGrowth
     // Chance to discard a status-effect attempt transferred from a segment.
     private static readonly float[] SegmentDebuffDiscardChanceByRank =
     {
-        0.20f, // Rank 1
-        0.25f, // Rank 2
-        0.30f, // Rank 3
-        0.35f, // Rank 4
+        0.25f, // Rank 1
+        0.30f, // Rank 2
+        0.35f, // Rank 3
+        0.37f, // Rank 4
         0.40f  // Rank 5
+    };
+
+    // Additive crit-damage bonus for weapons on the Leviathan player.
+    // Values are added to the native CritModifier:
+    // 0.05f = +5 percentage points of crit damage.
+    private static readonly float[] CritDamageBonusByRank =
+    {
+        0.10f, // Rank 1
+        0.20f, // Rank 2
+        0.30f, // Rank 3
+        0.40f, // Rank 4
+        0.50f  // Rank 5
+    };
+
+    // Multiplies the player's final heat capacity after native modifiers.
+    // 0.10f = +10% maximum heat.
+    private static readonly float[] HeatCapacityBonusByRank =
+    {
+        0.10f, // Rank 1
+        0.15f, // Rank 2
+        0.20f, // Rank 3
+        0.25f, // Rank 4
+        0.30f  // Rank 5
     };
 
     // =========================================================================
@@ -135,6 +158,30 @@ public static class LeviathanGrowth
         ];
     }
 
+    public static float GetCritDamageBonus(GameShip player)
+    {
+        int rank = GetRank(player);
+
+        if (rank < 1)
+            return 0f;
+
+        return CritDamageBonusByRank[
+            Mathf.Clamp(rank, 1, MaxRank) - 1
+        ];
+    }
+
+    public static float GetHeatCapacityBonus(GameShip player)
+    {
+        int rank = GetRank(player);
+
+        if (rank < 1)
+            return 0f;
+
+        return HeatCapacityBonusByRank[
+            Mathf.Clamp(rank, 1, MaxRank) - 1
+        ];
+    }
+
     internal static bool TryGetLeviathanPlayer(
         object instance,
         out GameShip player)
@@ -165,6 +212,68 @@ public static class LeviathanGrowth
     {
         return AccessTools.Method(typeof(GameShip), name) ??
             AccessTools.Method(typeof(Damageable), name);
+    }
+}
+
+
+[HarmonyPatch]
+public static class LeviathanGrowthHeatCapacityPatch
+{
+    public static MethodBase TargetMethod()
+    {
+        return LeviathanGrowth.FindStatGetter("get_HeatCapacity");
+    }
+
+    public static void Postfix(
+        object __instance,
+        ref int __result)
+    {
+        GameShip player;
+
+        if (!LeviathanGrowth.TryGetLeviathanPlayer(
+                __instance,
+                out player))
+        {
+            return;
+        }
+
+        float bonus =
+            LeviathanGrowth.GetHeatCapacityBonus(player);
+
+        __result = Mathf.RoundToInt(
+            __result * (1f + bonus)
+        );
+    }
+}
+
+
+[HarmonyPatch(typeof(Equippable), "ApplyModifierToPercentage")]
+public static class LeviathanGrowthCritDamagePatch
+{
+    public static void Postfix(
+        Equippable __instance,
+        Modifier.Type __0,
+        float __1,
+        bool __2,
+        ref float __result)
+    {
+        if (__instance == null ||
+            __0 != Modifier.Type.CritModifier ||
+            !__2)
+        {
+            return;
+        }
+
+        GameShip player;
+
+        if (!LeviathanGrowth.TryGetLeviathanPlayer(
+                __instance.parentShip,
+                out player))
+        {
+            return;
+        }
+
+        __result += LeviathanGrowth.GetCritDamageBonus(player);
     }
 }
 

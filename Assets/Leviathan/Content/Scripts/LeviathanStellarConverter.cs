@@ -7,7 +7,8 @@ using System.Reflection.Emit;
 using UnityEngine;
 using static StarVortex.Damageable;
 
-// Stellar Converter: first Primary Laser becomes a charged burst beam.
+// Stellar Converter: first Special-slot Laser, otherwise first Primary-slot Laser,
+// becomes a charged burst beam.
 // Native damage type, chaining, leech, piercing and attribution are preserved.
 // Normal release during charge cancels. If ship CC/offline interrupts an already-started
 // charge, that one shot remains committed and finishes its charge + output.
@@ -103,6 +104,10 @@ public static class LeviathanStellarConverter
         35.00f  // Rank 5
     };
 
+    // Extra mechanical width only. 1.20 = hitbox radius reaches 20% farther
+    // from the beam centerline than the rendered beam edge.
+    private const float HitboxWidthMultiplier = 1.20f;
+
     // Visual brightness only. 1.0 = vanilla brightness.
     private static readonly float[] BrightnessMultiplierByRank =
     {
@@ -192,7 +197,20 @@ public static class LeviathanStellarConverter
     private static bool inputHeld;
     private static bool forceCompleteCurrentShot;
 
-    // Distinguishes activation input from native lifecycle calls.
+    private sealed class RemoteState
+    {
+        public Phase phase;
+        public float phaseTimer;
+        public bool inputHeld;
+        public bool forceCompleteCurrentShot;
+    }
+
+    private static readonly Dictionary<Laser, RemoteState> RemoteStates =
+        new Dictionary<Laser, RemoteState>();
+
+    // Tracks the exact native activation route currently invoking Activatable.
+    // Primary sources are driven by the PrimaryWeapon type route. Special sources
+    // are driven by their own activatable index (or an explicit Special type call).
     [ThreadStatic]
     private static int inputStartDepth;
 
@@ -200,10 +218,31 @@ public static class LeviathanStellarConverter
     private static GameShip inputStartShip;
 
     [ThreadStatic]
+    private static bool inputStartByType;
+
+    [ThreadStatic]
+    private static Item.Type inputStartType;
+
+    [ThreadStatic]
+    private static int inputStartIndex;
+
+    [ThreadStatic]
     private static int inputStopDepth;
 
     [ThreadStatic]
     private static GameShip inputStopShip;
+
+    [ThreadStatic]
+    private static bool inputStopByType;
+
+    [ThreadStatic]
+    private static bool inputStopTypeHasValue;
+
+    [ThreadStatic]
+    private static Item.Type inputStopType;
+
+    [ThreadStatic]
+    private static int inputStopIndex;
 
     // Scoped only to native Beam raycast methods.
     [ThreadStatic]
@@ -276,26 +315,78 @@ public static class LeviathanStellarConverter
         if (player == null || player.slots == null)
             return null;
 
+        Laser primaryFallback = null;
+
+        // A Laser deliberately placed in a Special slot takes priority. There are
+        // very few Special-slot Lasers, so using one there is treated as explicit
+        // intent to make it the Stellar Converter source.
         for (int i = 0; i < player.slots.Length; i++)
         {
             Slot slot = player.slots[i];
 
-            if (slot == null ||
-                slot.type != Item.Type.PrimaryWeapon ||
-                slot.equippable == null)
-            {
+            if (slot == null || slot.equippable == null)
                 continue;
-            }
 
             Laser laser = slot.equippable as Laser;
-
-            if (laser == null || laser.type != Item.Type.PrimaryWeapon)
+            if (laser == null)
                 continue;
 
-            return laser;
+            if (slot.type == Item.Type.Special)
+                return laser;
+
+            if (primaryFallback == null &&
+                slot.type == Item.Type.PrimaryWeapon)
+            {
+                primaryFallback = laser;
+            }
         }
 
-        return null;
+        return primaryFallback;
+    }
+
+    private static bool TryGetSourceSlotType(
+        Laser laser,
+        out Item.Type slotType)
+    {
+        slotType = Item.Type.PrimaryWeapon;
+
+        GameShip player = laser == null ? null : laser.parentShip;
+        if (player == null || player.slots == null)
+            return false;
+
+        for (int i = 0; i < player.slots.Length; i++)
+        {
+            Slot slot = player.slots[i];
+
+            if (slot != null &&
+                ReferenceEquals(slot.equippable, laser))
+            {
+                slotType = slot.type;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int FindActivatableIndex(
+        GameShip player,
+        Laser laser)
+    {
+        if (player == null ||
+            laser == null ||
+            player.activatables == null)
+        {
+            return -1;
+        }
+
+        for (int i = 0; i < player.activatables.Count; i++)
+        {
+            if (ReferenceEquals(player.activatables[i], laser))
+                return i;
+        }
+
+        return -1;
     }
 
     private static bool TryGetContext(
@@ -308,7 +399,6 @@ public static class LeviathanStellarConverter
 
         if (laser == null ||
             player == null ||
-            laser.type != Item.Type.PrimaryWeapon ||
             !TryGetRank(player, out rank))
         {
             return false;
@@ -328,7 +418,6 @@ public static class LeviathanStellarConverter
         if (laser == null ||
             player == null ||
             !player.IsRemotePlayer() ||
-            laser.type != Item.Type.PrimaryWeapon ||
             !TryGetVisualRank(player, out rank))
         {
             return false;
@@ -349,9 +438,6 @@ public static class LeviathanStellarConverter
         if (laser == null)
             return false;
 
-        // Owner-local Converter uses the custom state machine. Remote replicas
-        // receive activation edges only when the owner's native Laser is actually
-        // active, which corresponds exactly to Converter's Firing phase.
         if (ReferenceEquals(sourceLaser, laser) &&
             phase == Phase.Firing &&
             TryGetContext(laser, out player, out rank))
@@ -359,18 +445,42 @@ public static class LeviathanStellarConverter
             return true;
         }
 
+        RemoteState remoteState;
+
         return TryGetRemoteSourceContext(laser, out player, out rank) &&
-            laser.IsActive();
+            RemoteStates.TryGetValue(laser, out remoteState) &&
+            remoteState.phase == Phase.Firing;
     }
 
     // =========================================================================
     // INPUT / STATE MACHINE
     // =========================================================================
 
-    public static void EnterInputStart(GameShip ship)
+    public static void EnterInputStartByType(
+        GameShip ship,
+        Item.Type type)
     {
         if (inputStartDepth == 0)
+        {
             inputStartShip = ship;
+            inputStartByType = true;
+            inputStartType = type;
+            inputStartIndex = -1;
+        }
+
+        inputStartDepth++;
+    }
+
+    public static void EnterInputStartByIndex(
+        GameShip ship,
+        int index)
+    {
+        if (inputStartDepth == 0)
+        {
+            inputStartShip = ship;
+            inputStartByType = false;
+            inputStartIndex = index;
+        }
 
         inputStartDepth++;
     }
@@ -383,13 +493,40 @@ public static class LeviathanStellarConverter
         inputStartDepth--;
 
         if (inputStartDepth == 0)
+        {
             inputStartShip = null;
+            inputStartByType = false;
+            inputStartIndex = -1;
+        }
     }
 
-    public static void EnterInputStop(GameShip ship)
+    public static void EnterInputStopByType(
+        GameShip ship,
+        Item.Type? type)
     {
         if (inputStopDepth == 0)
+        {
             inputStopShip = ship;
+            inputStopByType = true;
+            inputStopTypeHasValue = type.HasValue;
+            inputStopType = type.GetValueOrDefault();
+            inputStopIndex = -1;
+        }
+
+        inputStopDepth++;
+    }
+
+    public static void EnterInputStopByIndex(
+        GameShip ship,
+        int index)
+    {
+        if (inputStopDepth == 0)
+        {
+            inputStopShip = ship;
+            inputStopByType = false;
+            inputStopTypeHasValue = false;
+            inputStopIndex = index;
+        }
 
         inputStopDepth++;
     }
@@ -402,7 +539,57 @@ public static class LeviathanStellarConverter
         inputStopDepth--;
 
         if (inputStopDepth == 0)
+        {
             inputStopShip = null;
+            inputStopByType = false;
+            inputStopTypeHasValue = false;
+            inputStopIndex = -1;
+        }
+    }
+
+    private static bool IsStartInputForSource(Laser laser)
+    {
+        if (laser == null ||
+            inputStartDepth <= 0 ||
+            laser.parentShip != inputStartShip)
+        {
+            return false;
+        }
+
+        Item.Type slotType;
+        if (!TryGetSourceSlotType(laser, out slotType))
+            return false;
+
+        if (inputStartByType)
+            return inputStartType == slotType;
+
+        int sourceIndex = FindActivatableIndex(inputStartShip, laser);
+        return sourceIndex >= 0 && inputStartIndex == sourceIndex;
+    }
+
+    private static bool IsStopInputForSource(Laser laser)
+    {
+        if (laser == null ||
+            inputStopDepth <= 0 ||
+            laser.parentShip != inputStopShip)
+        {
+            return false;
+        }
+
+        if (inputStopByType)
+        {
+            // StopActivating(null) is the native global shutdown path and must
+            // reach either kind of Stellar source.
+            if (!inputStopTypeHasValue)
+                return true;
+
+            Item.Type slotType;
+            return TryGetSourceSlotType(laser, out slotType) &&
+                inputStopType == slotType;
+        }
+
+        int sourceIndex = FindActivatableIndex(inputStopShip, laser);
+        return sourceIndex >= 0 && inputStopIndex == sourceIndex;
     }
 
     public static bool InterceptNativeActivate(Activatable activatable)
@@ -414,20 +601,55 @@ public static class LeviathanStellarConverter
         GameShip player;
         int rank;
 
-        if (laser == null ||
-            !TryGetContext(laser, out player, out rank) ||
-            player != inputStartShip)
-        {
+        if (laser == null || laser.parentShip != inputStartShip)
             return false;
+
+        bool localSource = TryGetContext(laser, out player, out rank);
+        bool remoteSource = false;
+
+        if (!localSource)
+            remoteSource = TryGetRemoteSourceContext(laser, out player, out rank);
+
+        if (!localSource && !remoteSource)
+            return false;
+
+        // Linked/native activation paths can traverse into unrelated slots. Only
+        // the selected source's own trigger may drive Stellar's custom state.
+        if (!IsStartInputForSource(laser))
+        {
+            if (localSource)
+                SetNativeActive(laser, phase == Phase.Firing);
+            else
+            {
+                RemoteState existing = GetRemoteState(laser);
+                SetNativeActive(laser, existing.phase == Phase.Firing);
+            }
+
+            return true;
         }
 
-        SelectSource(laser);
-        inputHeld = true;
-
-        if (phase == Phase.Idle)
+        if (localSource)
         {
-            phase = Phase.Charging;
-            phaseTimer = 0f;
+            SelectSource(laser);
+            inputHeld = true;
+
+            if (phase == Phase.Idle)
+            {
+                phase = Phase.Charging;
+                phaseTimer = 0f;
+            }
+
+            SetNativeActive(laser, false);
+            return true;
+        }
+
+        RemoteState state = GetRemoteState(laser);
+        state.inputHeld = true;
+
+        if (state.phase == Phase.Idle)
+        {
+            state.phase = Phase.Charging;
+            state.phaseTimer = 0f;
         }
 
         SetNativeActive(laser, false);
@@ -443,35 +665,74 @@ public static class LeviathanStellarConverter
         GameShip player;
         int rank;
 
-        if (laser == null ||
-            !TryGetContext(laser, out player, out rank) ||
-            player != inputStopShip)
-        {
+        if (laser == null || laser.parentShip != inputStopShip)
             return false;
-        }
 
-        SelectSource(laser);
+        bool localSource = TryGetContext(laser, out player, out rank);
+        bool remoteSource = false;
 
-        // Disabled / weapons-offline calls StopActivating just like player release,
-        // but an already-started Stellar shot is intentionally unstoppable by that
-        // control loss. Mark the physical input released so it cannot queue another
-        // shot, then let the current Charging/Firing sequence finish once.
-        if (IsControlInterrupted(player) && phase != Phase.Idle)
+        if (!localSource)
+            remoteSource = TryGetRemoteSourceContext(laser, out player, out rank);
+
+        if (!localSource && !remoteSource)
+            return false;
+
+        // Suppress deactivation cross-talk from linked/unrelated activatables.
+        // Global StopActivating(null) is still accepted for CC/offline shutdown.
+        if (!IsStopInputForSource(laser))
         {
-            inputHeld = false;
-            forceCompleteCurrentShot = true;
-            SetNativeActive(laser, phase == Phase.Firing);
+            if (localSource)
+                SetNativeActive(laser, phase == Phase.Firing);
+            else
+            {
+                RemoteState existing = GetRemoteState(laser);
+                SetNativeActive(laser, existing.phase == Phase.Firing);
+            }
+
             return true;
         }
 
-        inputHeld = false;
-
-        // Normal release before charge completes cancels it. Once firing, the shot
-        // remains committed until OutputDurationByRank expires.
-        if (phase == Phase.Charging && !forceCompleteCurrentShot)
+        if (localSource)
         {
-            phase = Phase.Idle;
-            phaseTimer = 0f;
+            SelectSource(laser);
+
+            if (IsControlInterrupted(player) && phase != Phase.Idle)
+            {
+                inputHeld = false;
+                forceCompleteCurrentShot = true;
+                SetNativeActive(laser, phase == Phase.Firing);
+                return true;
+            }
+
+            inputHeld = false;
+
+            if (phase == Phase.Charging && !forceCompleteCurrentShot)
+            {
+                phase = Phase.Idle;
+                phaseTimer = 0f;
+                SetNativeActive(laser, false);
+            }
+
+            return true;
+        }
+
+        RemoteState state = GetRemoteState(laser);
+
+        if (IsControlInterrupted(player) && state.phase != Phase.Idle)
+        {
+            state.inputHeld = false;
+            state.forceCompleteCurrentShot = true;
+            SetNativeActive(laser, state.phase == Phase.Firing);
+            return true;
+        }
+
+        state.inputHeld = false;
+
+        if (state.phase == Phase.Charging &&
+            !state.forceCompleteCurrentShot)
+        {
+            state.phase = Phase.Idle;
+            state.phaseTimer = 0f;
             SetNativeActive(laser, false);
         }
 
@@ -483,33 +744,58 @@ public static class LeviathanStellarConverter
         GameShip player;
         int rank;
 
-        if (!TryGetContext(laser, out player, out rank))
+        if (TryGetContext(laser, out player, out rank))
         {
-            if (ReferenceEquals(sourceLaser, laser))
-                Reset();
+            if (IsTerminalStopped(player))
+            {
+                if (ReferenceEquals(sourceLaser, laser))
+                    ResetLocalSource();
+                else
+                    SetNativeActive(laser, false);
 
+                return;
+            }
+
+            SelectSource(laser);
+
+            if (phase == Phase.Charging &&
+                !inputHeld &&
+                !forceCompleteCurrentShot)
+            {
+                phase = Phase.Idle;
+                phaseTimer = 0f;
+            }
+
+            SetNativeActive(laser, phase == Phase.Firing);
             return;
         }
 
-        if (IsTerminalStopped(player))
+        if (TryGetRemoteSourceContext(laser, out player, out rank))
         {
-            if (ReferenceEquals(sourceLaser, laser))
-                Reset();
-            else
-                SetNativeActive(laser, false);
+            RemoteState state = GetRemoteState(laser);
 
+            if (IsTerminalStopped(player))
+            {
+                ResetRemoteSource(laser);
+                return;
+            }
+
+            if (state.phase == Phase.Charging &&
+                !state.inputHeld &&
+                !state.forceCompleteCurrentShot)
+            {
+                state.phase = Phase.Idle;
+                state.phaseTimer = 0f;
+            }
+
+            SetNativeActive(laser, state.phase == Phase.Firing);
             return;
         }
 
-        SelectSource(laser);
+        if (ReferenceEquals(sourceLaser, laser))
+            ResetLocalSource();
 
-        if (phase == Phase.Charging && !inputHeld && !forceCompleteCurrentShot)
-        {
-            phase = Phase.Idle;
-            phaseTimer = 0f;
-        }
-
-        SetNativeActive(laser, phase == Phase.Firing);
+        RemoteStates.Remove(laser);
     }
 
     public static void CompleteFixedUpdate(Laser laser)
@@ -517,12 +803,24 @@ public static class LeviathanStellarConverter
         GameShip player;
         int rank;
 
-        if (!ReferenceEquals(sourceLaser, laser) ||
-            !TryGetContext(laser, out player, out rank))
+        if (ReferenceEquals(sourceLaser, laser) &&
+            TryGetContext(laser, out player, out rank))
         {
+            AdvanceLocalState(laser, rank);
             return;
         }
 
+        if (TryGetRemoteSourceContext(laser, out player, out rank))
+        {
+            RemoteState state;
+
+            if (RemoteStates.TryGetValue(laser, out state))
+                AdvanceRemoteState(laser, state, rank);
+        }
+    }
+
+    private static void AdvanceLocalState(Laser laser, int rank)
+    {
         if (phase == Phase.Charging)
         {
             if (!inputHeld && !forceCompleteCurrentShot)
@@ -534,7 +832,6 @@ public static class LeviathanStellarConverter
 
             if (!laser.CanActivate())
             {
-                // Native activation restrictions still gate charging.
                 phaseTimer = 0f;
                 return;
             }
@@ -566,12 +863,69 @@ public static class LeviathanStellarConverter
 
         if (phaseTimer >= GetRankValue(OutputDurationByRank, rank))
         {
-            // Finish the current native update before ending output. A shot forced
-            // through CC never auto-queues another shot after control returns.
             bool queueNext = inputHeld && !forceCompleteCurrentShot;
             phase = queueNext ? Phase.Charging : Phase.Idle;
             phaseTimer = 0f;
             forceCompleteCurrentShot = false;
+        }
+    }
+
+    private static void AdvanceRemoteState(
+        Laser laser,
+        RemoteState state,
+        int rank)
+    {
+        if (state.phase == Phase.Charging)
+        {
+            if (!state.inputHeld && !state.forceCompleteCurrentShot)
+            {
+                state.phase = Phase.Idle;
+                state.phaseTimer = 0f;
+                return;
+            }
+
+            if (!laser.CanActivate())
+            {
+                state.phaseTimer = 0f;
+                return;
+            }
+
+            state.phaseTimer += Time.fixedDeltaTime;
+
+            if (state.phaseTimer >=
+                GetRankValue(ChargeDurationByRank, rank))
+            {
+                state.phase = Phase.Firing;
+                state.phaseTimer = 0f;
+            }
+
+            return;
+        }
+
+        if (state.phase != Phase.Firing)
+            return;
+
+        if (!laser.CanActivate())
+        {
+            SetNativeActive(laser, false);
+            state.phase = state.inputHeld ? Phase.Charging : Phase.Idle;
+            state.phaseTimer = 0f;
+            state.forceCompleteCurrentShot = false;
+            return;
+        }
+
+        state.phaseTimer += Time.fixedDeltaTime;
+
+        if (state.phaseTimer >=
+            GetRankValue(OutputDurationByRank, rank))
+        {
+            bool queueNext =
+                state.inputHeld &&
+                !state.forceCompleteCurrentShot;
+
+            state.phase = queueNext ? Phase.Charging : Phase.Idle;
+            state.phaseTimer = 0f;
+            state.forceCompleteCurrentShot = false;
         }
     }
 
@@ -590,7 +944,20 @@ public static class LeviathanStellarConverter
         forceCompleteCurrentShot = false;
     }
 
-    public static void Reset()
+    private static RemoteState GetRemoteState(Laser laser)
+    {
+        RemoteState state;
+
+        if (!RemoteStates.TryGetValue(laser, out state))
+        {
+            state = new RemoteState();
+            RemoteStates[laser] = state;
+        }
+
+        return state;
+    }
+
+    private static void ResetLocalSource()
     {
         if (sourceLaser != null)
             SetNativeActive(sourceLaser, false);
@@ -600,6 +967,84 @@ public static class LeviathanStellarConverter
         phaseTimer = 0f;
         inputHeld = false;
         forceCompleteCurrentShot = false;
+    }
+
+    private static void ResetRemoteSource(Laser laser)
+    {
+        if (laser == null)
+            return;
+
+        SetNativeActive(laser, false);
+        RemoteStates.Remove(laser);
+    }
+
+    public static void ResetSource(Laser laser)
+    {
+        if (ReferenceEquals(sourceLaser, laser))
+            ResetLocalSource();
+
+        ResetRemoteSource(laser);
+    }
+
+    public static void Reset()
+    {
+        ResetLocalSource();
+
+        foreach (KeyValuePair<Laser, RemoteState> pair in RemoteStates)
+        {
+            if (pair.Key != null)
+                SetNativeActive(pair.Key, false);
+        }
+
+        RemoteStates.Clear();
+    }
+
+    // Stellar deliberately toggles the native active flag across charge/output
+    // phases, so publish its actual input-held state on the network bit belonging
+    // to the selected source. Primary uses shared bit 0; Special uses its native
+    // activatable-index bit. Remote clients can then reconstruct the same cycle.
+    public static void ScaleNetworkSourceInput(
+        GameShip ship,
+        ref uint activeSlots)
+    {
+        Laser laser = FindSourceLaser(ship);
+        GameShip player;
+        int rank;
+
+        if (laser == null ||
+            !ReferenceEquals(sourceLaser, laser) ||
+            !TryGetContext(laser, out player, out rank))
+        {
+            return;
+        }
+
+        Item.Type slotType;
+        if (!TryGetSourceSlotType(laser, out slotType))
+            return;
+
+        uint bit;
+
+        if (slotType == Item.Type.PrimaryWeapon)
+        {
+            bit = 1U;
+        }
+        else if (slotType == Item.Type.Special)
+        {
+            int activatableIndex = FindActivatableIndex(ship, laser);
+            if (activatableIndex < 0 || activatableIndex >= 31)
+                return;
+
+            bit = 1U << (activatableIndex + 1);
+        }
+        else
+        {
+            return;
+        }
+
+        if (inputHeld)
+            activeSlots |= bit;
+        else
+            activeSlots &= ~bit;
     }
 
     private static void SetNativeActive(Laser laser, bool active)
@@ -644,12 +1089,17 @@ public static class LeviathanStellarConverter
                 !IsTerminalStopped(player);
         }
 
-        // Native remote beams also fade after Deactivate and would otherwise keep
-        // dealing victim-side damage during that fade. Match the owner's exact
-        // Converter output window by allowing remote ticks only while its active
-        // slot bit is still asserted.
+        // Remote replicas run the same Converter phase machine locally. This
+        // avoids the vanilla Primary active-slot bit latching Stellar on whenever
+        // any other Primary weapon remains held.
         if (TryGetRemoteSourceContext(laser, out player, out rank))
-            return laser.IsActive() && !IsTerminalStopped(player);
+        {
+            RemoteState state;
+
+            return RemoteStates.TryGetValue(laser, out state) &&
+                state.phase == Phase.Firing &&
+                !IsTerminalStopped(player);
+        }
 
         return true;
     }
@@ -740,7 +1190,7 @@ public static class LeviathanStellarConverter
     }
 
     // Native Striker range is injected through Equippable.ApplyModifier(MaxRange).
-    // Use that exact stat boundary for only the selected Primary Laser, so Beam's
+    // Use that exact stat boundary for only the selected source Laser, so Beam's
     // own raycasts, chaining and rendering all consume the scaled MaxRange.
     public static void ScaleMaxRange(
         Equippable equippable,
@@ -953,7 +1403,8 @@ public static class LeviathanStellarConverter
         radius = 0.5f *
             baseWidth *
             GetVisualState(beam) *
-            GetRankValue(WidthMultiplierByRank, rank);
+            GetRankValue(WidthMultiplierByRank, rank) *
+            HitboxWidthMultiplier;
 
         return radius > 0f;
     }
@@ -1045,9 +1496,12 @@ public static class LeviathanStellarConverterStartByTypePatch
         );
     }
 
-    public static void Prefix(GameShip __instance)
+    public static void Prefix(GameShip __instance, Item.Type __0)
     {
-        LeviathanStellarConverter.EnterInputStart(__instance);
+        LeviathanStellarConverter.EnterInputStartByType(
+            __instance,
+            __0
+        );
     }
 
     public static void Postfix()
@@ -1068,9 +1522,12 @@ public static class LeviathanStellarConverterStartByIndexPatch
         );
     }
 
-    public static void Prefix(GameShip __instance)
+    public static void Prefix(GameShip __instance, int __0)
     {
-        LeviathanStellarConverter.EnterInputStart(__instance);
+        LeviathanStellarConverter.EnterInputStartByIndex(
+            __instance,
+            __0
+        );
     }
 
     public static void Postfix()
@@ -1091,9 +1548,12 @@ public static class LeviathanStellarConverterStopByTypePatch
         );
     }
 
-    public static void Prefix(GameShip __instance)
+    public static void Prefix(GameShip __instance, Item.Type? __0)
     {
-        LeviathanStellarConverter.EnterInputStop(__instance);
+        LeviathanStellarConverter.EnterInputStopByType(
+            __instance,
+            __0
+        );
     }
 
     public static void Postfix()
@@ -1114,14 +1574,32 @@ public static class LeviathanStellarConverterStopByIndexPatch
         );
     }
 
-    public static void Prefix(GameShip __instance)
+    public static void Prefix(GameShip __instance, int __0)
     {
-        LeviathanStellarConverter.EnterInputStop(__instance);
+        LeviathanStellarConverter.EnterInputStopByIndex(
+            __instance,
+            __0
+        );
     }
 
     public static void Postfix()
     {
         LeviathanStellarConverter.ExitInputStop();
+    }
+}
+
+// RemoteShipDriver derives activation bits from Activatable.active. Stellar
+// deliberately toggles that flag across charge/output phases, so publish the
+// owner's actual input latch on the selected Primary or Special source bit.
+[HarmonyPatch(typeof(RemoteShipDriver), "BuildActiveSlotsMask")]
+public static class LeviathanStellarConverterNetworkSourceInputPatch
+{
+    public static void Postfix(GameShip __0, ref uint __result)
+    {
+        LeviathanStellarConverter.ScaleNetworkSourceInput(
+            __0,
+            ref __result
+        );
     }
 }
 
@@ -1191,7 +1669,7 @@ public static class LeviathanStellarConverterBeamWeaponUnequipPatch
                 source
             ))
         {
-            LeviathanStellarConverter.Reset();
+            LeviathanStellarConverter.ResetSource(source);
         }
     }
 }

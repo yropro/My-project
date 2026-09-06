@@ -1444,6 +1444,94 @@ public static class LeviathanSegmentAddStatusEffectPatch
     }
 }
 
+public static class LeviathanSegmentSourceTuning
+{
+    // Extra multiplier applied only when a Halo damages a Leviathan segment and
+    // that segment damage is redirected to the head. Direct head hits are untouched.
+    public const float EnemyHaloTransferredDamageMultiplier = 0.37f;
+
+    // Enable temporarily to print the exact recorded source of redirected hits.
+    public const bool LogSegmentDamageSources = false;
+
+    public static bool IsHaloSource(
+        GameShip segment,
+        GameShip attacker)
+    {
+        if (segment == null || attacker == null)
+            return false;
+
+        string weaponName =
+            segment.lastDamagedByWeaponName ?? string.Empty;
+
+        if (string.IsNullOrEmpty(weaponName) ||
+            attacker.slots == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < attacker.slots.Length; i++)
+        {
+            Slot slot = attacker.slots[i];
+
+            if (slot == null)
+                continue;
+
+            Halo halo = slot.equippable as Halo;
+
+            if (halo == null)
+                continue;
+
+            if (string.Equals(
+                    halo.GetName(false, false),
+                    weaponName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void LogSource(
+        GameShip segment,
+        GameShip attacker,
+        DamageType damageType,
+        DamageData[] damageData,
+        float finalMultiplier,
+        bool haloSource)
+    {
+        if (!LogSegmentDamageSources || segment == null)
+            return;
+
+        float rawDamage = 0f;
+        float rawDps = 0f;
+
+        if (damageData != null)
+        {
+            for (int i = 0; i < damageData.Length; i++)
+            {
+                rawDamage += damageData[i].damage;
+                rawDps += damageData[i].dps;
+            }
+        }
+
+        Debug.Log(
+            "[Leviathan] Segment hit source='" +
+            (segment.lastDamagedByWeaponName ?? "Unknown") +
+            "' ship='" +
+            (segment.lastDamagedByShipName ?? "Unknown") +
+            "' faction='" +
+            (segment.lastDamagedByFaction ?? "Unknown") +
+            "' type=" + damageType +
+            " rawDamage=" + rawDamage +
+            " rawDps=" + rawDps +
+            " multiplier=" + finalMultiplier +
+            " halo=" + haloSource
+        );
+    }
+}
+
 [HarmonyPatch]
 public static class LeviathanSegmentDamagePatch
 {
@@ -1495,7 +1583,39 @@ public static class LeviathanSegmentDamagePatch
         float multiplier =
             LeviathanBehemoth.GetSegmentDamageMultiplier(player);
 
-        DamageData[] scaledDamage = ScaleDamageData(__1, multiplier);
+        DamageData[] scaledDamage =
+            ScaleDamageData(__1, multiplier);
+
+        bool haloSource =
+            LeviathanSegmentSourceTuning.IsHaloSource(
+                __instance,
+                __5
+            );
+
+        // Final transfer check: after all normal segment scaling has already
+        // been applied, halve the resulting redirected damage if the source
+        // was a Halo. Direct head hits never pass through this path.
+        if (haloSource)
+        {
+            scaledDamage = ScaleDamageData(
+                scaledDamage,
+                LeviathanSegmentSourceTuning
+                    .EnemyHaloTransferredDamageMultiplier
+            );
+        }
+
+        LeviathanSegmentSourceTuning.LogSource(
+            __instance,
+            __5,
+            __0,
+            __1,
+            haloSource
+                ? multiplier *
+                    LeviathanSegmentSourceTuning
+                        .EnemyHaloTransferredDamageMultiplier
+                : multiplier,
+            haloSource
+        );
 
         float statusEffectChance =
             LeviathanSegmentStatusProtection.FilterStatusEffectChance(
@@ -1785,6 +1905,8 @@ public static class LeviathanAttachmentNormalizer
 
         if (InitializedAttachedShips.Add(instanceId))
         {
+            NormalizeSquadronRenderOrder(ship);
+
             if (SegmentLengthField != null)
                 SegmentLengthField.SetValue(attachedAI, -1f);
 
@@ -1824,6 +1946,50 @@ public static class LeviathanAttachmentNormalizer
         shipTransform.position = correctedPosition;
     }
 
+    private static void NormalizeSquadronRenderOrder(GameShip ship)
+    {
+        if (ship == null ||
+            ship.squadron == null ||
+            ship.squadron.ships == null ||
+            ship.squadron.ships.Count < 2)
+        {
+            return;
+        }
+
+        List<Squadron.SquadronShip> ships = ship.squadron.ships;
+        int shipIndex = -1;
+
+        for (int i = 1; i < ships.Count; i++)
+        {
+            if (ships[i] != null && ships[i].ship == ship)
+            {
+                shipIndex = i;
+                break;
+            }
+        }
+
+        if (shipIndex < 1 || ships[0] == null || ships[0].ship == null)
+            return;
+
+        UnityEngine.Rendering.SortingGroup headGroup;
+        UnityEngine.Rendering.SortingGroup shipGroup;
+
+        if (!ships[0].ship.TryGetComponent<
+                UnityEngine.Rendering.SortingGroup>(out headGroup) ||
+            !ship.TryGetComponent<
+                UnityEngine.Rendering.SortingGroup>(out shipGroup) ||
+            headGroup == null ||
+            shipGroup == null)
+        {
+            return;
+        }
+
+        // Draw the chain from head toward tail. Each following body sits
+        // above the previous ship so its body covers the previous thruster.
+        shipGroup.sortingLayerID = headGroup.sortingLayerID;
+        shipGroup.sortingOrder = headGroup.sortingOrder + shipIndex;
+    }
+
     private static bool TryGetAnchors(
         GameShip ship,
         out HullAnchors anchors)
@@ -1837,144 +2003,30 @@ public static class LeviathanAttachmentNormalizer
         if (AnchorCache.TryGetValue(ship, out anchors))
             return true;
 
-        ShipBody shipBody = ship.GetShipBody();
-
-        if (shipBody == null)
-        {
-            anchors = default(HullAnchors);
-            return false;
-        }
-
-        float minX = float.PositiveInfinity;
-        float maxX = float.NegativeInfinity;
-        float minY = float.PositiveInfinity;
-        float maxY = float.NegativeInfinity;
-        bool found = false;
-
-        foreach (ShipPart part in shipBody.GetShipParts())
-        {
-            if (part == null || part.partType != PartType.Body)
-                continue;
-
-            SpriteRenderer renderer = part.spriteRenderer;
-
-            if (renderer == null || renderer.sprite == null)
-                continue;
-
-            Bounds bounds = renderer.sprite.bounds;
-            Vector3 min = bounds.min;
-            Vector3 max = bounds.max;
-
-            IncludePoint(
-                ship,
-                renderer.transform,
-                min.x,
-                min.y,
-                ref minX,
-                ref maxX,
-                ref minY,
-                ref maxY
-            );
-
-            IncludePoint(
-                ship,
-                renderer.transform,
-                min.x,
-                max.y,
-                ref minX,
-                ref maxX,
-                ref minY,
-                ref maxY
-            );
-
-            IncludePoint(
-                ship,
-                renderer.transform,
-                max.x,
-                min.y,
-                ref minX,
-                ref maxX,
-                ref minY,
-                ref maxY
-            );
-
-            IncludePoint(
-                ship,
-                renderer.transform,
-                max.x,
-                max.y,
-                ref minX,
-                ref maxX,
-                ref minY,
-                ref maxY
-            );
-
-            found = true;
-        }
-
-        if (!found)
-        {
-            anchors = default(HullAnchors);
-            return false;
-        }
-
-        var thrusterEquipment = ship.GetThruster();
-
-        if (thrusterEquipment == null ||
-            thrusterEquipment.gameObject == null)
-        {
-            anchors = default(HullAnchors);
-            return false;
-        }
-
-        Vector3 thrusterLocal = ship.transform.InverseTransformPoint(
-            thrusterEquipment.gameObject.transform.position
-        );
-
-        float centerX = (minX + maxX) * 0.5f;
-        bool rearIsMinX = thrusterLocal.x <= centerX;
         float classRadius =
             Ship.GetClassShieldRadius(ship.GetShipClass());
 
         if (classRadius <= 0f)
+        {
+            anchors = default(HullAnchors);
             return false;
+        }
 
+        // Leviathan spacing uses only the class-size circle.
+        // Right edge is front; left edge is rear.
         anchors = new HullAnchors();
         anchors.frontLocal = new Vector2(
-            rearIsMinX ? classRadius : -classRadius,
+            classRadius,
             0f
         );
         anchors.rearLocal = new Vector2(
-            rearIsMinX ? -classRadius : classRadius,
+            -classRadius,
             0f
         );
-        anchors.forwardLocal =
-            rearIsMinX ? Vector2.right : Vector2.left;
+        anchors.forwardLocal = Vector2.right;
         anchors.length = classRadius * 2f;
 
         AnchorCache[ship] = anchors;
         return true;
-    }
-
-    private static void IncludePoint(
-        GameShip ship,
-        Transform rendererTransform,
-        float x,
-        float y,
-        ref float minX,
-        ref float maxX,
-        ref float minY,
-        ref float maxY)
-    {
-        Vector3 world = rendererTransform.TransformPoint(
-            new Vector3(x, y, 0f)
-        );
-
-        Vector3 local = ship.transform.InverseTransformPoint(world);
-
-        minX = Mathf.Min(minX, local.x);
-        maxX = Mathf.Max(maxX, local.x);
-        minY = Mathf.Min(minY, local.y);
-        maxY = Mathf.Max(maxY, local.y);
     }
 }

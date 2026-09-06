@@ -106,7 +106,7 @@ public static class LeviathanStarfireRuntime
         1.00f  // Rank 5
     };
 
-    // Future Deep Breath / charge-profile hooks. These are intentionally neutral
+    // Futurewa / charge-profile hooks. These are intentionally neutral
     // today. StartupDelaySeconds is an explicit wind-up before Starfire can deal
     // damage; native charge/VFX can still build during that telegraph.
     private static readonly float[] StartupDelaySecondsByRank =

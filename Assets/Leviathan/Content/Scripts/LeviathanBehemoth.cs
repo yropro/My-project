@@ -17,9 +17,9 @@ public static class LeviathanBehemoth
 
     private static readonly float[] SegmentDamageMultiplierByRank =
     {
-        0.45f, // Rank 1
-        0.40f, // Rank 2
-        0.35f, // Rank 3
+        0.47f, // Rank 1
+        0.38f, // Rank 2
+        0.33f, // Rank 3
         0.30f, // Rank 4
         0.25f  // Rank 5
     };
@@ -27,7 +27,7 @@ public static class LeviathanBehemoth
     // Additional chance to discard a status-effect attempt transferred from a segment.
     private static readonly float[] SegmentDebuffDiscardChanceByRank =
     {
-        0.25f, // Rank 1
+        0.27f, // Rank 1
         0.30f, // Rank 2
         0.35f, // Rank 3
         0.37f, // Rank 4
@@ -60,11 +60,11 @@ public static class LeviathanBehemoth
     // 1.00 = unchanged.
     private static readonly float[] MaxHullMultiplierByRank =
     {
-        1.00f, // Rank 1
-        1.00f, // Rank 2
-        1.00f, // Rank 3
-        1.00f, // Rank 4
-        1.00f  // Rank 5
+        1.05f, // Rank 1
+        1.10f, // Rank 2
+        1.20f, // Rank 3
+        1.25f, // Rank 4
+        1.30f  // Rank 5
     };
 
     // Flat maximum hull added after the multiplier.
@@ -81,21 +81,21 @@ public static class LeviathanBehemoth
     // Example: 10.0f with 9 bodies + tail = 10 segments = +100 max hull.
     private static readonly float[] MaxHullFlatBonusPerSegmentByRank =
     {
-        0.00f, // Rank 1
-        0.00f, // Rank 2
-        0.00f, // Rank 3
-        0.00f, // Rank 4
-        0.00f  // Rank 5
+        50.00f, // Rank 1
+        55.00f, // Rank 2
+        60.00f, // Rank 3
+        65.00f, // Rank 4
+        70.00f  // Rank 5
     };
 
     // Flat hull regenerated per second.
     private static readonly float[] StaticHullRegenPerSecondByRank =
     {
-        0.00f, // Rank 1
-        0.00f, // Rank 2
-        0.00f, // Rank 3
-        0.00f, // Rank 4
-        0.00f  // Rank 5
+        5.00f, // Rank 1
+        5.00f, // Rank 2
+        10.00f, // Rank 3
+        15.00f, // Rank 4
+        50.00f  // Rank 5
     };
 
     // Flat hull regenerated per second PER attached Leviathan segment
@@ -106,7 +106,7 @@ public static class LeviathanBehemoth
         4.75f, // Rank 2
         5.50f, // Rank 3
         6.50f, // Rank 4
-        7.50f  // Rank 5
+        8.50f  // Rank 5
     };
 
     // Additional hull regenerated per second as a percentage of adjusted max hull.
