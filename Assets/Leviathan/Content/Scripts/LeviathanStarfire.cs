@@ -49,9 +49,10 @@ public static class LeviathanStarfireRuntime
         1.5f  // Rank 5
     };
 
-    // Multiplier on the source Torch spike body's native Y scale. Torch damage uses
-    // the same spike Collider2D, so this widens both the native visual and hit area.
-    // Rank 1 is completely vanilla width; Rank 5 reaches 2.5x width.
+    // Multiplier on Starfire's base fan angle. The native Torch body stays at
+    // Y scale 1; width is now encoded in one trapezoid collider plus cosmetic
+    // beam strips. With BaseFanHalfAngleDegrees = 10, these values produce
+    // half-angles of 13 / 15 / 17 / 18 / 20 degrees by rank.
     private static readonly float[] WidthMultiplierByRank =
     {
         1.30f, // Rank 1
@@ -60,6 +61,88 @@ public static class LeviathanStarfireRuntime
         1.80f, // Rank 4
         2.00f  // Rank 5
     };
+
+    // Cosmetic fan only. All strips share one generated mesh per native Torch
+    // SpriteRenderer layer and never receive colliders or damage logic.
+    private const int VisualBeamCount = 16;
+
+    // Rank spread = this angle * WidthMultiplierByRank. This is the main cone
+    // angle knob. Example: 10 degrees * Rank 5's 2.0 = 20 degree half-angle.
+    private const float BaseFanHalfAngleDegrees = 15.0f;
+
+    // Width at the muzzle as a fraction of the native Torch half-width. The
+    // far end then expands according to the fan angle and current beam length.
+    private const float MuzzleHalfWidthMultiplier = 0.65f;
+
+    // 1.0 means neighboring cosmetic strips just touch at their center spacing.
+    // Below 1 leaves visible seams; above 1 deliberately overlaps neighboring
+    // strips. 1.35 is intentionally dense so ten beams read as one plume.
+    private const float VisualBeamFillFraction = 1.6f;
+
+    // Never let an individual strip become thinner than this fraction of the
+    // native Torch half-width. 1.00 keeps each cosmetic strip approximately
+    // native-beam thickness instead of squeezing ten skinny ribbons into the fan.
+    private const float VisualMinimumHalfWidthMultiplier = 1.20f;
+
+    // Slightly pad the single mechanical trapezoid beyond the visible fan to be
+    // forgiving of motion/netcode without adding extra overlap queries.
+    private const float HitboxWidthPaddingMultiplier = 1.05f;
+
+    // Global opacity of the cosmetic Starfire plume. 1.00 is fully opaque;
+    // 0.50 is half opacity. This affects visuals only, never hit detection.
+    private const float VisualOpacity = 0.70f;
+
+    // Terminal shaping shared by visuals and the single mechanical collider.
+    // The outermost beam pair keeps the base breath length while progressively
+    // more central pairs extend farther. With 10 beams, pair weights are
+    // 0 / 25 / 50 / 75 / 100 percent of this bonus.
+    private const float VisualCenterLengthBonusFraction = 0.10f;
+
+    // Starfire AoE timing is intentionally independent of native Torch charge.
+    // Arrays are Rank 1 -> Rank 5 so each rank can tune the sustained full-size
+    // phase without changing the geometry/damage implementation.
+    private static readonly float[] FullSizeHoldSecondsByRank =
+    {
+        2.00f, // Rank 1
+        2.00f, // Rank 2
+        2.00f, // Rank 3
+        2.00f, // Rank 4
+        2.00f  // Rank 5
+    };
+
+    // Time spent shrinking from full range to BreathMinimumLengthFraction.
+    private static readonly float[] BreathRetreatSecondsByRank =
+    {
+        2.00f, // Rank 1
+        2.00f, // Rank 2
+        2.00f, // Rank 3
+        2.00f, // Rank 4
+        2.00f  // Rank 5
+    };
+
+    // Remaining longitudinal breath length after the retreat completes. 0.25
+    // leaves one quarter of the initial breath range until the trigger is released.
+    private const float BreathMinimumLengthFraction = 0.25f;
+
+    // Shapes retreat progress after the full-size hold. 1 = linear; values above
+    // 1 keep the breath large longer, then make it collapse faster near the end.
+    private static readonly float[] BreathRetreatCurveExponentByRank =
+    {
+        2.00f, // Rank 1
+        2.00f, // Rank 2
+        2.00f, // Rank 3
+        2.00f, // Rank 4
+        2.00f  // Rank 5
+    };
+
+    // Only the terminal edge is alpha-feathered. The rest of the breath remains
+    // at VisualOpacity for the full firing cycle. 0.10 softens the final 10% of
+    // each cosmetic ribbon without narrowing it.
+    private const float VisualEndFeatherFraction = 0.10f;
+
+    // More longitudinal sections make the endpoint alpha feather smoother without
+    // adding more Torch strips. This is still a very small cosmetic mesh.
+    private const int VisualLengthSegments = 32;
 
     // Direct multiplier on the source Torch's native DamageData[] packet.
     // Neutral for now; future Starfire branches can change this independently.
@@ -106,7 +189,7 @@ public static class LeviathanStarfireRuntime
         1.00f  // Rank 5
     };
 
-    // Futurewa / charge-profile hooks. These are intentionally neutral
+    // Future Deep Breath / charge-profile hooks. These are intentionally neutral
     // today. StartupDelaySeconds is an explicit wind-up before Starfire can deal
     // damage; native charge/VFX can still build during that telegraph.
     private static readonly float[] StartupDelaySecondsByRank =
@@ -119,15 +202,15 @@ public static class LeviathanStarfireRuntime
     };
 
     // Multiplier on native Torch charge speed. 2.00 = half native chargeTime;
-    // 0.50 = double native chargeTime. Because Torch's own `charge` drives both
-    // range and GetDamageData(), this changes the real mechanical ramp, not just VFX.
+    // 0.50 = double native chargeTime. Native charge still affects Torch damage and
+    // weapon behavior, but Starfire AoE geometry now uses its separate breath timer.
     private static readonly float[] ChargeRampSpeedMultiplierByRank =
     {
-        1.00f, // Rank 1
-        1.00f, // Rank 2
-        1.00f, // Rank 3
-        1.00f, // Rank 4
-        1.00f  // Rank 5
+        0.90f, // Rank 1
+        0.80f, // Rank 2
+        0.70f, // Rank 3
+        0.60f, // Rank 4
+        0.30f  // Rank 5
     };
 
     // =========================================================================
@@ -181,6 +264,44 @@ public static class LeviathanStarfireRuntime
 
     private static bool warnedNoSpikeFields;
     private static bool warnedNoSpikeObject;
+    private static bool warnedNoFanCollider;
+    private static bool warnedNoFanVisual;
+
+    private sealed class FanVisualLayer
+    {
+        public SpriteRenderer sourceRenderer;
+        public bool sourceWasEnabled;
+        public GameObject objectInstance;
+        public Mesh mesh;
+        public Material material;
+        public float uMin;
+        public float uMax;
+        public float vMin;
+        public float vMax;
+        public float nativeHalfWidth;
+    }
+
+    private sealed class FanState
+    {
+        public object nativeSpike;
+        public GameObject spikeObject;
+        public Transform body;
+        public FieldInfo colliderField;
+        public Collider2D originalCollider;
+        public bool originalColliderEnabled;
+        public GameObject fanColliderObject;
+        public PolygonCollider2D fanCollider;
+        public float minX;
+        public float maxX;
+        public float centerY;
+        public float baseHalfWidth;
+        public float breathStartTime = -1f;
+        public readonly List<FanVisualLayer> visualLayers =
+            new List<FanVisualLayer>();
+    }
+
+    private static readonly Dictionary<Torch, FanState> FanStates =
+        new Dictionary<Torch, FanState>();
 
 
     // Narrower context used only while the source Torch's native DoSpikeDamage
@@ -325,9 +446,8 @@ public static class LeviathanStarfireRuntime
         int rank;
         if (!TryGetStarfireContext(torch, out player, out rank))
         {
-            // If this Torch was previously touched by Starfire, restore only the
-            // components Starfire itself suppressed. Do this once on transition,
-            // rather than forcing native component state every frame.
+            RestoreStarfireFan(torch);
+
             if (TouchedTorches.Remove(torch))
             {
                 if (FullySuppressedTorches.Remove(torch))
@@ -347,29 +467,35 @@ public static class LeviathanStarfireRuntime
 
         if (!source)
         {
+            RestoreStarfireFan(torch);
             FullySuppressedTorches.Add(torch);
             SetSpikeSuppressed(mainSpike, true);
             SetSpikeSuppressed(mirrorSpike, true);
             return;
         }
 
-        // If equipment changes made a previously-suppressed Torch become the new
-        // source, restore its main spike once. Otherwise leave native main-spike
-        // enabled/disabled state untouched.
         if (FullySuppressedTorches.Remove(torch))
             SetSpikeSuppressed(mainSpike, false);
 
-        // Starfire is exactly one breath. Keep the source Torch's normal native
-        // rectangular spike at its original mount and suppress only the mirror.
+        // Starfire still owns exactly one native damage spike. The mirror and
+        // every extra Primary Torch remain mechanically suppressed.
         SetSpikeSuppressed(mirrorSpike, true);
 
-        if (applyScale)
+        // Native Torch charge eases back toward zero after release. Starfire should
+        // not remain visible during that discharge tail: releasing the trigger (or
+        // being forced inactive by overheat) ends the breath immediately. Reset the
+        // retreat cycle too, so a quick re-press begins at full Starfire range.
+        bool firing = torch.IsActive();
+        SetStarfireFanActive(torch, firing);
+
+        if (!firing)
         {
-            ApplySpikeScale(
-                mainSpike,
-                GetRankValue(WidthMultiplierByRank, rank)
-            );
+            StartupBeginTimes.Remove(torch);
+            return;
         }
+
+        if (applyScale)
+            ApplyStarfireFan(torch, mainSpike, rank);
     }
 
     private static object GetMainSpike(Torch torch)
@@ -391,21 +517,1038 @@ public static class LeviathanStarfireRuntime
         return MirrorSpikeField.GetValue(torch);
     }
 
-    private static void ApplySpikeScale(
+    private static void ApplyStarfireFan(
+        Torch torch,
         object nativeSpike,
-        float widthMultiplier)
+        int rank)
     {
-        Transform body = GetSpikeBodyTransform(nativeSpike);
-        if (body == null)
+        if (torch == null || nativeSpike == null)
             return;
 
-        // Length is supplied through Torch.MaxRange at the native modifier boundary.
-        // Torch.SetSpikeScale has already put the correct mechanical length into X
-        // and resets Y to 1, so assign width absolutely to avoid compounding across
-        // FixedUpdate/LateUpdate. The native rectangular Collider2D scales with it.
+        FanState state = EnsureStarfireFan(torch, nativeSpike);
+        if (state == null)
+            return;
+
+        float fanHalfAngle = Mathf.Deg2Rad *
+            BaseFanHalfAngleDegrees *
+            GetRankValue(WidthMultiplierByRank, rank);
+
+        float localLength = Mathf.Max(0.0001f, state.maxX - state.minX);
+        float fullRangeScaleX = Mathf.Max(0.0001f, Mathf.Abs(torch.MaxRange));
+        float x0 = 0f;
+        float x1 = localLength;
+
+        // Starfire uses its own sustained-breath clock rather than native Torch
+        // charge for geometry. This lets the AoE stay fully open for a while, then
+        // retreat on its own schedule while native charge remains free to drive the
+        // Torch's normal damage/weapon behavior. Release/overheat resets this timer.
+        if (state.breathStartTime < 0f)
+            state.breathStartTime = Time.time;
+
+        float elapsed = Mathf.Max(0f, Time.time - state.breathStartTime);
+        float holdSeconds = Mathf.Max(
+            0f,
+            GetRankValue(FullSizeHoldSecondsByRank, rank)
+        );
+        float retreatSeconds = Mathf.Max(
+            0f,
+            GetRankValue(BreathRetreatSecondsByRank, rank)
+        );
+        float retreatProgress;
+
+        if (elapsed <= holdSeconds)
+        {
+            retreatProgress = 0f;
+        }
+        else if (retreatSeconds <= 0.0001f)
+        {
+            retreatProgress = 1f;
+        }
+        else
+        {
+            retreatProgress = Mathf.Clamp01(
+                (elapsed - holdSeconds) / retreatSeconds
+            );
+        }
+
+        float curveExponent = Mathf.Max(
+            0.01f,
+            GetRankValue(BreathRetreatCurveExponentByRank, rank)
+        );
+        float curvedRetreatProgress = Mathf.Pow(
+            retreatProgress,
+            curveExponent
+        );
+        float minimumLengthFraction = Mathf.Clamp(
+            BreathMinimumLengthFraction,
+            0.01f,
+            1f
+        );
+        float remainingLengthFraction = Mathf.Lerp(
+            1f,
+            minimumLengthFraction,
+            curvedRetreatProgress
+        );
+        float breathScaleX = Mathf.Max(
+            0.0001f,
+            fullRangeScaleX * remainingLengthFraction
+        );
+
+        // Override the native growing X scale after Torch.UpdateSpikeScale. This one
+        // transform drives the real collider range; generated visuals use the same
+        // scale explicitly, so cosmetic and mechanical reach stay synchronized.
+        Vector3 bodyScale = state.body.localScale;
+        bodyScale.x = breathScaleX;
+        bodyScale.y = 1f;
+        state.body.localScale = bodyScale;
+
+        float scaledLength = localLength * breathScaleX;
+        float nearHalfWidth = Mathf.Max(
+            state.baseHalfWidth * MuzzleHalfWidthMultiplier,
+            state.baseHalfWidth * 0.01f
+        );
+        float farHalfWidth =
+            nearHalfWidth + Mathf.Tan(fanHalfAngle) * scaledLength;
+        farHalfWidth = Mathf.Max(farHalfWidth, nearHalfWidth);
+
+        float cy = state.centerY;
+
+        // Still exactly one PolygonCollider2D / one native OverlapCollider call.
+        // Its points are derived from the current cosmetic beam silhouette, so
+        // beam count, length staggering, fill/thickness and feather changes carry
+        // into the approximate damage envelope automatically.
+        state.fanCollider.points = BuildMechanicalFanPointsFromVisual(
+            x0,
+            x1,
+            cy,
+            nearHalfWidth,
+            farHalfWidth,
+            state.baseHalfWidth
+        );
+
+        state.originalCollider.enabled = false;
+        state.fanCollider.enabled = true;
+
+        if (state.colliderField != null &&
+            !ReferenceEquals(
+                state.colliderField.GetValue(state.nativeSpike),
+                state.fanCollider))
+        {
+            state.colliderField.SetValue(
+                state.nativeSpike,
+                state.fanCollider
+            );
+        }
+
+        UpdateFanVisuals(
+            torch,
+            state,
+            nearHalfWidth,
+            farHalfWidth,
+            x0,
+            x1,
+            cy,
+            breathScaleX
+        );
+    }
+
+    private static Vector2[] BuildMechanicalFanPointsFromVisual(
+        float x0,
+        float x1,
+        float centerY,
+        float nearHalfWidth,
+        float farHalfWidth,
+        float nativeHalfWidth)
+    {
+        // Build the one mechanical polygon from the same beam-count, staggered
+        // endpoint, beam-fill/thickness and terminal-feather knobs used by the
+        // cosmetic plume. This keeps one cheap native overlap while making most
+        // visual-shape tuning automatically reshape the damage envelope too.
+        int beamCount = Mathf.Max(1, VisualBeamCount);
+        float centerLengthBonus = Mathf.Max(
+            0f,
+            VisualCenterLengthBonusFraction
+        );
+        float endFeatherFraction = Mathf.Clamp(
+            VisualEndFeatherFraction,
+            0f,
+            0.50f
+        );
+        float nearSpacing = beamCount > 1
+            ? (nearHalfWidth * 2f) / (beamCount - 1)
+            : nearHalfWidth * 2f;
+        float farSpacing = beamCount > 1
+            ? (farHalfWidth * 2f) / (beamCount - 1)
+            : farHalfWidth * 2f;
+        float safeNativeHalfWidth = Mathf.Max(
+            0.0001f,
+            nativeHalfWidth
+        );
+        float minimumHalfThickness =
+            safeNativeHalfWidth * VisualMinimumHalfWidthMultiplier;
+        float nearHalfThickness = Mathf.Max(
+            minimumHalfThickness,
+            nearSpacing * VisualBeamFillFraction * 0.5f
+        );
+        float farHalfThickness = Mathf.Max(
+            minimumHalfThickness,
+            farSpacing * VisualBeamFillFraction * 0.5f
+        );
+
+        // Treat the midpoint of the alpha-feather as the practical visible edge.
+        // Geometry continues through a fully-transparent tail, but damage should
+        // follow what the player can meaningfully see rather than that invisible
+        // final sliver. SmoothStep is 50% alpha at the feather midpoint.
+        float visibleEndT = 1f - endFeatherFraction * 0.5f;
+        List<Vector2> points = new List<Vector2>(beamCount + 4);
+        float nearOuterExtent =
+            (nearHalfWidth + nearHalfThickness) *
+            HitboxWidthPaddingMultiplier;
+
+        points.Add(new Vector2(x0, centerY + nearOuterExtent));
+
+        // Trace the terminal visual silhouette from upper outer beam through the
+        // center and down to the lower outer beam. Endpoint depth, fan expansion
+        // and ribbon thickness use the same formulas as UpdateFanVisuals().
+        for (int beam = beamCount - 1; beam >= 0; beam--)
+        {
+            float beamT = beamCount == 1
+                ? 0f
+                : Mathf.Lerp(
+                    -1f,
+                    1f,
+                    beam / (beamCount - 1f)
+                );
+            float centerLengthWeight = GetCenterLengthWeight(
+                beam,
+                beamCount
+            );
+            float beamLengthScale =
+                1f + centerLengthBonus * centerLengthWeight;
+            float fanT = visibleEndT * beamLengthScale;
+            float terminalX = x0 +
+                (x1 - x0) * fanT;
+            float terminalHalfWidth =
+                nearHalfWidth +
+                (farHalfWidth - nearHalfWidth) * fanT;
+            float terminalHalfThickness =
+                nearHalfThickness +
+                (farHalfThickness - nearHalfThickness) * fanT;
+            float beamCenterY =
+                centerY + terminalHalfWidth * beamT;
+
+            if (Mathf.Abs(beamT) <= 0.0001f)
+            {
+                float paddedThickness =
+                    terminalHalfThickness * HitboxWidthPaddingMultiplier;
+                points.Add(new Vector2(
+                    terminalX,
+                    beamCenterY + paddedThickness
+                ));
+                points.Add(new Vector2(
+                    terminalX,
+                    beamCenterY - paddedThickness
+                ));
+            }
+            else
+            {
+                float outerY = beamCenterY +
+                    Mathf.Sign(beamT) * terminalHalfThickness;
+                outerY = centerY +
+                    (outerY - centerY) * HitboxWidthPaddingMultiplier;
+
+                points.Add(new Vector2(terminalX, outerY));
+            }
+        }
+
+        points.Add(new Vector2(x0, centerY - nearOuterExtent));
+        return points.ToArray();
+    }
+
+    private static float GetCenterLengthWeight(int beam, int beamCount)
+    {
+        if (beamCount <= 1)
+            return 1f;
+
+        int pairDepth = Mathf.Min(
+            beam,
+            beamCount - 1 - beam
+        );
+        int maxPairDepth = Mathf.Max(
+            1,
+            (beamCount - 1) / 2
+        );
+
+        return pairDepth / (float)maxPairDepth;
+    }
+
+    private static FanState EnsureStarfireFan(
+        Torch torch,
+        object nativeSpike)
+    {
+        GameObject spikeObject = GetSpikeGameObject(nativeSpike);
+        Transform body = GetSpikeBodyTransform(nativeSpike);
+
+        if (spikeObject == null || body == null)
+            return null;
+
+        FanState existing;
+        if (FanStates.TryGetValue(torch, out existing))
+        {
+            if (existing != null &&
+                existing.spikeObject == spikeObject &&
+                ReferenceEquals(existing.nativeSpike, nativeSpike) &&
+                existing.fanCollider != null)
+            {
+                return existing;
+            }
+
+            CleanupFanState(existing);
+            FanStates.Remove(torch);
+        }
+
+        FieldInfo colliderField =
+            AccessTools.Field(nativeSpike.GetType(), "collider");
+        Collider2D originalCollider = colliderField == null
+            ? null
+            : colliderField.GetValue(nativeSpike) as Collider2D;
+
+        if (originalCollider == null)
+            originalCollider =
+                spikeObject.GetComponentInChildren<Collider2D>(true);
+
+        float minX;
+        float maxX;
+        float centerY;
+        float halfWidth;
+
+        if (originalCollider == null ||
+            !TryGetColliderLocalProfile(
+                originalCollider,
+                out minX,
+                out maxX,
+                out centerY,
+                out halfWidth))
+        {
+            if (!warnedNoFanCollider)
+            {
+                warnedNoFanCollider = true;
+                Debug.LogError(
+                    "[Leviathan] Starfire could not resolve the native Torch " +
+                    "collider profile; fan geometry will remain native."
+                );
+            }
+
+            return null;
+        }
+
+        FanState state = new FanState();
+        state.nativeSpike = nativeSpike;
+        state.spikeObject = spikeObject;
+        state.body = body;
+        state.colliderField = colliderField;
+        state.originalCollider = originalCollider;
+        state.originalColliderEnabled = originalCollider.enabled;
+        state.minX = minX;
+        state.maxX = maxX;
+        state.centerY = centerY;
+        state.baseHalfWidth = halfWidth;
+
+        // Add the polygon to an empty child, not the native SpriteRenderer object.
+        // Unity otherwise attempts sprite-outline generation against Star Vortex's
+        // non-readable textures when PolygonCollider2D is created at runtime.
+        GameObject colliderObject =
+            new GameObject("Starfire Fan Collider");
+        colliderObject.layer = originalCollider.gameObject.layer;
+        colliderObject.transform.SetParent(originalCollider.transform, false);
+        colliderObject.transform.localPosition = Vector3.zero;
+        colliderObject.transform.localRotation = Quaternion.identity;
+        colliderObject.transform.localScale = Vector3.one;
+        state.fanColliderObject = colliderObject;
+
+        PolygonCollider2D fanCollider =
+            colliderObject.AddComponent<PolygonCollider2D>();
+        fanCollider.isTrigger = originalCollider.isTrigger;
+        fanCollider.sharedMaterial = originalCollider.sharedMaterial;
+        fanCollider.usedByEffector = originalCollider.usedByEffector;
+        fanCollider.enabled = true;
+        state.fanCollider = fanCollider;
+
+        originalCollider.enabled = false;
+        if (colliderField != null)
+            colliderField.SetValue(nativeSpike, fanCollider);
+
+        BuildFanVisualLayers(state);
+        FanStates[torch] = state;
+        return state;
+    }
+
+    private static void BuildFanVisualLayers(FanState state)
+    {
+        if (state == null || state.spikeObject == null)
+            return;
+
+        SpriteRenderer[] renderers =
+            state.spikeObject.GetComponentsInChildren<SpriteRenderer>(true);
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer source = renderers[i];
+            if (source == null || source.sprite == null)
+                continue;
+
+            Shader shader = source.sharedMaterial == null
+                ? Shader.Find("Sprites/Default")
+                : source.sharedMaterial.shader;
+
+            if (shader == null)
+                continue;
+
+            FanVisualLayer layer = new FanVisualLayer();
+            layer.sourceRenderer = source;
+            layer.sourceWasEnabled = source.enabled;
+            layer.nativeHalfWidth = GetRendererHalfWidthInBodySpace(
+                state,
+                source
+            );
+
+            // Fall back to the native collider profile only if this particular
+            // sprite layer cannot report usable geometry. Normally the sprite
+            // bounds are the correct source of truth for vanilla visual width.
+            if (layer.nativeHalfWidth <= 0.0001f)
+                layer.nativeHalfWidth = state.baseHalfWidth;
+
+            GameObject meshObject =
+                new GameObject("Starfire Fan Visual");
+            meshObject.transform.SetParent(state.spikeObject.transform, false);
+            meshObject.transform.localPosition = Vector3.zero;
+            meshObject.transform.localRotation = Quaternion.identity;
+            meshObject.transform.localScale = Vector3.one;
+            layer.objectInstance = meshObject;
+
+            MeshFilter filter = meshObject.AddComponent<MeshFilter>();
+            MeshRenderer renderer = meshObject.AddComponent<MeshRenderer>();
+
+            Mesh mesh = new Mesh();
+            mesh.name = "Starfire Fan Mesh";
+            mesh.MarkDynamic();
+            layer.mesh = mesh;
+            filter.sharedMesh = mesh;
+
+            Material material = source.sharedMaterial == null
+                ? new Material(shader)
+                : new Material(source.sharedMaterial);
+            layer.material = material;
+
+            if (material.HasProperty("_MainTex"))
+                material.mainTexture = source.sprite.texture;
+
+            renderer.sharedMaterial = material;
+            renderer.sortingLayerID = source.sortingLayerID;
+            renderer.sortingOrder = source.sortingOrder;
+
+            Vector2[] spriteUv = source.sprite.uv;
+            layer.uMin = float.PositiveInfinity;
+            layer.uMax = float.NegativeInfinity;
+            layer.vMin = float.PositiveInfinity;
+            layer.vMax = float.NegativeInfinity;
+
+            for (int uvIndex = 0; uvIndex < spriteUv.Length; uvIndex++)
+            {
+                Vector2 value = spriteUv[uvIndex];
+                layer.uMin = Mathf.Min(layer.uMin, value.x);
+                layer.uMax = Mathf.Max(layer.uMax, value.x);
+                layer.vMin = Mathf.Min(layer.vMin, value.y);
+                layer.vMax = Mathf.Max(layer.vMax, value.y);
+            }
+
+            if (spriteUv.Length == 0)
+            {
+                layer.uMin = 0f;
+                layer.uMax = 1f;
+                layer.vMin = 0f;
+                layer.vMax = 1f;
+            }
+
+            if (source.flipX)
+            {
+                float temp = layer.uMin;
+                layer.uMin = layer.uMax;
+                layer.uMax = temp;
+            }
+
+            if (source.flipY)
+            {
+                float temp = layer.vMin;
+                layer.vMin = layer.vMax;
+                layer.vMax = temp;
+            }
+
+            int beamCount = Mathf.Max(1, VisualBeamCount);
+            int lengthSegments = Mathf.Max(2, VisualLengthSegments);
+            int vertsPerBeam = (lengthSegments + 1) * 2;
+            int trisPerBeam = lengthSegments * 6;
+            Vector3[] vertices =
+                new Vector3[beamCount * vertsPerBeam];
+            Vector2[] uv = new Vector2[beamCount * vertsPerBeam];
+            int[] triangles = new int[beamCount * trisPerBeam];
+            Color[] colors = new Color[beamCount * vertsPerBeam];
+
+            for (int beam = 0; beam < beamCount; beam++)
+            {
+                int vBase = beam * vertsPerBeam;
+                int triBase = beam * trisPerBeam;
+
+                for (int section = 0;
+                     section <= lengthSegments;
+                     section++)
+                {
+                    float t = section / (float)lengthSegments;
+                    float u = Mathf.Lerp(layer.uMin, layer.uMax, t);
+                    int v = vBase + section * 2;
+
+                    uv[v + 0] = new Vector2(u, layer.vMax);
+                    uv[v + 1] = new Vector2(u, layer.vMin);
+                    colors[v + 0] = source.color;
+                    colors[v + 1] = source.color;
+                }
+
+                for (int section = 0;
+                     section < lengthSegments;
+                     section++)
+                {
+                    int v = vBase + section * 2;
+                    int tri = triBase + section * 6;
+
+                    triangles[tri + 0] = v + 0;
+                    triangles[tri + 1] = v + 1;
+                    triangles[tri + 2] = v + 2;
+                    triangles[tri + 3] = v + 2;
+                    triangles[tri + 4] = v + 1;
+                    triangles[tri + 5] = v + 3;
+                }
+            }
+
+            mesh.vertices = vertices;
+            mesh.uv = uv;
+            mesh.triangles = triangles;
+            mesh.colors = colors;
+            mesh.RecalculateBounds();
+
+            source.enabled = false;
+            state.visualLayers.Add(layer);
+        }
+
+        if (state.visualLayers.Count == 0 && !warnedNoFanVisual)
+        {
+            warnedNoFanVisual = true;
+            Debug.LogWarning(
+                "[Leviathan] Starfire did not find a SpriteRenderer on the " +
+                "Torch spike prefab. The fan hitbox will still work, but the " +
+                "cosmetic beam fan cannot be generated automatically."
+            );
+        }
+    }
+
+    private static void UpdateFanVisuals(
+        Torch torch,
+        FanState state,
+        float nearHalfWidth,
+        float farHalfWidth,
+        float x0,
+        float x1,
+        float centerY,
+        float breathScaleX)
+    {
+        if (torch == null ||
+            state == null ||
+            state.spikeObject == null ||
+            state.body == null)
+        {
+            return;
+        }
+
+        int beamCount = Mathf.Max(1, VisualBeamCount);
+        int lengthSegments = Mathf.Max(2, VisualLengthSegments);
+        int vertsPerBeam = (lengthSegments + 1) * 2;
+        float nearSpacing = beamCount > 1
+            ? (nearHalfWidth * 2f) / (beamCount - 1)
+            : nearHalfWidth * 2f;
+        float farSpacing = beamCount > 1
+            ? (farHalfWidth * 2f) / (beamCount - 1)
+            : farHalfWidth * 2f;
+
+        float centerLengthBonus = Mathf.Max(
+            0f,
+            VisualCenterLengthBonusFraction
+        );
+        float endFeatherFraction = Mathf.Clamp(
+            VisualEndFeatherFraction,
+            0.001f,
+            0.50f
+        );
+        float endFeatherStart = 1f - endFeatherFraction;
+
+        for (int layerIndex = 0;
+             layerIndex < state.visualLayers.Count;
+             layerIndex++)
+        {
+            FanVisualLayer layer = state.visualLayers[layerIndex];
+            if (layer == null || layer.mesh == null)
+                continue;
+
+            if (layer.sourceRenderer != null)
+                layer.sourceRenderer.enabled = false;
+
+            // Fan spacing is expressed in native collider/body coordinates while
+            // cosmetic strips display the actual Torch sprite. Correct thickness
+            // by real vanilla sprite width so 1.00 remains one vanilla beam wide.
+            float nativeHalfWidth = Mathf.Max(
+                0.0001f,
+                layer.nativeHalfWidth
+            );
+            float colliderHalfWidth = Mathf.Max(
+                0.0001f,
+                state.baseHalfWidth
+            );
+            float visualWidthScale = nativeHalfWidth / colliderHalfWidth;
+
+            float minimumHalfThickness =
+                nativeHalfWidth * VisualMinimumHalfWidthMultiplier;
+            float nearHalfThickness = Mathf.Max(
+                minimumHalfThickness,
+                nearSpacing * VisualBeamFillFraction * 0.5f *
+                    visualWidthScale
+            );
+            float farHalfThickness = Mathf.Max(
+                minimumHalfThickness,
+                farSpacing * VisualBeamFillFraction * 0.5f *
+                    visualWidthScale
+            );
+
+            Vector3[] vertices = layer.mesh.vertices;
+            Color[] colors = layer.mesh.colors;
+            if (vertices == null ||
+                vertices.Length != beamCount * vertsPerBeam)
+            {
+                continue;
+            }
+
+            if (colors == null || colors.Length != vertices.Length)
+                colors = new Color[vertices.Length];
+
+            Color sourceColor = layer.sourceRenderer == null
+                ? Color.white
+                : layer.sourceRenderer.color;
+            float baseAlpha =
+                sourceColor.a * Mathf.Clamp01(VisualOpacity);
+
+            for (int beam = 0; beam < beamCount; beam++)
+            {
+                float beamT = beamCount == 1
+                    ? 0f
+                    : Mathf.Lerp(
+                        -1f,
+                        1f,
+                        beam / (beamCount - 1f)
+                    );
+                // Shape the plume's terminal silhouette by staggering whole-beam
+                // lengths rather than narrowing/fading the end of each ribbon.
+                // For 10 beams, pairDepth is 0/1/2/3/4/4/3/2/1/0, matching the
+                // desired outer +0 through center +4 style progression.
+                float centerLengthWeight = GetCenterLengthWeight(
+                    beam,
+                    beamCount
+                );
+                float beamLengthScale =
+                    1f + centerLengthBonus * centerLengthWeight;
+                float beamEndX =
+                    x0 + (x1 - x0) * beamLengthScale;
+
+                int vBase = beam * vertsPerBeam;
+
+                for (int section = 0;
+                     section <= lengthSegments;
+                     section++)
+                {
+                    float t = section / (float)lengthSegments;
+                    float fanT = t * beamLengthScale;
+                    float x = Mathf.Lerp(x0, beamEndX, t);
+                    float halfWidth =
+                        nearHalfWidth +
+                        (farHalfWidth - nearHalfWidth) * fanT;
+                    float halfThickness =
+                        nearHalfThickness +
+                        (farHalfThickness - nearHalfThickness) * fanT;
+                    float center = centerY + halfWidth * beamT;
+
+                    // Keep brightness static across the active plume. Only the
+                    // last portion of each ribbon fades to transparent, which
+                    // softens the stepped ten-beam silhouette without narrowing
+                    // the ribbon or adding more cosmetic Torch strips.
+                    float endAlpha = t <= endFeatherStart
+                        ? 1f
+                        : 1f - Mathf.SmoothStep(
+                            0f,
+                            1f,
+                            (t - endFeatherStart) / endFeatherFraction
+                        );
+
+                    float alpha = baseAlpha * endAlpha;
+                    int v = vBase + section * 2;
+
+                    vertices[v + 0] =
+                        BodyPointToSpikeLocalWithXScale(
+                            state,
+                            new Vector3(
+                                x,
+                                center + halfThickness,
+                                0f
+                            ),
+                            breathScaleX
+                        );
+                    vertices[v + 1] =
+                        BodyPointToSpikeLocalWithXScale(
+                            state,
+                            new Vector3(
+                                x,
+                                center - halfThickness,
+                                0f
+                            ),
+                            breathScaleX
+                        );
+
+                    Color vertexColor = sourceColor;
+                    vertexColor.a = alpha;
+                    colors[v + 0] = vertexColor;
+                    colors[v + 1] = vertexColor;
+                }
+            }
+
+            layer.mesh.vertices = vertices;
+            layer.mesh.colors = colors;
+            layer.mesh.RecalculateBounds();
+        }
+    }
+
+    private static float GetRendererHalfWidthInBodySpace(
+        FanState state,
+        SpriteRenderer renderer)
+    {
+        if (state == null ||
+            state.body == null ||
+            renderer == null ||
+            renderer.sprite == null)
+        {
+            return 0f;
+        }
+
+        Bounds bounds = renderer.sprite.bounds;
+        Vector3 min = bounds.min;
+        Vector3 max = bounds.max;
+
+        Vector3[] corners = new Vector3[]
+        {
+            new Vector3(min.x, min.y, 0f),
+            new Vector3(min.x, max.y, 0f),
+            new Vector3(max.x, min.y, 0f),
+            new Vector3(max.x, max.y, 0f)
+        };
+
+        float lowY = float.PositiveInfinity;
+        float highY = float.NegativeInfinity;
+
+        for (int i = 0; i < corners.Length; i++)
+        {
+            Vector3 world = renderer.transform.TransformPoint(corners[i]);
+            Vector3 bodyLocal = state.body.InverseTransformPoint(world);
+            lowY = Mathf.Min(lowY, bodyLocal.y);
+            highY = Mathf.Max(highY, bodyLocal.y);
+        }
+
+        if (float.IsInfinity(lowY) || float.IsInfinity(highY))
+            return 0f;
+
+        return Mathf.Max(0f, (highY - lowY) * 0.5f);
+    }
+
+    private static Vector3 BodyPointToSpikeLocal(
+        FanState state,
+        Vector3 bodyLocalPoint)
+    {
+        Vector3 world = state.body.TransformPoint(bodyLocalPoint);
+        return state.spikeObject.transform.InverseTransformPoint(world);
+    }
+
+    private static Vector3 BodyPointToSpikeLocalWithXScale(
+        FanState state,
+        Vector3 bodyLocalPoint,
+        float xScale)
+    {
+        if (state == null || state.body == null || state.spikeObject == null)
+            return Vector3.zero;
+
+        Transform body = state.body;
         Vector3 scale = body.localScale;
-        scale.y = widthMultiplier;
-        body.localScale = scale;
+        scale.x = xScale;
+
+        Vector3 parentLocal =
+            body.localPosition +
+            body.localRotation * Vector3.Scale(bodyLocalPoint, scale);
+        Vector3 world = body.parent == null
+            ? parentLocal
+            : body.parent.TransformPoint(parentLocal);
+
+        return state.spikeObject.transform.InverseTransformPoint(world);
+    }
+
+    private static void SetStarfireFanActive(Torch torch, bool active)
+    {
+        if (torch == null)
+            return;
+
+        FanState state;
+        if (!FanStates.TryGetValue(torch, out state) || state == null)
+            return;
+
+        if (!active)
+            state.breathStartTime = -1f;
+        else if (state.breathStartTime < 0f)
+            state.breathStartTime = Time.time;
+
+        if (state.fanCollider != null)
+            state.fanCollider.enabled = active;
+
+        for (int i = 0; i < state.visualLayers.Count; i++)
+        {
+            FanVisualLayer layer = state.visualLayers[i];
+            if (layer != null && layer.objectInstance != null)
+                layer.objectInstance.SetActive(active);
+        }
+    }
+
+    public static void RestoreStarfireFan(Torch torch)
+    {
+        if (torch == null)
+            return;
+
+        FanState state;
+        if (!FanStates.TryGetValue(torch, out state))
+            return;
+
+        CleanupFanState(state);
+        FanStates.Remove(torch);
+    }
+
+    public static void ForgetStarfireFan(Torch torch)
+    {
+        RestoreStarfireFan(torch);
+    }
+
+    private static void CleanupFanState(FanState state)
+    {
+        if (state == null)
+            return;
+
+        if (state.colliderField != null &&
+            state.nativeSpike != null &&
+            state.originalCollider != null)
+        {
+            try
+            {
+                state.colliderField.SetValue(
+                    state.nativeSpike,
+                    state.originalCollider
+                );
+            }
+            catch
+            {
+            }
+        }
+
+        if (state.originalCollider != null)
+            state.originalCollider.enabled = state.originalColliderEnabled;
+
+        if (state.fanCollider != null)
+            state.fanCollider.enabled = false;
+
+        if (state.fanColliderObject != null)
+            UnityEngine.Object.Destroy(state.fanColliderObject);
+
+        for (int i = 0; i < state.visualLayers.Count; i++)
+        {
+            FanVisualLayer layer = state.visualLayers[i];
+            if (layer == null)
+                continue;
+
+            if (layer.sourceRenderer != null)
+                layer.sourceRenderer.enabled = layer.sourceWasEnabled;
+
+            if (layer.mesh != null)
+                UnityEngine.Object.Destroy(layer.mesh);
+            if (layer.material != null)
+                UnityEngine.Object.Destroy(layer.material);
+            if (layer.objectInstance != null)
+                UnityEngine.Object.Destroy(layer.objectInstance);
+        }
+
+        state.visualLayers.Clear();
+    }
+
+    private static bool TryGetColliderLocalProfile(
+        Collider2D collider,
+        out float minX,
+        out float maxX,
+        out float centerY,
+        out float halfWidth)
+    {
+        minX = 0f;
+        maxX = 0f;
+        centerY = 0f;
+        halfWidth = 0f;
+
+        if (collider == null)
+            return false;
+
+        BoxCollider2D box = collider as BoxCollider2D;
+        if (box != null)
+        {
+            minX = box.offset.x - box.size.x * 0.5f;
+            maxX = box.offset.x + box.size.x * 0.5f;
+            centerY = box.offset.y;
+            halfWidth = Mathf.Abs(box.size.y) * 0.5f;
+            return maxX > minX && halfWidth > 0f;
+        }
+
+        CapsuleCollider2D capsule = collider as CapsuleCollider2D;
+        if (capsule != null)
+        {
+            minX = capsule.offset.x - capsule.size.x * 0.5f;
+            maxX = capsule.offset.x + capsule.size.x * 0.5f;
+            centerY = capsule.offset.y;
+            halfWidth = Mathf.Abs(capsule.size.y) * 0.5f;
+            return maxX > minX && halfWidth > 0f;
+        }
+
+        CircleCollider2D circle = collider as CircleCollider2D;
+        if (circle != null)
+        {
+            minX = circle.offset.x - circle.radius;
+            maxX = circle.offset.x + circle.radius;
+            centerY = circle.offset.y;
+            halfWidth = Mathf.Abs(circle.radius);
+            return maxX > minX && halfWidth > 0f;
+        }
+
+        PolygonCollider2D polygon = collider as PolygonCollider2D;
+        if (polygon != null && polygon.pathCount > 0)
+        {
+            float lowX = float.PositiveInfinity;
+            float highX = float.NegativeInfinity;
+            float lowY = float.PositiveInfinity;
+            float highY = float.NegativeInfinity;
+
+            for (int pathIndex = 0;
+                 pathIndex < polygon.pathCount;
+                 pathIndex++)
+            {
+                Vector2[] path = polygon.GetPath(pathIndex);
+                for (int i = 0; i < path.Length; i++)
+                {
+                    Vector2 point = path[i] + polygon.offset;
+                    lowX = Mathf.Min(lowX, point.x);
+                    highX = Mathf.Max(highX, point.x);
+                    lowY = Mathf.Min(lowY, point.y);
+                    highY = Mathf.Max(highY, point.y);
+                }
+            }
+
+            if (!float.IsInfinity(lowX) &&
+                highX > lowX &&
+                highY > lowY)
+            {
+                minX = lowX;
+                maxX = highX;
+                centerY = (lowY + highY) * 0.5f;
+                halfWidth = (highY - lowY) * 0.5f;
+                return true;
+            }
+        }
+
+        EdgeCollider2D edge = collider as EdgeCollider2D;
+        if (edge != null && edge.points != null && edge.points.Length > 1)
+        {
+            float lowX = float.PositiveInfinity;
+            float highX = float.NegativeInfinity;
+            float lowY = float.PositiveInfinity;
+            float highY = float.NegativeInfinity;
+
+            for (int i = 0; i < edge.points.Length; i++)
+            {
+                Vector2 point = edge.points[i] + edge.offset;
+                lowX = Mathf.Min(lowX, point.x);
+                highX = Mathf.Max(highX, point.x);
+                lowY = Mathf.Min(lowY, point.y);
+                highY = Mathf.Max(highY, point.y);
+            }
+
+            if (highX > lowX && highY > lowY)
+            {
+                minX = lowX;
+                maxX = highX;
+                centerY = (lowY + highY) * 0.5f;
+                halfWidth = (highY - lowY) * 0.5f;
+                return true;
+            }
+        }
+
+        Bounds bounds = collider.bounds;
+        Vector3[] worldCorners =
+        {
+            new Vector3(
+                bounds.min.x,
+                bounds.min.y,
+                collider.transform.position.z),
+            new Vector3(
+                bounds.min.x,
+                bounds.max.y,
+                collider.transform.position.z),
+            new Vector3(
+                bounds.max.x,
+                bounds.min.y,
+                collider.transform.position.z),
+            new Vector3(
+                bounds.max.x,
+                bounds.max.y,
+                collider.transform.position.z)
+        };
+
+        float fallbackMinX = float.PositiveInfinity;
+        float fallbackMaxX = float.NegativeInfinity;
+        float fallbackMinY = float.PositiveInfinity;
+        float fallbackMaxY = float.NegativeInfinity;
+
+        for (int i = 0; i < worldCorners.Length; i++)
+        {
+            Vector3 local =
+                collider.transform.InverseTransformPoint(worldCorners[i]);
+            fallbackMinX = Mathf.Min(fallbackMinX, local.x);
+            fallbackMaxX = Mathf.Max(fallbackMaxX, local.x);
+            fallbackMinY = Mathf.Min(fallbackMinY, local.y);
+            fallbackMaxY = Mathf.Max(fallbackMaxY, local.y);
+        }
+
+        if (fallbackMaxX <= fallbackMinX ||
+            fallbackMaxY <= fallbackMinY)
+        {
+            return false;
+        }
+
+        minX = fallbackMinX;
+        maxX = fallbackMaxX;
+        centerY = (fallbackMinY + fallbackMaxY) * 0.5f;
+        halfWidth = (fallbackMaxY - fallbackMinY) * 0.5f;
+        return halfWidth > 0f;
     }
 
     private static Transform GetSpikeBodyTransform(object nativeSpike)
@@ -426,7 +1569,8 @@ public static class LeviathanStarfireRuntime
         if (spikeObject == null)
             return;
 
-        Renderer[] renderers = spikeObject.GetComponentsInChildren<Renderer>(true);
+        Renderer[] renderers =
+            spikeObject.GetComponentsInChildren<Renderer>(true);
         for (int i = 0; i < renderers.Length; i++)
         {
             if (renderers[i] != null)
@@ -450,7 +1594,6 @@ public static class LeviathanStarfireRuntime
 
         Type type = nativeSpike.GetType();
 
-        // Decompiled Torch.Spike stores its root GameObject in `obj`.
         FieldInfo named = AccessTools.Field(type, "obj");
         GameObject result = GetGameObjectFromValue(
             named == null ? null : named.GetValue(nativeSpike)
@@ -978,6 +2121,21 @@ public static class LeviathanStarfireRuntime
         return GetRankValue(ChargeRampSpeedMultiplierByRank, rank);
     }
 
+    public static float GetFullSizeHoldSeconds(int rank)
+    {
+        return GetRankValue(FullSizeHoldSecondsByRank, rank);
+    }
+
+    public static float GetBreathRetreatSeconds(int rank)
+    {
+        return GetRankValue(BreathRetreatSecondsByRank, rank);
+    }
+
+    public static float GetBreathRetreatCurveExponent(int rank)
+    {
+        return GetRankValue(BreathRetreatCurveExponentByRank, rank);
+    }
+
     private static float GetRankValue(float[] values, int rank)
     {
         int index = Mathf.Clamp(rank, 1, values.Length) - 1;
@@ -1024,6 +2182,17 @@ public static class LeviathanStarfireMaxRangePatch
 // Native Torch hooks
 // -----------------------------------------------------------------------------
 
+// Native BuildSpikes starts by destroying the previous spike. Clear generated
+// fan state first so collider/material references cannot survive a rebuild.
+[HarmonyPatch(typeof(Torch), "DestroySpikes")]
+public static class LeviathanStarfireDestroySpikesPatch
+{
+    public static void Prefix(Torch __instance)
+    {
+        LeviathanStarfireRuntime.ForgetStarfireFan(__instance);
+    }
+}
+
 [HarmonyPatch(typeof(Torch), "BuildSpikes")]
 public static class LeviathanStarfireBuildSpikesPatch
 {
@@ -1040,9 +2209,9 @@ public static class LeviathanStarfireFollowSpikesPatch
 
     public static void Postfix(Torch __instance)
     {
-        // Keep source/mirror/extra-Torch suppression enforced without relocating
-        // the source. Native FollowSpikes remains fully responsible for its mount.
-        LeviathanStarfireRuntime.RefreshTorchGeometry(__instance, true);
+        // Generated fan objects are children of the native spike and follow its
+        // transform automatically. No mesh/collider rebuild is needed here.
+        LeviathanStarfireRuntime.RefreshTorchGeometry(__instance, false);
     }
 }
 

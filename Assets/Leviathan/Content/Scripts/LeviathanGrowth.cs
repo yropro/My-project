@@ -18,13 +18,13 @@ public static class LeviathanGrowth
     public const float HullPerSegment = 125.0f;
 
     // Effective mass of the player/head per Growth rank.
-    public const float MassBonusPerRank = 0.25f;
+    public const float MassBonusPerRank = 0.30f;
 
     // Extra Leviathan cruising resistance starts above this fraction of MaxSpeed.
     public const float ResistanceStartFraction = 0.40f;
 
     // At theoretical MaxSpeed, remove this fraction of MaxSpeed per second.
-    public const float ResistanceStrength = 0.55f;
+    public const float ResistanceStrength = 0.58f;
 
     // Chance to discard a status-effect attempt transferred from a segment.
     private static readonly float[] SegmentDebuffDiscardChanceByRank =

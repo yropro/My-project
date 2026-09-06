@@ -73,11 +73,11 @@ public static class LeviathanConstrictor
     // Overall passive contact-damage multiplier.
     private static readonly float[] DamageMultiplierByRank =
     {
-        3.40f, // Rank 1
-        4.00f, // Rank 2
-        4.45f, // Rank 3
-        4.55f, // Rank 4
-        5.00f  // Rank 5
+        3.10f, // Rank 1
+        3.40f, // Rank 2
+        3.60f, // Rank 3
+        3.8f, // Rank 4
+        4.00f  // Rank 5
     };
 
     // ADDITIVE crit chance granted by Constrictor, on top of the equipped

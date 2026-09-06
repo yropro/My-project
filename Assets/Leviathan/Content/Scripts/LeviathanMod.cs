@@ -126,6 +126,7 @@ public static class LeviathanWorldDestroyedPatch
         LeviathanMod.Controller?.ClearPlayerShip();
         LeviathanSegmentStatusProtection.Reset();
         LeviathanSegmentDamageLimiter.Reset();
+        LeviathanSegmentTransferProtection.Reset();
     }
 }
 
@@ -1408,6 +1409,456 @@ public static class LeviathanSegmentDamageLimiter
     }
 }
 
+public static class LeviathanSegmentTransferProtection
+{
+    // Maximum actual shield + hull damage that redirected segment hits may deal
+    // during the rolling window, expressed as a fraction of max hull + max shield.
+    public const float MaxCombinedHealthFractionPerWindow = 0.30f;
+
+    // Rolling damage window in seconds.
+    public const float WindowSeconds = 0.10f;
+
+    private struct TransferEvent
+    {
+        public float time;
+        public float damage;
+    }
+
+    private static readonly Dictionary<int, List<TransferEvent>>
+        DamageEventsByPlayer =
+            new Dictionary<int, List<TransferEvent>>();
+
+    public static float CaptureCurrentCombinedHealth(GameShip player)
+    {
+        if (player == null)
+            return 0f;
+
+        float shield =
+            player.shield == null
+                ? 0f
+                : Mathf.Max(0f, player.shield.shield);
+
+        return Mathf.Max(0f, player.health) + shield;
+    }
+
+    public static DamageData[] LimitDamageData(
+        GameShip player,
+        DamageType damageType,
+        DamageData[] source,
+        GameShip fromShip)
+    {
+        if (player == null || source == null)
+            return source;
+
+        float remaining = GetRemainingBudget(player);
+
+        if (remaining <= 0f)
+            return ScaleDamageData(source, 0f);
+
+        float estimatedResolvedDamage =
+            EstimateResolvedDamageUpperBound(
+                player,
+                damageType,
+                source,
+                fromShip
+            );
+
+        if (estimatedResolvedDamage <= 0f ||
+            estimatedResolvedDamage <= remaining)
+        {
+            return source;
+        }
+
+        return ScaleDamageData(
+            source,
+            Mathf.Clamp01(remaining / estimatedResolvedDamage)
+        );
+    }
+
+    public static float LimitDirectDamage(
+        GameShip player,
+        DamageType damageType,
+        float damage)
+    {
+        if (player == null || damage <= 0f)
+            return Mathf.Max(0f, damage);
+
+        float remaining = GetRemainingBudget(player);
+
+        if (remaining <= 0f)
+            return 0f;
+
+        float resistanceMultiplier =
+            GetResistanceMultiplier(
+                player,
+                damageType,
+                null,
+                false
+            );
+
+        float estimatedResolvedDamage =
+            damage * resistanceMultiplier;
+
+        if (estimatedResolvedDamage <= 0f ||
+            estimatedResolvedDamage <= remaining)
+        {
+            return damage;
+        }
+
+        return damage *
+            Mathf.Clamp01(
+                remaining / estimatedResolvedDamage
+            );
+    }
+
+    public static void RecordActualDamage(
+        GameShip player,
+        float combinedHealthBefore)
+    {
+        if (player == null)
+            return;
+
+        float combinedHealthAfter =
+            CaptureCurrentCombinedHealth(player);
+
+        float actualDamage =
+            Mathf.Max(
+                0f,
+                combinedHealthBefore - combinedHealthAfter
+            );
+
+        if (actualDamage <= 0f)
+            return;
+
+        int playerId = player.gameObject.GetInstanceID();
+        List<TransferEvent> events;
+
+        if (!DamageEventsByPlayer.TryGetValue(
+                playerId,
+                out events))
+        {
+            events = new List<TransferEvent>();
+            DamageEventsByPlayer[playerId] = events;
+        }
+
+        Prune(events);
+
+        TransferEvent transferEvent = new TransferEvent();
+        transferEvent.time = Time.time;
+        transferEvent.damage = actualDamage;
+        events.Add(transferEvent);
+    }
+
+    private static float GetRemainingBudget(GameShip player)
+    {
+        float maxShield =
+            player.shield == null
+                ? 0f
+                : Mathf.Max(0f, player.shield.ShieldMax);
+
+        float maxCombinedHealth =
+            Mathf.Max(0f, player.HealthMax) + maxShield;
+
+        float budget =
+            maxCombinedHealth *
+            MaxCombinedHealthFractionPerWindow;
+
+        if (budget <= 0f)
+            return 0f;
+
+        int playerId = player.gameObject.GetInstanceID();
+        List<TransferEvent> events;
+
+        if (!DamageEventsByPlayer.TryGetValue(
+                playerId,
+                out events))
+        {
+            return budget;
+        }
+
+        Prune(events);
+
+        float spent = 0f;
+
+        for (int i = 0; i < events.Count; i++)
+            spent += events[i].damage;
+
+        return Mathf.Max(0f, budget - spent);
+    }
+
+    private static void Prune(List<TransferEvent> events)
+    {
+        float cutoff = Time.time - WindowSeconds;
+
+        for (int i = events.Count - 1; i >= 0; i--)
+        {
+            if (events[i].time < cutoff)
+                events.RemoveAt(i);
+        }
+    }
+
+    private static float EstimateResolvedDamageUpperBound(
+        GameShip player,
+        DamageType damageType,
+        DamageData[] damageData,
+        GameShip fromShip)
+    {
+        float relevantDamage = 0f;
+
+        for (int i = 0; i < damageData.Length; i++)
+        {
+            DamageData datum = damageData[i];
+
+            if (datum.damage <= 0f)
+                continue;
+
+            switch (datum.modifierType)
+            {
+                case Modifier.Type.DamageVsBurning:
+                    if (!player.HasStatusEffect(StatusEffect.Type.Burning))
+                        continue;
+                    break;
+
+                case Modifier.Type.DamageVsCorroding:
+                    if (!player.HasStatusEffect(StatusEffect.Type.Corroding))
+                        continue;
+                    break;
+
+                case Modifier.Type.DamageVsDisabled:
+                    if (!player.HasStatusEffect(StatusEffect.Type.Disabled))
+                        continue;
+                    break;
+
+                case Modifier.Type.DamageVsFrozen:
+                    if (!player.HasStatusEffect(StatusEffect.Type.Frozen))
+                        continue;
+                    break;
+
+                case Modifier.Type.DamageVsRadioactive:
+                    if (!player.HasStatusEffect(StatusEffect.Type.Radioactive))
+                        continue;
+                    break;
+            }
+
+            relevantDamage += datum.damage;
+        }
+
+        if (relevantDamage <= 0f)
+            return 0f;
+
+        float gameShipMultiplier =
+            GetGameShipIncomingMultiplier(
+                player,
+                damageType,
+                fromShip
+            );
+
+        float resistanceMultiplier =
+            GetResistanceMultiplier(
+                player,
+                damageType,
+                fromShip,
+                true
+            );
+
+        float kineticHullMultiplier = 1f;
+
+        if (damageType == DamageType.Kinetic &&
+            fromShip != null)
+        {
+            int kineticHull =
+                GameShip.GetPlayerSourceUpgradeValue(
+                    fromShip,
+                    Upgrade.Key.JuggernautKineticHull
+                );
+
+            if (kineticHull > 0)
+            {
+                kineticHullMultiplier +=
+                    (float)kineticHull / 100f;
+            }
+        }
+
+        // This is deliberately an upper bound. DamageReduction is omitted because
+        // it can only reduce hull damage, while shield damage does not use it.
+        return relevantDamage *
+            gameShipMultiplier *
+            resistanceMultiplier *
+            kineticHullMultiplier;
+    }
+
+    private static float GetGameShipIncomingMultiplier(
+        GameShip player,
+        DamageType damageType,
+        GameShip fromShip)
+    {
+        float multiplier = 1f;
+
+        if (WorldController.instance != null)
+        {
+            Star currentStar =
+                WorldController.instance.GetCurrentStar();
+
+            if (currentStar != null)
+            {
+                if ((currentStar.debrisType ==
+                        Star.DebrisType.FrozenAsteroids &&
+                        damageType == DamageType.Cold) ||
+                    (currentStar.debrisType ==
+                        Star.DebrisType.MoltenAsteroids &&
+                        damageType == DamageType.Thermal) ||
+                    (currentStar.debrisType ==
+                        Star.DebrisType.RadioactiveAsteroids &&
+                        damageType == DamageType.Radiation) ||
+                    (currentStar.debrisType ==
+                        Star.DebrisType.CorrosiveAsteroids &&
+                        damageType == DamageType.Corrosive))
+                {
+                    multiplier *= 1.5f;
+                }
+            }
+        }
+
+        if (fromShip == null ||
+            fromShip.pilot == null ||
+            player.pilot == null)
+        {
+            return multiplier;
+        }
+
+        int levelDifference =
+            fromShip.pilot.GetLevel(0) -
+            player.pilot.GetLevel(0);
+
+        if (levelDifference < -9)
+            multiplier *= 0.25f;
+        else if (levelDifference < -4)
+            multiplier *= 0.50f;
+        else if (levelDifference < -3)
+            multiplier *= 0.75f;
+        else if (levelDifference > 9)
+            multiplier *= 4.00f;
+        else if (levelDifference > 4)
+            multiplier *= 2.00f;
+        else if (levelDifference > 3)
+            multiplier *= 1.50f;
+
+        return multiplier;
+    }
+
+    private static float GetResistanceMultiplier(
+        GameShip player,
+        DamageType damageType,
+        GameShip fromShip,
+        bool includePenetration)
+    {
+        float resistance = 0f;
+
+        switch (damageType)
+        {
+            case DamageType.Kinetic:
+                resistance = player.ResistanceKinetic;
+                break;
+            case DamageType.Cold:
+                resistance = player.ResistanceCold;
+                break;
+            case DamageType.Corrosive:
+                resistance = player.ResistanceCorrosive;
+                break;
+            case DamageType.Electric:
+                resistance = player.ResistanceElectric;
+                break;
+            case DamageType.Thermal:
+                resistance = player.ResistanceThermal;
+                break;
+            case DamageType.Radiation:
+                resistance = player.ResistanceRadiation;
+                break;
+        }
+
+        if (includePenetration && fromShip != null)
+        {
+            Upgrade.Key penetrationKey;
+            bool hasPenetrationKey = true;
+
+            switch (damageType)
+            {
+                case DamageType.Kinetic:
+                    penetrationKey =
+                        Upgrade.Key.JuggernautKineticPenetration;
+                    break;
+                case DamageType.Electric:
+                    penetrationKey =
+                        Upgrade.Key.TempestElectricPenetration;
+                    break;
+                case DamageType.Thermal:
+                    penetrationKey =
+                        Upgrade.Key.ArsonistThermalPenetration;
+                    break;
+                case DamageType.Cold:
+                    penetrationKey =
+                        Upgrade.Key.CryonicColdPenetration;
+                    break;
+                case DamageType.Corrosive:
+                    penetrationKey =
+                        Upgrade.Key.VitriolicCorrosivePenetration;
+                    break;
+                case DamageType.Radiation:
+                    penetrationKey =
+                        Upgrade.Key.ContaminatorRadiationPenetration;
+                    break;
+                default:
+                    penetrationKey = default(Upgrade.Key);
+                    hasPenetrationKey = false;
+                    break;
+            }
+
+            if (hasPenetrationKey)
+            {
+                int penetration =
+                    GameShip.GetPlayerSourceUpgradeValue(
+                        fromShip,
+                        penetrationKey
+                    );
+
+                if (penetration > 0)
+                {
+                    resistance -=
+                        (float)penetration / 100f;
+                }
+            }
+        }
+
+        return Mathf.Max(0f, 1f - resistance);
+    }
+
+    private static DamageData[] ScaleDamageData(
+        DamageData[] source,
+        float multiplier)
+    {
+        if (source == null)
+            return null;
+
+        DamageData[] scaled =
+            new DamageData[source.Length];
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            DamageData datum = source[i];
+            datum.damage *= multiplier;
+            datum.dps *= multiplier;
+            scaled[i] = datum;
+        }
+
+        return scaled;
+    }
+
+    public static void Reset()
+    {
+        DamageEventsByPlayer.Clear();
+    }
+}
+
 [HarmonyPatch(typeof(GameShip), "AddStatusEffect")]
 public static class LeviathanSegmentAddStatusEffectPatch
 {
@@ -1604,6 +2055,14 @@ public static class LeviathanSegmentDamagePatch
             );
         }
 
+        scaledDamage =
+            LeviathanSegmentTransferProtection.LimitDamageData(
+                player,
+                __0,
+                scaledDamage,
+                __5
+            );
+
         LeviathanSegmentSourceTuning.LogSource(
             __instance,
             __5,
@@ -1628,6 +2087,10 @@ public static class LeviathanSegmentDamagePatch
 
         CopyDamageAttribution(__instance, player);
 
+        float combinedHealthBefore =
+            LeviathanSegmentTransferProtection
+                .CaptureCurrentCombinedHealth(player);
+
         __result = player.Damage(
             __0,
             scaledDamage,
@@ -1636,6 +2099,11 @@ public static class LeviathanSegmentDamagePatch
             __4,
             __5,
             true
+        );
+
+        LeviathanSegmentTransferProtection.RecordActualDamage(
+            player,
+            combinedHealthBefore
         );
 
         return false;
@@ -1710,16 +2178,65 @@ public static class LeviathanSegmentDirectDamagePatch
         float multiplier =
             LeviathanBehemoth.GetSegmentDamageMultiplier(player);
 
+        float redirectedDamage =
+            __1 * multiplier;
+
+        redirectedDamage =
+            LeviathanSegmentTransferProtection.LimitDirectDamage(
+                player,
+                __0,
+                redirectedDamage
+            );
+
         player.lastDirectDamageSourceName =
             __instance.lastDirectDamageSourceName;
 
+        float combinedHealthBefore =
+            LeviathanSegmentTransferProtection
+                .CaptureCurrentCombinedHealth(player);
+
         __result = player.DirectDamage(
             __0,
-            __1 * multiplier,
+            redirectedDamage,
             true
         );
 
+        LeviathanSegmentTransferProtection.RecordActualDamage(
+            player,
+            combinedHealthBefore
+        );
+
         return false;
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "SetRemoteEntity")]
+public static class LeviathanRemoteEntityRenderOrderPatch
+{
+    public static void Postfix(
+        GameShip __instance,
+        uint __0)
+    {
+        LeviathanAttachmentNormalizer.NormalizeRemoteRenderOrder(
+            __instance,
+            __0
+        );
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "SetRemotePlayer")]
+public static class LeviathanRemotePlayerRenderOrderPatch
+{
+    public static void Postfix(
+        GameShip __instance,
+        NetPlayer __0)
+    {
+        if (__0 == null)
+            return;
+
+        LeviathanAttachmentNormalizer.RefreshRemoteRenderOrder(
+            __0.playerId
+        );
     }
 }
 
@@ -1753,6 +2270,19 @@ public static class LeviathanAttachmentNormalizer
 {
     private const float OverlapFraction = 0.10f;
 
+    // Head is highest, then each body/tail steps downward.
+    // Thruster roots are pulled out of their parent ship SortingGroup and
+    // placed well underneath the entire Leviathan chain.
+    private const int ThrusterBottomOffset = 1000;
+
+    private static readonly PropertyInfo SortingGroupSortAtRootProperty =
+        typeof(UnityEngine.Rendering.SortingGroup).GetProperty(
+            "sortAtRoot",
+            BindingFlags.Instance |
+            BindingFlags.Public |
+            BindingFlags.NonPublic
+        );
+
     private static readonly FieldInfo GameShipField =
         AccessTools.Field(typeof(AIShip), "gameShip");
 
@@ -1767,6 +2297,8 @@ public static class LeviathanAttachmentNormalizer
 
     private static readonly HashSet<int> InitializedAttachedShips =
         new HashSet<int>();
+
+    private static HashSet<string> leviathanSegmentNameKeys;
 
     public sealed class State
     {
@@ -1790,6 +2322,7 @@ public static class LeviathanAttachmentNormalizer
     {
         AnchorCache.Clear();
         InitializedAttachedShips.Clear();
+        leviathanSegmentNameKeys = null;
     }
 
     public static State Begin(AttachedAIShip attachedAI)
@@ -1946,6 +2479,205 @@ public static class LeviathanAttachmentNormalizer
         shipTransform.position = correctedPosition;
     }
 
+    public static void NormalizeRemoteRenderOrder(
+        GameShip ship,
+        uint netId)
+    {
+        if (ship == null ||
+            !NetIds.IsPlayerEntityNetId(netId) ||
+            !IsRemoteLeviathanSegment(ship))
+        {
+            return;
+        }
+
+        int ownerId = NetIds.PlayerEntityOwnerOf(netId);
+        uint firstEntityId = NetIds.FirstPlayerEntityId(ownerId);
+
+        // Player-entity IDs preserve creation order. Gaps from other owned
+        // entities do not matter; later Leviathan sections still sort lower.
+        int entityOrdinal = (int)(netId - firstEntityId);
+
+        if (entityOrdinal < 1)
+            entityOrdinal = 1;
+
+        UnityEngine.Rendering.SortingGroup shipGroup;
+
+        if (!ship.TryGetComponent<
+                UnityEngine.Rendering.SortingGroup>(out shipGroup) ||
+            shipGroup == null)
+        {
+            return;
+        }
+
+        GameShip headShip =
+            FindRemotePlayerShip(ownerId);
+
+        UnityEngine.Rendering.SortingGroup headGroup = null;
+
+        if (headShip != null)
+        {
+            headShip.TryGetComponent<
+                UnityEngine.Rendering.SortingGroup>(out headGroup);
+        }
+
+        if (headGroup != null)
+        {
+            shipGroup.sortingLayerID = headGroup.sortingLayerID;
+
+            // Head on top; domino downward toward the tail.
+            shipGroup.sortingOrder =
+                headGroup.sortingOrder - entityOrdinal;
+
+            NormalizeThrusterRenderOrder(
+                headShip,
+                headGroup.sortingLayerID,
+                headGroup.sortingOrder - ThrusterBottomOffset
+            );
+
+            NormalizeThrusterRenderOrder(
+                ship,
+                headGroup.sortingLayerID,
+                headGroup.sortingOrder - ThrusterBottomOffset
+            );
+        }
+        else
+        {
+            // Temporary deterministic fallback until the remote head exists.
+            shipGroup.sortingOrder = -entityOrdinal;
+
+            NormalizeThrusterRenderOrder(
+                ship,
+                shipGroup.sortingLayerID,
+                shipGroup.sortingOrder - ThrusterBottomOffset
+            );
+        }
+    }
+
+    public static void RefreshRemoteRenderOrder(int ownerId)
+    {
+        if (WorldController.instance == null)
+            return;
+
+        List<GameShip> gameShips =
+            WorldController.instance.GetGameShips();
+
+        if (gameShips == null)
+            return;
+
+        for (int i = 0; i < gameShips.Count; i++)
+        {
+            GameShip candidate = gameShips[i];
+
+            if (candidate == null ||
+                !candidate.isRemoteEntity ||
+                !NetIds.IsPlayerEntityNetId(candidate.netId) ||
+                NetIds.PlayerEntityOwnerOf(candidate.netId) != ownerId)
+            {
+                continue;
+            }
+
+            NormalizeRemoteRenderOrder(
+                candidate,
+                candidate.netId
+            );
+        }
+    }
+
+    private static GameShip FindRemotePlayerShip(int ownerId)
+    {
+        if (WorldController.instance == null)
+            return null;
+
+        List<GameShip> gameShips =
+            WorldController.instance.GetGameShips();
+
+        if (gameShips == null)
+            return null;
+
+        for (int i = 0; i < gameShips.Count; i++)
+        {
+            GameShip candidate = gameShips[i];
+
+            if (candidate == null ||
+                candidate.isRemoteEntity ||
+                candidate.netOwnerPlayerId != ownerId)
+            {
+                continue;
+            }
+
+            return candidate;
+        }
+
+        return null;
+    }
+
+    private static bool IsRemoteLeviathanSegment(GameShip ship)
+    {
+        if (ship == null ||
+            ship.originalShip == null ||
+            ship.originalShip.aiBehaviour != Ship.AiBehaviour.Attached)
+        {
+            return false;
+        }
+
+        EnsureLeviathanSegmentNameKeys();
+
+        // If the authored base cannot be resolved, Attached is still a better
+        // fallback than leaving a known Leviathan replica unsorted.
+        if (leviathanSegmentNameKeys == null ||
+            leviathanSegmentNameKeys.Count == 0)
+        {
+            return true;
+        }
+
+        string nameKey =
+            ship.originalShip.GetNameLanguageKey();
+
+        return !string.IsNullOrEmpty(nameKey) &&
+            leviathanSegmentNameKeys.Contains(nameKey);
+    }
+
+    private static void EnsureLeviathanSegmentNameKeys()
+    {
+        if (leviathanSegmentNameKeys != null)
+            return;
+
+        leviathanSegmentNameKeys =
+            new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase
+            );
+
+        SquadronBase leviathanBase =
+            Resources.FindObjectsOfTypeAll<SquadronBase>()
+                .FirstOrDefault(x => x.name == "LeviathanTest");
+
+        if (leviathanBase == null)
+            return;
+
+        Squadron squadron = leviathanBase.GetSquadron(1);
+
+        if (squadron == null || squadron.ships == null)
+            return;
+
+        for (int i = 1; i < squadron.ships.Count; i++)
+        {
+            Squadron.SquadronShip slot = squadron.ships[i];
+
+            if (slot == null || slot.npc == null)
+                continue;
+
+            Ship definition = slot.npc.GetShip();
+
+            if (definition == null)
+                continue;
+
+            string nameKey = definition.GetNameLanguageKey();
+
+            if (!string.IsNullOrEmpty(nameKey))
+                leviathanSegmentNameKeys.Add(nameKey);
+        }
+    }
+
     private static void NormalizeSquadronRenderOrder(GameShip ship)
     {
         if (ship == null ||
@@ -1956,38 +2688,133 @@ public static class LeviathanAttachmentNormalizer
             return;
         }
 
-        List<Squadron.SquadronShip> ships = ship.squadron.ships;
-        int shipIndex = -1;
+        List<Squadron.SquadronShip> ships =
+            ship.squadron.ships;
 
-        for (int i = 1; i < ships.Count; i++)
-        {
-            if (ships[i] != null && ships[i].ship == ship)
-            {
-                shipIndex = i;
-                break;
-            }
-        }
-
-        if (shipIndex < 1 || ships[0] == null || ships[0].ship == null)
+        if (ships[0] == null || ships[0].ship == null)
             return;
+
+        GameShip headShip = ships[0].ship;
 
         UnityEngine.Rendering.SortingGroup headGroup;
-        UnityEngine.Rendering.SortingGroup shipGroup;
 
-        if (!ships[0].ship.TryGetComponent<
+        if (!headShip.TryGetComponent<
                 UnityEngine.Rendering.SortingGroup>(out headGroup) ||
-            !ship.TryGetComponent<
-                UnityEngine.Rendering.SortingGroup>(out shipGroup) ||
-            headGroup == null ||
-            shipGroup == null)
+            headGroup == null)
         {
             return;
         }
 
-        // Draw the chain from head toward tail. Each following body sits
-        // above the previous ship so its body covers the previous thruster.
-        shipGroup.sortingLayerID = headGroup.sortingLayerID;
-        shipGroup.sortingOrder = headGroup.sortingOrder + shipIndex;
+        int sortingLayerId = headGroup.sortingLayerID;
+        int headOrder = headGroup.sortingOrder;
+        int thrusterOrder =
+            headOrder - ThrusterBottomOffset;
+
+        // Head stays on top. Every following body/tail is exactly one
+        // SortingGroup step below the preceding section.
+        for (int i = 0; i < ships.Count; i++)
+        {
+            Squadron.SquadronShip slot = ships[i];
+
+            if (slot == null || slot.ship == null)
+                continue;
+
+            GameShip section = slot.ship;
+
+            UnityEngine.Rendering.SortingGroup sectionGroup;
+
+            if (section.TryGetComponent<
+                    UnityEngine.Rendering.SortingGroup>(out sectionGroup) &&
+                sectionGroup != null)
+            {
+                sectionGroup.sortingLayerID = sortingLayerId;
+                sectionGroup.sortingOrder = headOrder - i;
+            }
+
+            NormalizeThrusterRenderOrder(
+                section,
+                sortingLayerId,
+                thrusterOrder
+            );
+        }
+    }
+
+    private static void NormalizeThrusterRenderOrder(
+        GameShip ship,
+        int sortingLayerId,
+        int sortingOrder)
+    {
+        if (ship == null)
+            return;
+
+        // Thruster.Equip creates the primary/mirror emissions as children of
+        // their thruster roots. Vanity thrusters use the same ThrusterEmission
+        // child pattern on separate roots. Boost trails are later instantiated
+        // beneath those same roots, so one root SortingGroup covers all of them.
+        ThrusterEmission[] emissions =
+            ship.GetComponentsInChildren<ThrusterEmission>(true);
+
+        if (emissions == null || emissions.Length == 0)
+            return;
+
+        HashSet<int> handledRoots = new HashSet<int>();
+
+        for (int i = 0; i < emissions.Length; i++)
+        {
+            ThrusterEmission emission = emissions[i];
+
+            if (emission == null ||
+                emission.transform == null ||
+                emission.transform.parent == null)
+            {
+                continue;
+            }
+
+            GameObject root =
+                emission.transform.parent.gameObject;
+
+            if (root == null ||
+                root == ship.gameObject ||
+                !handledRoots.Add(root.GetInstanceID()))
+            {
+                continue;
+            }
+
+            UnityEngine.Rendering.SortingGroup thrusterGroup =
+                root.GetComponent<
+                    UnityEngine.Rendering.SortingGroup>();
+
+            if (thrusterGroup == null)
+            {
+                thrusterGroup =
+                    root.AddComponent<
+                        UnityEngine.Rendering.SortingGroup>();
+            }
+
+            thrusterGroup.sortingLayerID = sortingLayerId;
+            thrusterGroup.sortingOrder = sortingOrder;
+
+            // A nested SortingGroup normally remains inside its ship's group.
+            // sortAtRoot makes this thruster root participate in global sorting,
+            // allowing it to sit underneath every Leviathan body.
+            if (SortingGroupSortAtRootProperty != null &&
+                SortingGroupSortAtRootProperty.CanWrite)
+            {
+                try
+                {
+                    SortingGroupSortAtRootProperty.SetValue(
+                        thrusterGroup,
+                        true,
+                        null
+                    );
+                }
+                catch
+                {
+                    // Older Unity versions may expose the property differently.
+                    // The explicit group/order still provides the best fallback.
+                }
+            }
+        }
     }
 
     private static bool TryGetAnchors(
