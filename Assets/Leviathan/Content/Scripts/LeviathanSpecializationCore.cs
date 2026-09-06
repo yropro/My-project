@@ -1,0 +1,1081 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+
+public enum LeviathanSpecializationNodeType
+{
+    Root,
+    Passive,
+    Major,
+    Keystone
+}
+
+public enum LeviathanSpecializationEffectType
+{
+    FlatPerRank,
+    PercentPerRank,
+    MultiplierPerRank,
+    Flag
+}
+
+public enum LeviathanRequirementKind
+{
+    Always,
+    Rank,
+    All,
+    Any
+}
+
+public interface ILeviathanSpecializationRankSource
+{
+    int GetRank(string nodeId);
+}
+
+public abstract class LeviathanRequirement
+{
+    public abstract LeviathanRequirementKind Kind { get; }
+    public abstract bool IsSatisfied(ILeviathanSpecializationRankSource ranks);
+    public abstract void CollectNodeIds(HashSet<string> output);
+    public abstract string Describe(Func<string, string> nameResolver);
+
+    public virtual bool TryGetSimpleParents(out List<string> nodeIds)
+    {
+        nodeIds = null;
+        return false;
+    }
+}
+
+public sealed class LeviathanAlwaysRequirement : LeviathanRequirement
+{
+    public override LeviathanRequirementKind Kind
+    {
+        get { return LeviathanRequirementKind.Always; }
+    }
+
+    public override bool IsSatisfied(ILeviathanSpecializationRankSource ranks)
+    {
+        return true;
+    }
+
+    public override void CollectNodeIds(HashSet<string> output)
+    {
+    }
+
+    public override string Describe(Func<string, string> nameResolver)
+    {
+        return "None";
+    }
+}
+
+public sealed class LeviathanRankRequirement : LeviathanRequirement
+{
+    public readonly string NodeId;
+    public readonly int Rank;
+
+    public LeviathanRankRequirement(string nodeId, int rank)
+    {
+        NodeId = nodeId;
+        Rank = Math.Max(1, rank);
+    }
+
+    public override LeviathanRequirementKind Kind
+    {
+        get { return LeviathanRequirementKind.Rank; }
+    }
+
+    public override bool IsSatisfied(ILeviathanSpecializationRankSource ranks)
+    {
+        return ranks != null && ranks.GetRank(NodeId) >= Rank;
+    }
+
+    public override void CollectNodeIds(HashSet<string> output)
+    {
+        if (output != null && !string.IsNullOrEmpty(NodeId))
+            output.Add(NodeId);
+    }
+
+    public override string Describe(Func<string, string> nameResolver)
+    {
+        string name = nameResolver == null ? NodeId : nameResolver(NodeId);
+        return name + " " + Rank.ToString();
+    }
+
+    public override bool TryGetSimpleParents(out List<string> nodeIds)
+    {
+        nodeIds = new List<string> { NodeId };
+        return true;
+    }
+}
+
+public abstract class LeviathanCompositeRequirement : LeviathanRequirement
+{
+    public readonly LeviathanRequirement[] Children;
+
+    protected LeviathanCompositeRequirement(params LeviathanRequirement[] children)
+    {
+        Children = children == null
+            ? new LeviathanRequirement[0]
+            : children.Where(c => c != null).ToArray();
+    }
+
+    public override void CollectNodeIds(HashSet<string> output)
+    {
+        if (output == null)
+            return;
+
+        for (int i = 0; i < Children.Length; i++)
+            Children[i].CollectNodeIds(output);
+    }
+
+    public override bool TryGetSimpleParents(out List<string> nodeIds)
+    {
+        nodeIds = new List<string>();
+
+        for (int i = 0; i < Children.Length; i++)
+        {
+            LeviathanRankRequirement rank = Children[i] as LeviathanRankRequirement;
+            if (rank == null)
+            {
+                nodeIds = null;
+                return false;
+            }
+
+            nodeIds.Add(rank.NodeId);
+        }
+
+        return nodeIds.Count > 0;
+    }
+}
+
+public sealed class LeviathanAllRequirement : LeviathanCompositeRequirement
+{
+    public LeviathanAllRequirement(params LeviathanRequirement[] children)
+        : base(children)
+    {
+    }
+
+    public override LeviathanRequirementKind Kind
+    {
+        get { return LeviathanRequirementKind.All; }
+    }
+
+    public override bool IsSatisfied(ILeviathanSpecializationRankSource ranks)
+    {
+        for (int i = 0; i < Children.Length; i++)
+        {
+            if (!Children[i].IsSatisfied(ranks))
+                return false;
+        }
+
+        return true;
+    }
+
+    public override string Describe(Func<string, string> nameResolver)
+    {
+        if (Children.Length == 0)
+            return "None";
+
+        return "ALL: " + string.Join(
+            ", ",
+            Children.Select(c => c.Describe(nameResolver)).ToArray()
+        );
+    }
+}
+
+public sealed class LeviathanAnyRequirement : LeviathanCompositeRequirement
+{
+    public LeviathanAnyRequirement(params LeviathanRequirement[] children)
+        : base(children)
+    {
+    }
+
+    public override LeviathanRequirementKind Kind
+    {
+        get { return LeviathanRequirementKind.Any; }
+    }
+
+    public override bool IsSatisfied(ILeviathanSpecializationRankSource ranks)
+    {
+        if (Children.Length == 0)
+            return true;
+
+        for (int i = 0; i < Children.Length; i++)
+        {
+            if (Children[i].IsSatisfied(ranks))
+                return true;
+        }
+
+        return false;
+    }
+
+    public override string Describe(Func<string, string> nameResolver)
+    {
+        if (Children.Length == 0)
+            return "None";
+
+        return "ANY: " + string.Join(
+            ", ",
+            Children.Select(c => c.Describe(nameResolver)).ToArray()
+        );
+    }
+}
+
+public static class LeviathanReq
+{
+    public static readonly LeviathanRequirement None =
+        new LeviathanAlwaysRequirement();
+
+    public static LeviathanRequirement Rank(string nodeId, int rank)
+    {
+        return new LeviathanRankRequirement(nodeId, rank);
+    }
+
+    public static LeviathanRequirement Rank(string nodeId)
+    {
+        return Rank(nodeId, 1);
+    }
+
+    public static LeviathanRequirement All(params LeviathanRequirement[] children)
+    {
+        return new LeviathanAllRequirement(children);
+    }
+
+    public static LeviathanRequirement Any(params LeviathanRequirement[] children)
+    {
+        return new LeviathanAnyRequirement(children);
+    }
+}
+
+public sealed class LeviathanSpecializationEffect
+{
+    public readonly LeviathanSpecializationEffectType Type;
+    public readonly string Key;
+    public readonly float ValuePerRank;
+
+    private LeviathanSpecializationEffect(
+        LeviathanSpecializationEffectType type,
+        string key,
+        float valuePerRank)
+    {
+        Type = type;
+        Key = key;
+        ValuePerRank = valuePerRank;
+    }
+
+    public static LeviathanSpecializationEffect Flat(
+        string statId,
+        float valuePerRank)
+    {
+        return new LeviathanSpecializationEffect(
+            LeviathanSpecializationEffectType.FlatPerRank,
+            statId,
+            valuePerRank
+        );
+    }
+
+    public static LeviathanSpecializationEffect Percent(
+        string statId,
+        float valuePerRank)
+    {
+        return new LeviathanSpecializationEffect(
+            LeviathanSpecializationEffectType.PercentPerRank,
+            statId,
+            valuePerRank
+        );
+    }
+
+    // Value is the factor for one rank: 1.10 = x1.10 per rank.
+    public static LeviathanSpecializationEffect Multiplier(
+        string statId,
+        float factorPerRank)
+    {
+        return new LeviathanSpecializationEffect(
+            LeviathanSpecializationEffectType.MultiplierPerRank,
+            statId,
+            factorPerRank
+        );
+    }
+
+    public static LeviathanSpecializationEffect Flag(string flagId)
+    {
+        return new LeviathanSpecializationEffect(
+            LeviathanSpecializationEffectType.Flag,
+            flagId,
+            1f
+        );
+    }
+
+    public string Describe(int rank, Func<string, string> statNameResolver)
+    {
+        string name = statNameResolver == null ? Key : statNameResolver(Key);
+
+        if (Type == LeviathanSpecializationEffectType.Flag)
+            return "Enables " + name;
+
+        float total = ValuePerRank * rank;
+
+        if (Type == LeviathanSpecializationEffectType.FlatPerRank)
+        {
+            return (total >= 0f ? "+" : string.Empty) +
+                total.ToString("0.###") + " " + name;
+        }
+
+        if (Type == LeviathanSpecializationEffectType.PercentPerRank)
+        {
+            return (total >= 0f ? "+" : string.Empty) +
+                (total * 100f).ToString("0.#") + "% " + name;
+        }
+
+        double factor = Math.Pow(ValuePerRank, rank);
+        return "x" + factor.ToString("0.###") + " " + name;
+    }
+}
+
+public sealed class LeviathanSpecializationNode
+{
+    public readonly string Id;
+    public readonly string Name;
+    public readonly int MaxRank;
+    public readonly LeviathanSpecializationNodeType Type;
+    public readonly LeviathanRequirement Requirement;
+    public readonly string ExclusiveGroup;
+    public readonly string Description;
+    public readonly LeviathanSpecializationEffect[] Effects;
+
+    public LeviathanSpecializationNode(
+        string id,
+        string name,
+        int maxRank,
+        LeviathanSpecializationNodeType type,
+        LeviathanRequirement requirement,
+        string exclusiveGroup,
+        string description,
+        params LeviathanSpecializationEffect[] effects)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentException("Node id is required.", "id");
+
+        Id = id;
+        Name = string.IsNullOrWhiteSpace(name) ? id : name;
+        MaxRank = Math.Max(1, maxRank);
+        Type = type;
+        Requirement = requirement ?? LeviathanReq.None;
+        ExclusiveGroup = exclusiveGroup ?? string.Empty;
+        Description = description ?? string.Empty;
+        Effects = effects == null
+            ? new LeviathanSpecializationEffect[0]
+            : effects.Where(e => e != null).ToArray();
+    }
+}
+
+public sealed class LeviathanSpecializationTree
+{
+    public const string RootId = "$root";
+
+    public readonly string Id;
+    public readonly string Name;
+    public readonly int OwnerUpgradeKey;
+
+    private readonly List<LeviathanSpecializationNode> nodes =
+        new List<LeviathanSpecializationNode>();
+
+    private readonly Dictionary<string, LeviathanSpecializationNode> byId =
+        new Dictionary<string, LeviathanSpecializationNode>(StringComparer.Ordinal);
+
+    public LeviathanSpecializationTree(
+        string id,
+        string name,
+        int ownerUpgradeKey)
+    {
+        Id = id;
+        Name = name;
+        OwnerUpgradeKey = ownerUpgradeKey;
+    }
+
+    public IList<LeviathanSpecializationNode> Nodes
+    {
+        get { return nodes.AsReadOnly(); }
+    }
+
+    public LeviathanSpecializationTree Add(LeviathanSpecializationNode node)
+    {
+        if (node == null)
+            throw new ArgumentNullException("node");
+
+        if (byId.ContainsKey(node.Id))
+            throw new InvalidOperationException(
+                "Duplicate specialization node id '" + node.Id + "'."
+            );
+
+        nodes.Add(node);
+        byId.Add(node.Id, node);
+        return this;
+    }
+
+    public LeviathanSpecializationNode GetNode(string nodeId)
+    {
+        LeviathanSpecializationNode node;
+        return nodeId != null && byId.TryGetValue(nodeId, out node)
+            ? node
+            : null;
+    }
+
+    public string GetNodeName(string nodeId)
+    {
+        LeviathanSpecializationNode node = GetNode(nodeId);
+        return node == null ? nodeId : node.Name;
+    }
+
+    public IList<LeviathanSpecializationNode> GetExclusiveGroupMembers(
+        string group)
+    {
+        if (string.IsNullOrEmpty(group))
+            return new List<LeviathanSpecializationNode>().AsReadOnly();
+
+        return nodes
+            .Where(n => string.Equals(
+                n.ExclusiveGroup,
+                group,
+                StringComparison.Ordinal))
+            .ToList()
+            .AsReadOnly();
+    }
+
+    public void Validate()
+    {
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            HashSet<string> dependencies = new HashSet<string>(StringComparer.Ordinal);
+            nodes[i].Requirement.CollectNodeIds(dependencies);
+
+            foreach (string dependency in dependencies)
+            {
+                if (!byId.ContainsKey(dependency))
+                {
+                    throw new InvalidOperationException(
+                        "Tree '" + Id + "': node '" + nodes[i].Id +
+                        "' requires missing node '" + dependency + "'."
+                    );
+                }
+            }
+        }
+
+        Dictionary<string, int> marks =
+            new Dictionary<string, int>(StringComparer.Ordinal);
+
+        for (int i = 0; i < nodes.Count; i++)
+            VisitForCycle(nodes[i].Id, marks, new Stack<string>());
+    }
+
+    private void VisitForCycle(
+        string nodeId,
+        Dictionary<string, int> marks,
+        Stack<string> path)
+    {
+        int mark;
+        if (marks.TryGetValue(nodeId, out mark))
+        {
+            if (mark == 2)
+                return;
+
+            if (mark == 1)
+            {
+                string cycle = string.Join(" -> ", path.Reverse().ToArray());
+                throw new InvalidOperationException(
+                    "Tree '" + Id + "' contains a prerequisite cycle near '" +
+                    nodeId + "': " + cycle + " -> " + nodeId
+                );
+            }
+        }
+
+        marks[nodeId] = 1;
+        path.Push(nodeId);
+
+        HashSet<string> dependencies = new HashSet<string>(StringComparer.Ordinal);
+        byId[nodeId].Requirement.CollectNodeIds(dependencies);
+
+        foreach (string dependency in dependencies)
+            VisitForCycle(dependency, marks, path);
+
+        path.Pop();
+        marks[nodeId] = 2;
+    }
+}
+
+public sealed class LeviathanSpecializationState : ILeviathanSpecializationRankSource
+{
+    private readonly Dictionary<string, int> ranks =
+        new Dictionary<string, int>(StringComparer.Ordinal);
+
+    public int GetRank(string nodeId)
+    {
+        int rank;
+        return nodeId != null && ranks.TryGetValue(nodeId, out rank)
+            ? rank
+            : 0;
+    }
+
+    public void SetRank(string nodeId, int rank)
+    {
+        if (string.IsNullOrEmpty(nodeId))
+            return;
+
+        if (rank <= 0)
+            ranks.Remove(nodeId);
+        else
+            ranks[nodeId] = rank;
+    }
+
+    public IDictionary<string, int> Snapshot()
+    {
+        return new Dictionary<string, int>(ranks, StringComparer.Ordinal);
+    }
+
+    public bool CanInvest(
+        LeviathanSpecializationTree tree,
+        string nodeId,
+        out string reason)
+    {
+        reason = string.Empty;
+
+        if (tree == null)
+        {
+            reason = "No tree.";
+            return false;
+        }
+
+        LeviathanSpecializationNode node = tree.GetNode(nodeId);
+        if (node == null)
+        {
+            reason = "Unknown node.";
+            return false;
+        }
+
+        int current = GetRank(node.Id);
+        if (current >= node.MaxRank)
+        {
+            reason = "Already at maximum rank.";
+            return false;
+        }
+
+        if (!node.Requirement.IsSatisfied(this))
+        {
+            reason = "Prerequisites are not satisfied.";
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(node.ExclusiveGroup))
+        {
+            IList<LeviathanSpecializationNode> group =
+                tree.GetExclusiveGroupMembers(node.ExclusiveGroup);
+
+            for (int i = 0; i < group.Count; i++)
+            {
+                if (group[i].Id != node.Id && GetRank(group[i].Id) > 0)
+                {
+                    reason = "Mutually exclusive with " + group[i].Name + ".";
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public bool TryInvest(
+        LeviathanSpecializationTree tree,
+        string nodeId,
+        out string reason)
+    {
+        if (!CanInvest(tree, nodeId, out reason))
+            return false;
+
+        LeviathanSpecializationNode node = tree.GetNode(nodeId);
+        SetRank(node.Id, GetRank(node.Id) + 1);
+        return true;
+    }
+
+    public bool CanRefund(
+        LeviathanSpecializationTree tree,
+        string nodeId,
+        out string reason)
+    {
+        reason = string.Empty;
+
+        if (tree == null)
+        {
+            reason = "No tree.";
+            return false;
+        }
+
+        LeviathanSpecializationNode node = tree.GetNode(nodeId);
+        if (node == null || GetRank(nodeId) <= 0)
+        {
+            reason = "No rank to refund.";
+            return false;
+        }
+
+        int oldRank = GetRank(nodeId);
+        SetRank(nodeId, oldRank - 1);
+
+        string invalid;
+        bool valid = ValidateInvestedState(tree, out invalid);
+
+        SetRank(nodeId, oldRank);
+
+        if (!valid)
+        {
+            reason = "Required by " + invalid + ".";
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool TryRefund(
+        LeviathanSpecializationTree tree,
+        string nodeId,
+        out string reason)
+    {
+        if (!CanRefund(tree, nodeId, out reason))
+            return false;
+
+        SetRank(nodeId, GetRank(nodeId) - 1);
+        return true;
+    }
+
+    public bool ValidateInvestedState(
+        LeviathanSpecializationTree tree,
+        out string invalidNodeName)
+    {
+        invalidNodeName = string.Empty;
+
+        if (tree == null)
+            return false;
+
+        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            LeviathanSpecializationNode node = nodes[i];
+            int rank = GetRank(node.Id);
+
+            if (rank <= 0)
+                continue;
+
+            if (rank > node.MaxRank || !node.Requirement.IsSatisfied(this))
+            {
+                invalidNodeName = node.Name;
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(node.ExclusiveGroup))
+            {
+                int investedInGroup = tree
+                    .GetExclusiveGroupMembers(node.ExclusiveGroup)
+                    .Count(n => GetRank(n.Id) > 0);
+
+                if (investedInGroup > 1)
+                {
+                    invalidNodeName = node.Name;
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public float GetFlat(
+        LeviathanSpecializationTree tree,
+        string statId)
+    {
+        float flat = 0f;
+        float percent = 0f;
+        float multiplier = 1f;
+        AggregateCore(tree, statId, ref flat, ref percent, ref multiplier);
+        return flat;
+    }
+
+    public float GetPercent(
+        LeviathanSpecializationTree tree,
+        string statId)
+    {
+        float flat = 0f;
+        float percent = 0f;
+        float multiplier = 1f;
+        AggregateCore(tree, statId, ref flat, ref percent, ref multiplier);
+        return percent;
+    }
+
+    public float GetMultiplier(
+        LeviathanSpecializationTree tree,
+        string statId)
+    {
+        float flat = 0f;
+        float percent = 0f;
+        float multiplier = 1f;
+        AggregateCore(tree, statId, ref flat, ref percent, ref multiplier);
+        return (1f + percent) * multiplier;
+    }
+
+    public float Apply(
+        LeviathanSpecializationTree tree,
+        string statId,
+        float baseValue)
+    {
+        float flat = 0f;
+        float percent = 0f;
+        float multiplier = 1f;
+        AggregateCore(tree, statId, ref flat, ref percent, ref multiplier);
+        return (baseValue + flat) * (1f + percent) * multiplier;
+    }
+
+    public bool HasFlag(
+        LeviathanSpecializationTree tree,
+        string flagId)
+    {
+        if (tree == null || string.IsNullOrEmpty(flagId))
+            return false;
+
+        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            int rank = GetRank(nodes[i].Id);
+            if (rank <= 0)
+                continue;
+
+            for (int e = 0; e < nodes[i].Effects.Length; e++)
+            {
+                LeviathanSpecializationEffect effect = nodes[i].Effects[e];
+                if (effect.Type == LeviathanSpecializationEffectType.Flag &&
+                    string.Equals(effect.Key, flagId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private void AggregateCore(
+        LeviathanSpecializationTree tree,
+        string statId,
+        ref float flat,
+        ref float percent,
+        ref float multiplier)
+    {
+        if (tree == null || string.IsNullOrEmpty(statId))
+            return;
+
+        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            int rank = GetRank(nodes[i].Id);
+            if (rank <= 0)
+                continue;
+
+            for (int e = 0; e < nodes[i].Effects.Length; e++)
+            {
+                LeviathanSpecializationEffect effect = nodes[i].Effects[e];
+                if (!string.Equals(effect.Key, statId, StringComparison.Ordinal))
+                    continue;
+
+                if (effect.Type == LeviathanSpecializationEffectType.FlatPerRank)
+                {
+                    flat += effect.ValuePerRank * rank;
+                }
+                else if (effect.Type == LeviathanSpecializationEffectType.PercentPerRank)
+                {
+                    percent += effect.ValuePerRank * rank;
+                }
+                else if (effect.Type == LeviathanSpecializationEffectType.MultiplierPerRank)
+                {
+                    multiplier *= (float)Math.Pow(effect.ValuePerRank, rank);
+                }
+            }
+        }
+    }
+}
+
+public struct LeviathanLayoutPoint
+{
+    public float X;
+    public float Y;
+
+    public LeviathanLayoutPoint(float x, float y)
+    {
+        X = x;
+        Y = y;
+    }
+}
+
+public sealed class LeviathanSpecializationLayoutNode
+{
+    public string NodeId;
+    public int Layer;
+    public int Order;
+    public LeviathanLayoutPoint Position;
+}
+
+public sealed class LeviathanSpecializationLayoutEdge
+{
+    public string FromNodeId;
+    public string ToNodeId;
+    public LeviathanRequirementKind TargetRequirementKind;
+}
+
+public sealed class LeviathanSpecializationLayout
+{
+    public readonly Dictionary<string, LeviathanSpecializationLayoutNode> Nodes =
+        new Dictionary<string, LeviathanSpecializationLayoutNode>(StringComparer.Ordinal);
+
+    public readonly List<LeviathanSpecializationLayoutEdge> Edges =
+        new List<LeviathanSpecializationLayoutEdge>();
+
+    public float Width;
+    public float Height;
+}
+
+public static class LeviathanSpecializationAutoLayout
+{
+    private const float HorizontalSpacing = 250f;
+    private const float VerticalSpacing = 140f;
+
+    public static LeviathanSpecializationLayout Build(
+        LeviathanSpecializationTree tree)
+    {
+        if (tree == null)
+            throw new ArgumentNullException("tree");
+
+        tree.Validate();
+
+        LeviathanSpecializationLayout result =
+            new LeviathanSpecializationLayout();
+
+        Dictionary<string, int> layers =
+            new Dictionary<string, int>(StringComparer.Ordinal);
+
+        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+        for (int i = 0; i < nodes.Count; i++)
+            ComputeLayer(tree, nodes[i].Id, layers);
+
+        Dictionary<int, List<string>> byLayer =
+            new Dictionary<int, List<string>>();
+
+        for (int i = 0; i < nodes.Count; i++)
+            AddToLayer(byLayer, layers[nodes[i].Id], nodes[i].Id);
+
+        foreach (KeyValuePair<int, List<string>> pair in byLayer)
+            pair.Value.Sort(StringComparer.Ordinal);
+
+        BuildEdges(tree, result);
+
+        // Deterministic barycentric sweeps. This is intentionally small/simple;
+        // Leviathan trees are tens of nodes, not general-purpose graph diagrams.
+        for (int pass = 0; pass < 8; pass++)
+        {
+            bool forward = pass % 2 == 0;
+            List<int> layerIds = byLayer.Keys.OrderBy(x => x).ToList();
+            if (!forward)
+                layerIds.Reverse();
+
+            for (int l = 0; l < layerIds.Count; l++)
+            {
+                int layer = layerIds[l];
+                if (layer == 0)
+                    continue;
+
+                SortLayerByBarycenter(
+                    byLayer,
+                    result.Edges,
+                    layer,
+                    forward
+                );
+            }
+        }
+
+        if (byLayer.Count == 0)
+        {
+            result.Width = 900f;
+            result.Height = 620f;
+            return result;
+        }
+
+        int maxLayer = byLayer.Keys.Max();
+        int maxCount = byLayer.Values.Max(v => v.Count);
+
+        foreach (KeyValuePair<int, List<string>> pair in byLayer)
+        {
+            List<string> ids = pair.Value;
+            float center = (ids.Count - 1) * 0.5f;
+
+            for (int i = 0; i < ids.Count; i++)
+            {
+                result.Nodes[ids[i]] = new LeviathanSpecializationLayoutNode
+                {
+                    NodeId = ids[i],
+                    Layer = pair.Key,
+                    Order = i,
+                    Position = new LeviathanLayoutPoint(
+                        pair.Key * HorizontalSpacing,
+                        (i - center) * VerticalSpacing
+                    )
+                };
+            }
+        }
+
+        result.Width = Math.Max(900f, maxLayer * HorizontalSpacing + 420f);
+        result.Height = Math.Max(620f, maxCount * VerticalSpacing + 260f);
+        return result;
+    }
+
+    private static int ComputeLayer(
+        LeviathanSpecializationTree tree,
+        string nodeId,
+        Dictionary<string, int> layers)
+    {
+        int existing;
+        if (layers.TryGetValue(nodeId, out existing))
+            return existing;
+
+        LeviathanSpecializationNode node = tree.GetNode(nodeId);
+        HashSet<string> parents = new HashSet<string>(StringComparer.Ordinal);
+        node.Requirement.CollectNodeIds(parents);
+
+        int layer = 0;
+        foreach (string parent in parents)
+            layer = Math.Max(layer, ComputeLayer(tree, parent, layers) + 1);
+
+        layers[nodeId] = layer;
+        return layer;
+    }
+
+    private static void AddToLayer(
+        Dictionary<int, List<string>> byLayer,
+        int layer,
+        string nodeId)
+    {
+        List<string> list;
+        if (!byLayer.TryGetValue(layer, out list))
+        {
+            list = new List<string>();
+            byLayer.Add(layer, list);
+        }
+
+        list.Add(nodeId);
+    }
+
+    private static void BuildEdges(
+        LeviathanSpecializationTree tree,
+        LeviathanSpecializationLayout layout)
+    {
+        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            HashSet<string> parents = new HashSet<string>(StringComparer.Ordinal);
+            nodes[i].Requirement.CollectNodeIds(parents);
+
+            if (parents.Count == 0)
+                continue;
+
+            foreach (string parent in parents)
+            {
+                layout.Edges.Add(new LeviathanSpecializationLayoutEdge
+                {
+                    FromNodeId = parent,
+                    ToNodeId = nodes[i].Id,
+                    TargetRequirementKind = nodes[i].Requirement.Kind
+                });
+            }
+        }
+    }
+
+    private static void SortLayerByBarycenter(
+        Dictionary<int, List<string>> byLayer,
+        List<LeviathanSpecializationLayoutEdge> edges,
+        int layer,
+        bool useParents)
+    {
+        List<string> current;
+        if (!byLayer.TryGetValue(layer, out current) || current.Count <= 1)
+            return;
+
+        Dictionary<string, float> previousOrder =
+            new Dictionary<string, float>(StringComparer.Ordinal);
+
+        foreach (KeyValuePair<int, List<string>> pair in byLayer)
+        {
+            for (int i = 0; i < pair.Value.Count; i++)
+                previousOrder[pair.Value[i]] = i;
+        }
+
+        current.Sort(delegate (string a, string b)
+        {
+            float ba = GetBarycenter(a, edges, previousOrder, useParents);
+            float bb = GetBarycenter(b, edges, previousOrder, useParents);
+
+            int compare = ba.CompareTo(bb);
+            return compare != 0
+                ? compare
+                : string.CompareOrdinal(a, b);
+        });
+    }
+
+    private static float GetBarycenter(
+        string nodeId,
+        List<LeviathanSpecializationLayoutEdge> edges,
+        Dictionary<string, float> order,
+        bool useParents)
+    {
+        float total = 0f;
+        int count = 0;
+
+        for (int i = 0; i < edges.Count; i++)
+        {
+            string neighbor = null;
+
+            if (useParents && edges[i].ToNodeId == nodeId)
+                neighbor = edges[i].FromNodeId;
+            else if (!useParents && edges[i].FromNodeId == nodeId)
+                neighbor = edges[i].ToNodeId;
+
+            float value;
+            if (neighbor != null && order.TryGetValue(neighbor, out value))
+            {
+                total += value;
+                count++;
+            }
+        }
+
+        return count == 0 ? float.MaxValue : total / count;
+    }
+}
+
+public static class LeviathanSpecializationRegistry
+{
+    private static readonly Dictionary<string, LeviathanSpecializationTree> trees =
+        new Dictionary<string, LeviathanSpecializationTree>(StringComparer.Ordinal);
+
+    public static void Register(LeviathanSpecializationTree tree)
+    {
+        if (tree == null)
+            throw new ArgumentNullException("tree");
+
+        tree.Validate();
+        trees[tree.Id] = tree;
+    }
+
+    public static LeviathanSpecializationTree Get(string treeId)
+    {
+        LeviathanSpecializationTree tree;
+        return treeId != null && trees.TryGetValue(treeId, out tree)
+            ? tree
+            : null;
+    }
+
+    public static IList<LeviathanSpecializationTree> All()
+    {
+        return trees.Values.OrderBy(t => t.Id).ToList().AsReadOnly();
+    }
+}
