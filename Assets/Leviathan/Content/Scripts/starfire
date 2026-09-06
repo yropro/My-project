@@ -1,0 +1,130 @@
+using HarmonyLib;
+using StarVortex;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using UnityEngine;
+using static StarVortex.Damageable;
+
+/// <summary>
+/// Starfire transforms one equipped Torch Primary weapon into a broad Leviathan
+/// breath attack. The first equipped Primary Torch in native slot order is the source;
+/// all other equipped Primary Torches are suppressed while Starfire is active.
+///
+/// The source Torch remains the source of truth for native damage packet
+/// construction, damage type, legendary/customizer behavior, native
+/// charge/tick timing and attribution. Starfire reshapes the native spike and
+/// exposes neutral tuning hooks for damage, crits, debuffs and future charge
+/// profiles while scaling heat/geometry by rank.
+/// </summary>
+public static class LeviathanStarfireRuntime
+{
+    // =========================================================================
+    // BALANCE TUNING
+    // =========================================================================
+    // Arrays are Rank 1 -> Rank 5. These are the main Starfire balance knobs.
+
+    // Multiplier on native Torch heat generation from the one Starfire source.
+    // Rank 1 starts at double heat. Rank 5 is 50% lower than that starting
+    // burden and returns to the source Torch's native heat generation.
+    private static readonly float[] HeatMultiplierByRank =
+    {
+        1.50f, // Rank 1
+        1.45f, // Rank 2
+        1.40f, // Rank 3
+        1.35f, // Rank 4
+        1.30f  // Rank 5
+    };
+
+    // Multiplier on the selected Torch's native MaxRange result. This is applied at
+    // the same Equippable.ApplyModifier(MaxRange) boundary used by Striker, so
+    // Torch's own charge, VFX length and collider length all inherit it natively.
+    private static readonly float[] LengthMultiplierByRank =
+    {
+        1.1f, // Rank 1
+        1.2f, // Rank 2
+        1.3f, // Rank 3
+        1.4f, // Rank 4
+        1.5f  // Rank 5
+    };
+
+    // Multiplier on the source Torch spike body's native Y scale. Torch damage uses
+    // the same spike Collider2D, so this widens both the visible breath and hit area.
+    private static readonly float[] WidthMultiplierByRank =
+    {
+        1.50f, // Rank 1
+        1.60f, // Rank 2
+        1.70f, // Rank 3
+        1.80f, // Rank 4
+        2.00f  // Rank 5
+    };
+
+    // Direct multiplier on the source Torch's native DamageData[] packet.
+    // Neutral for now; future Starfire branches can change this independently.
+    private static readonly float[] DamageMultiplierByRank =
+    {
+        1.00f, // Rank 1
+        1.00f, // Rank 2
+        1.00f, // Rank 3
+        1.00f, // Rank 4
+        1.00f  // Rank 5
+    };
+
+    // Multiplier on the equipped Torch's native crit chance. 1.00 preserves the
+    // source weapon's exact native roll. Non-neutral values reroll only Starfire
+    // hits and leave every other Torch/weapon untouched.
+    private static readonly float[] CritChanceMultiplierByRank =
+    {
+        1.00f, // Rank 1
+        1.00f, // Rank 2
+        1.00f, // Rank 3
+        1.00f, // Rank 4
+        1.00f  // Rank 5
+    };
+
+    // Multiplier on the BONUS portion of native crit damage. Example: a native
+    // +50% crit with this at 2.00 becomes +100%, not 2x the entire final hit.
+    private static readonly float[] CritDamageMultiplierByRank =
+    {
+        1.00f, // Rank 1
+        1.00f, // Rank 2
+        1.00f, // Rank 3
+        1.00f, // Rank 4
+        1.00f  // Rank 5
+    };
+
+    // Multiplier on native Torch status/debuff proc chance. Damage type and the
+    // actual status applied remain entirely inherited from the equipped Torch.
+    private static readonly float[] DebuffChanceMultiplierByRank =
+    {
+        1.00f, // Rank 1
+        1.00f, // Rank 2
+        1.00f, // Rank 3
+        1.00f, // Rank 4
+        1.00f  // Rank 5
+    };
+
+    // Future Deep Breath / charge-profile hooks. These are intentionally neutral
+    // today. StartupDelaySeconds is an explicit wind-up before Starfire can deal
+    // damage; native charge/VFX can still build during that telegraph.
+    private static readonly float[] StartupDelaySecondsByRank =
+    {
+        0.00f, // Rank 1
+        0.00f, // Rank 2
+        0.00f, // Rank 3
+        0.00f, // Rank 4
+        0.00f  // Rank 5
+    };
+
+    // Multiplier on native Torch charge speed. 2.00 = half native chargeTime;
+    // 0.50 = double native chargeTime. Because Torch's own `charge` drives both
+    // range and GetDamageData(), this changes the real mechanical ramp, not just VFX.
+    private static readonly float[] ChargeRampSpeedMultiplierByRank =
+    {
+        0.50f, // Rank 1
+        0.60f, // Rank 2
+        0.70f, // Rank 3
+        0.80f, // Rank 4
+        0.90f  // Rank 5
+    };

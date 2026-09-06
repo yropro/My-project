@@ -24,6 +24,16 @@ public static class LeviathanBehemoth
         0.25f  // Rank 5
     };
 
+    // Additional chance to discard a status-effect attempt transferred from a segment.
+    private static readonly float[] SegmentDebuffDiscardChanceByRank =
+    {
+        0.25f, // Rank 1
+        0.30f, // Rank 2
+        0.35f, // Rank 3
+        0.37f, // Rank 4
+        0.40f  // Rank 5
+    };
+
     // Multiplies all six final hull resistance values.
     // 1.00 = unchanged.
     private static readonly float[] ResistanceMultiplierByRank =
@@ -60,11 +70,11 @@ public static class LeviathanBehemoth
     // Flat maximum hull added after the multiplier.
     private static readonly float[] MaxHullFlatBonusByRank =
     {
-        0.00f, // Rank 1
-        0.00f, // Rank 2
-        0.00f, // Rank 3
-        0.00f, // Rank 4
-        0.00f  // Rank 5
+        50.00f, // Rank 1
+        55.00f, // Rank 2
+        60.00f, // Rank 3
+        65.00f, // Rank 4
+        70.00f  // Rank 5
     };
 
     // Flat maximum hull PER attached Leviathan segment (body + tail).
@@ -92,22 +102,22 @@ public static class LeviathanBehemoth
     // (body + tail). Example: 0.5f with 9 bodies + tail = +5 hull/sec.
     private static readonly float[] StaticHullRegenPerSegmentPerSecondByRank =
     {
-        0.00f, // Rank 1
-        0.00f, // Rank 2
-        0.00f, // Rank 3
-        0.00f, // Rank 4
-        0.00f  // Rank 5
+        2.00f, // Rank 1
+        4.75f, // Rank 2
+        5.50f, // Rank 3
+        6.50f, // Rank 4
+        7.50f  // Rank 5
     };
 
     // Additional hull regenerated per second as a percentage of adjusted max hull.
     // Enter percentage points directly: 1.00f = +1% max hull per second.
     private static readonly float[] MaxHullRegenPercentPerSecondByRank =
     {
-        0.00f, // Rank 1
-        0.00f, // Rank 2
-        0.00f, // Rank 3
-        0.00f, // Rank 4
-        0.00f  // Rank 5
+        0.20f, // Rank 1
+        0.40f, // Rank 2
+        0.65f, // Rank 3
+        0.80f, // Rank 4
+        1.00f  // Rank 5
     };
 
     public const int MaxRank = 5;
@@ -141,6 +151,16 @@ public static class LeviathanBehemoth
         return pilot == null
             ? 0
             : pilot.GetUpgradeLevel(LeviathanMod.BehemothUpgrade);
+    }
+
+    public static float GetSegmentDebuffDiscardChance(GameShip player)
+    {
+        int rank = Mathf.Clamp(GetRank(player), 0, MaxRank);
+
+        if (rank < 1)
+            return 0f;
+
+        return GetRankValue(SegmentDebuffDiscardChanceByRank, rank);
     }
 
     internal static bool TryGetActiveRank(
@@ -224,7 +244,16 @@ public static class LeviathanBehemoth
             return 0f;
 
         object value = HealthMaxGetter.Invoke(player, null);
-        return value is float ? (float)value : 0f;
+
+        // Native GameShip.HealthMax is int. Accept float too so this helper stays
+        // tolerant if another supported target ever exposes a floating-point stat.
+        if (value is int)
+            return (float)(int)value;
+
+        if (value is float)
+            return (float)value;
+
+        return 0f;
     }
 
     internal static MethodInfo FindStatGetter(string name)
@@ -337,13 +366,19 @@ public static class LeviathanBehemothHullRegenPatch
             LeviathanGrowth.GetSegmentCount(player);
 
         float maxHull = LeviathanBehemoth.GetAdjustedMaxHull(player);
-        float percentPerSecond =
-            LeviathanBehemoth.GetMaxHullRegenPercent(rank) / 100f;
 
-        __result += LeviathanBehemoth.GetStaticHullRegen(rank);
-        __result +=
+        // GameShip.HealthRegen is normalized against max hull rather than stored
+        // directly as HP/sec. Convert flat HP/sec bonuses into that normalized value.
+        float flatRegenPerSecond =
+            LeviathanBehemoth.GetStaticHullRegen(rank) +
             segmentCount *
             LeviathanBehemoth.GetStaticHullRegenPerSegment(rank);
-        __result += maxHull * percentPerSecond;
+
+        if (maxHull > 0f)
+            __result += flatRegenPerSecond / maxHull;
+
+        // Percentage points convert directly to the normalized regen value.
+        __result +=
+            LeviathanBehemoth.GetMaxHullRegenPercent(rank) / 100f;
     }
 }

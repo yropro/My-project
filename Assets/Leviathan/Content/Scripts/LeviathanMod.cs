@@ -124,6 +124,8 @@ public static class LeviathanWorldDestroyedPatch
     public static void Prefix()
     {
         LeviathanMod.Controller?.ClearPlayerShip();
+        LeviathanSegmentStatusProtection.Reset();
+        LeviathanSegmentDamageLimiter.Reset();
     }
 }
 
@@ -1125,6 +1127,323 @@ public static class LeviathanReflection
     }
 }
 
+public static class LeviathanSegmentStatusProtection
+{
+    private struct StatusAttemptKey
+    {
+        public int playerId;
+        public int attackerId;
+        public DamageType damageType;
+        public int sourceX;
+        public int sourceY;
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + playerId;
+                hash = hash * 31 + attackerId;
+                hash = hash * 31 + (int)damageType;
+                hash = hash * 31 + sourceX;
+                hash = hash * 31 + sourceY;
+                return hash;
+            }
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is StatusAttemptKey))
+                return false;
+
+            StatusAttemptKey other = (StatusAttemptKey)obj;
+
+            return playerId == other.playerId &&
+                attackerId == other.attackerId &&
+                damageType == other.damageType &&
+                sourceX == other.sourceX &&
+                sourceY == other.sourceY;
+        }
+    }
+
+    private struct DirectStatusAttemptKey
+    {
+        public int playerId;
+        public int attackerId;
+        public StatusEffect.Type statusType;
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + playerId;
+                hash = hash * 31 + attackerId;
+                hash = hash * 31 + (int)statusType;
+                return hash;
+            }
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is DirectStatusAttemptKey))
+                return false;
+
+            DirectStatusAttemptKey other =
+                (DirectStatusAttemptKey)obj;
+
+            return playerId == other.playerId &&
+                attackerId == other.attackerId &&
+                statusType == other.statusType;
+        }
+    }
+
+    private static readonly HashSet<StatusAttemptKey> SeenThisFrame =
+        new HashSet<StatusAttemptKey>();
+
+    private static readonly HashSet<DirectStatusAttemptKey>
+        DirectSeenThisFrame =
+            new HashSet<DirectStatusAttemptKey>();
+
+    private static int lastFrame = -1;
+
+    public static float FilterStatusEffectChance(
+        GameShip player,
+        DamageType damageType,
+        float statusEffectChance,
+        Vector2 fromPosition,
+        GameShip fromShip)
+    {
+        if (player == null || statusEffectChance <= 0f)
+            return 0f;
+
+        EnsureFrame();
+
+        StatusAttemptKey key = new StatusAttemptKey();
+        key.playerId = player.gameObject.GetInstanceID();
+        key.attackerId =
+            fromShip == null
+                ? 0
+                : fromShip.gameObject.GetInstanceID();
+        key.damageType = damageType;
+
+        // One attacker gets one segment-originated status opportunity per damage
+        // type per frame. Unowned hazards are separated by source position.
+        if (fromShip == null)
+        {
+            key.sourceX = Mathf.RoundToInt(fromPosition.x * 1000f);
+            key.sourceY = Mathf.RoundToInt(fromPosition.y * 1000f);
+        }
+
+        if (!SeenThisFrame.Add(key))
+            return 0f;
+
+        return RollDiscard(player)
+            ? 0f
+            : statusEffectChance;
+    }
+
+    public static bool ShouldTransferDirectStatus(
+        GameShip player,
+        StatusEffect statusEffect)
+    {
+        if (player == null ||
+            statusEffect == null ||
+            !statusEffect.IsNegative())
+        {
+            return false;
+        }
+
+        EnsureFrame();
+
+        DirectStatusAttemptKey key =
+            new DirectStatusAttemptKey();
+
+        key.playerId = player.gameObject.GetInstanceID();
+        key.attackerId =
+            statusEffect.attacker == null
+                ? 0
+                : statusEffect.attacker.gameObject.GetInstanceID();
+        key.statusType = statusEffect.GetStatusEffectType();
+
+        // Direct AddStatusEffect paths such as Wildfire can otherwise put the same
+        // debuff on many segments at once. Collapse those to one head opportunity.
+        if (!DirectSeenThisFrame.Add(key))
+            return false;
+
+        return !RollDiscard(player);
+    }
+
+    private static bool RollDiscard(GameShip player)
+    {
+        float discardChance =
+            LeviathanGrowth.GetSegmentDebuffDiscardChance(player) +
+            LeviathanBehemoth.GetSegmentDebuffDiscardChance(player);
+
+        return discardChance > 0f &&
+            UnityEngine.Random.value < Mathf.Clamp01(discardChance);
+    }
+
+    private static void EnsureFrame()
+    {
+        if (Time.frameCount == lastFrame)
+            return;
+
+        lastFrame = Time.frameCount;
+        SeenThisFrame.Clear();
+        DirectSeenThisFrame.Clear();
+    }
+
+    public static void Reset()
+    {
+        SeenThisFrame.Clear();
+        DirectSeenThisFrame.Clear();
+        lastFrame = -1;
+    }
+}
+
+public static class LeviathanSegmentDamageLimiter
+{
+    // Maximum redirected segment hits from one source during one simulation step.
+    // Direct hits to the player/head never enter this limiter.
+    public const int MaxSegmentHitsPerSourceStep = 4;
+
+    private struct DamageWindowKey
+    {
+        public int playerId;
+        public int attackerId;
+        public DamageType damageType;
+        public string weaponName;
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + playerId;
+                hash = hash * 31 + attackerId;
+                hash = hash * 31 + (int)damageType;
+                hash = hash * 31 +
+                    (weaponName == null ? 0 : weaponName.GetHashCode());
+                return hash;
+            }
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is DamageWindowKey))
+                return false;
+
+            DamageWindowKey other = (DamageWindowKey)obj;
+
+            return playerId == other.playerId &&
+                attackerId == other.attackerId &&
+                damageType == other.damageType &&
+                string.Equals(
+                    weaponName,
+                    other.weaponName,
+                    StringComparison.Ordinal
+                );
+        }
+    }
+
+    private static readonly Dictionary<DamageWindowKey, int>
+        HitsThisStep =
+            new Dictionary<DamageWindowKey, int>();
+
+    private static int lastFrame = -1;
+    private static float lastFixedTime = float.NaN;
+
+    public static bool AllowSegmentDamage(
+        GameShip segment,
+        GameShip player,
+        DamageType damageType,
+        GameShip fromShip)
+    {
+        if (segment == null || player == null)
+            return true;
+
+        EnsureStep();
+
+        DamageWindowKey key = new DamageWindowKey();
+        key.playerId = player.gameObject.GetInstanceID();
+        key.attackerId =
+            fromShip == null
+                ? 0
+                : fromShip.gameObject.GetInstanceID();
+        key.damageType = damageType;
+        key.weaponName =
+            segment.lastDamagedByWeaponName ?? string.Empty;
+
+        int hitCount;
+
+        if (!HitsThisStep.TryGetValue(key, out hitCount))
+            hitCount = 0;
+
+        if (hitCount >= MaxSegmentHitsPerSourceStep)
+            return false;
+
+        HitsThisStep[key] = hitCount + 1;
+        return true;
+    }
+
+    private static void EnsureStep()
+    {
+        int frame = Time.frameCount;
+        float fixedTime = Time.fixedTime;
+
+        if (frame == lastFrame && fixedTime == lastFixedTime)
+            return;
+
+        lastFrame = frame;
+        lastFixedTime = fixedTime;
+        HitsThisStep.Clear();
+    }
+
+    public static void Reset()
+    {
+        HitsThisStep.Clear();
+        lastFrame = -1;
+        lastFixedTime = float.NaN;
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "AddStatusEffect")]
+public static class LeviathanSegmentAddStatusEffectPatch
+{
+    public static bool Prefix(
+        GameShip __instance,
+        StatusEffect __0)
+    {
+        if (__instance == null ||
+            __0 == null ||
+            !__0.IsNegative())
+        {
+            return true;
+        }
+
+        GameShip player =
+            LeviathanMod.Controller?.GetDamageRedirectTarget(__instance);
+
+        if (player == null)
+            return true;
+
+        // Negative statuses never live on a Leviathan segment. Direct status
+        // application paths get one deduped/discardable opportunity on the head.
+        if (LeviathanSegmentStatusProtection.ShouldTransferDirectStatus(
+                player,
+                __0))
+        {
+            StatusEffect transferred = __0.Clone() as StatusEffect;
+
+            if (transferred != null)
+                player.AddStatusEffect(transferred);
+        }
+
+        return false;
+    }
+}
+
 [HarmonyPatch]
 public static class LeviathanSegmentDamagePatch
 {
@@ -1163,15 +1482,36 @@ public static class LeviathanSegmentDamagePatch
         if (player == null)
             return true;
 
+        if (!LeviathanSegmentDamageLimiter.AllowSegmentDamage(
+                __instance,
+                player,
+                __0,
+                __5))
+        {
+            __result = false;
+            return false;
+        }
+
         float multiplier =
             LeviathanBehemoth.GetSegmentDamageMultiplier(player);
 
         DamageData[] scaledDamage = ScaleDamageData(__1, multiplier);
 
+        float statusEffectChance =
+            LeviathanSegmentStatusProtection.FilterStatusEffectChance(
+                player,
+                __0,
+                __2,
+                __4,
+                __5
+            );
+
+        CopyDamageAttribution(__instance, player);
+
         __result = player.Damage(
             __0,
             scaledDamage,
-            __2,
+            statusEffectChance,
             __3,
             __4,
             __5,
@@ -1179,6 +1519,21 @@ public static class LeviathanSegmentDamagePatch
         );
 
         return false;
+    }
+
+    private static void CopyDamageAttribution(
+        GameShip segment,
+        GameShip player)
+    {
+        if (segment == null || player == null)
+            return;
+
+        player.lastDamagedByWeaponName =
+            segment.lastDamagedByWeaponName;
+        player.lastDamagedByShipName =
+            segment.lastDamagedByShipName;
+        player.lastDamagedByFaction =
+            segment.lastDamagedByFaction;
     }
 
     private static DamageData[] ScaleDamageData(
@@ -1234,6 +1589,9 @@ public static class LeviathanSegmentDirectDamagePatch
 
         float multiplier =
             LeviathanBehemoth.GetSegmentDamageMultiplier(player);
+
+        player.lastDirectDamageSourceName =
+            __instance.lastDirectDamageSourceName;
 
         __result = player.DirectDamage(
             __0,

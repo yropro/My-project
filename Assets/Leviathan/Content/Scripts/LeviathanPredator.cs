@@ -26,42 +26,42 @@ public static class LeviathanPredatorRuntime
     // Leviathan section-size multiplier is applied.
     private static readonly float[] DamageMultiplierByRank =
     {
-        1.50f,  // Rank 1
-        1.625f, // Rank 2
-        1.75f,  // Rank 3
-        1.875f, // Rank 4
-        2.00f   // Rank 5
+        1.90f,  // Rank 1
+        2.00f, // Rank 2
+        2.05f,  // Rank 3
+        2.10f, // Rank 4
+        2.20f   // Rank 5
     };
 
     // Fraction of the native Assault lunge distance.
     private static readonly float[] LungeDistanceMultiplierByRank =
     {
-        0.70f, // Rank 1
-        0.75f, // Rank 2
-        0.80f, // Rank 3
-        0.85f, // Rank 4
-        0.90f  // Rank 5
+        0.80f, // Rank 1
+        0.90f, // Rank 2
+        1.00f, // Rank 3
+        1.10f, // Rank 4
+        1.15f  // Rank 5
     };
 
     // Multiplier on native lunge duration. Larger = slower at the same distance.
     // 1.25 duration means 80% of the previous Predator movement speed.
     private static readonly float[] LungeDurationMultiplierByRank =
     {
-        1.6f, // Rank 1
-        1.5f, // Rank 2
-        1.3f, // Rank 3
-        1.3f, // Rank 4
-        1.2f  // Rank 5
+        2.0f, // Rank 1
+        2.0f, // Rank 2
+        1.8f, // Rank 3
+        1.6f, // Rank 4
+        1.4f  // Rank 5
     };
 
     // Multiplier on the equipped Assault weapon's native cooldown.
     private static readonly float[] CooldownMultiplierByRank =
     {
-        2.15f, // Rank 1
-        2.00f, // Rank 2
-        1.85f, // Rank 3
-        1.70f, // Rank 4
-        1.55f  // Rank 5
+        2.95f, // Rank 1
+        2.70f, // Rank 2
+        2.55f, // Rank 3
+        2.20f, // Rank 4
+        1.85f  // Rank 5
     };
 
     // Flat crit chance added to the equipped Assault weapon.
@@ -144,7 +144,10 @@ public static class LeviathanPredatorRuntime
         GameShip player;
         int rank;
 
-        if (!TryGetPredatorContext(assault, out player, out rank))
+        // Remote player replicas replay Assault.StartAttack from the native
+        // active-slot network mask. Recognize Predator on those replicas too so
+        // their visual/predicted lunge uses the same distance and duration.
+        if (!TryGetPredatorVisualContext(assault, out player, out rank))
             return false;
 
         startingAssault = assault;
@@ -169,7 +172,7 @@ public static class LeviathanPredatorRuntime
 
         if (assault == null ||
             player == null ||
-            !TryGetPredatorContext(assault, out assaultPlayer, out rank) ||
+            !TryGetPredatorVisualContext(assault, out assaultPlayer, out rank) ||
             assaultPlayer != player)
         {
             return false;
@@ -181,6 +184,17 @@ public static class LeviathanPredatorRuntime
         if (GetLungeTimer(player) > 0f)
             return false;
 
+        // Local mechanics still require the fully built Leviathan chain. Remote
+        // player replicas do not own that local controller state, but they do carry
+        // the owner's Pilot upgrades in their replicated Ship payload.
+        bool localPlayer = IsCurrentPlayer(player);
+
+        if (localPlayer &&
+            !TryGetPredatorContext(assault, out assaultPlayer, out rank))
+        {
+            return false;
+        }
+
         float distanceMultiplier = GetLungeDistanceMultiplier(rank);
         float durationMultiplier = GetLungeDurationMultiplier(rank);
 
@@ -188,6 +202,12 @@ public static class LeviathanPredatorRuntime
         // distanceMultiplier / durationMultiplier relative to native Assault.
         distance *= distanceMultiplier;
         duration *= durationMultiplier;
+
+        // Remote replicas need only the altered native lunge presentation. Their
+        // transform is still reconciled by RemoteShipDriver, and custom Predator
+        // collision/damage remains owner-only to avoid duplicate hits.
+        if (!localPlayer)
+            return false;
 
         activeAssault = assault;
         activePlayer = player;
@@ -293,7 +313,7 @@ public static class LeviathanPredatorRuntime
         return GetRankValue(CooldownMultiplierByRank, rank);
     }
 
-    private static bool TryGetPredatorContext(
+    private static bool TryGetPredatorVisualContext(
         Assault assault,
         out GameShip player,
         out int rank)
@@ -301,30 +321,39 @@ public static class LeviathanPredatorRuntime
         player = null;
         rank = 0;
 
-        if (assault == null ||
-            ParentShipField == null ||
-            LeviathanMod.Controller == null)
-        {
+        if (assault == null || ParentShipField == null)
             return false;
-        }
 
         player = ParentShipField.GetValue(assault) as GameShip;
 
-        if (player == null || !IsCurrentPlayer(player))
+        if (player == null || !player.IsAnyPlayerShip())
             return false;
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
 
         if (pilot == null ||
-            pilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade) < 1 ||
-            LeviathanMod.Controller.GetActiveSectionCount(player) <
-                LeviathanGrowth.GetBodySegmentCountForRank(1) + 2)
+            pilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade) < 1)
         {
             return false;
         }
 
         rank = pilot.GetUpgradeLevel(LeviathanMod.PredatorUpgrade);
         return rank >= 1;
+    }
+
+    private static bool TryGetPredatorContext(
+        Assault assault,
+        out GameShip player,
+        out int rank)
+    {
+        if (!TryGetPredatorVisualContext(assault, out player, out rank))
+            return false;
+
+        if (!IsCurrentPlayer(player) || LeviathanMod.Controller == null)
+            return false;
+
+        return LeviathanMod.Controller.GetActiveSectionCount(player) >=
+            LeviathanGrowth.GetBodySegmentCountForRank(1) + 2;
     }
 
     private static bool IsCurrentPlayer(GameShip player)

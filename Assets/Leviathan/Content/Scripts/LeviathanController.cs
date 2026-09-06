@@ -374,6 +374,30 @@ public class LeviathanController : MonoBehaviour
             }
 
             segment.faction = player.faction;
+
+            // Leviathan followers are structural sections, not independent
+            // NPCs. Hide their floating NPC name/health minibars locally and
+            // persist the flag in the Ship payload so remote replicas hide
+            // them too.
+            segment.disableMinibars = true;
+
+            if (segment.originalShip != null)
+                segment.originalShip.disableMinibars = true;
+
+            segment.CheckAttachMinibars();
+
+            // Squadron.SpawnShip creates these as star-owned entities. In a
+            // multiplayer session the Leviathan chain is actually owned by the
+            // local player, so hand each segment to Star Vortex's native
+            // player-entity replication path. NetWorldBridge will allocate a
+            // player-owned netId, announce the full Ship JSON, and stream the
+            // segment transform to every other peer.
+            if (NetSession.InSession)
+            {
+                segment.netStarEntity = false;
+                segment.netPlayerEntity = true;
+            }
+
             segments.Add(segment);
         }
 

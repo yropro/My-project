@@ -15,16 +15,26 @@ public static class LeviathanGrowth
 
     // Flat maximum hull granted by each attached Leviathan segment.
     // "Segment" means body + tail; the head is not counted.
-    public const float HullPerSegment = 60.0f;
+    public const float HullPerSegment = 100.0f;
 
     // Effective mass of the player/head per Growth rank.
-    public const float MassBonusPerRank = 0.40f;
+    public const float MassBonusPerRank = 0.25f;
 
     // Extra Leviathan cruising resistance starts above this fraction of MaxSpeed.
     public const float ResistanceStartFraction = 0.40f;
 
     // At theoretical MaxSpeed, remove this fraction of MaxSpeed per second.
-    public const float ResistanceStrength = 0.65f;
+    public const float ResistanceStrength = 0.55f;
+
+    // Chance to discard a status-effect attempt transferred from a segment.
+    private static readonly float[] SegmentDebuffDiscardChanceByRank =
+    {
+        0.20f, // Rank 1
+        0.25f, // Rank 2
+        0.30f, // Rank 3
+        0.35f, // Rank 4
+        0.40f  // Rank 5
+    };
 
     // =========================================================================
     // NATIVE / MECHANICAL CONSTANTS
@@ -113,6 +123,18 @@ public static class LeviathanGrowth
         return 1f + effectiveRank * MassBonusPerRank;
     }
 
+    public static float GetSegmentDebuffDiscardChance(GameShip player)
+    {
+        int rank = GetRank(player);
+
+        if (rank < 1)
+            return 0f;
+
+        return SegmentDebuffDiscardChanceByRank[
+            Mathf.Clamp(rank, 1, MaxRank) - 1
+        ];
+    }
+
     internal static bool TryGetLeviathanPlayer(
         object instance,
         out GameShip player)
@@ -164,7 +186,7 @@ public static class LeviathanGrowthMaxHullPatch
 
     public static void Postfix(
         object __instance,
-        ref float __result)
+        ref int __result)
     {
         GameShip player;
 
@@ -178,7 +200,8 @@ public static class LeviathanGrowthMaxHullPatch
         int segmentCount =
             LeviathanGrowth.GetSegmentCount(player);
 
-        __result +=
+        float adjustedHull =
+            __result +
             segmentCount * LeviathanGrowth.HullPerSegment;
 
         int behemothRank = Mathf.Clamp(
@@ -187,16 +210,20 @@ public static class LeviathanGrowthMaxHullPatch
             LeviathanBehemoth.MaxRank
         );
 
-        if (behemothRank < 1)
-            return;
+        if (behemothRank >= 1)
+        {
+            adjustedHull =
+                adjustedHull *
+                    LeviathanBehemoth.GetMaxHullMultiplier(behemothRank) +
+                LeviathanBehemoth.GetMaxHullFlatBonus(behemothRank) +
+                segmentCount *
+                    LeviathanBehemoth.GetMaxHullFlatBonusPerSegment(
+                        behemothRank
+                    );
+        }
 
-        __result =
-            __result *
-                LeviathanBehemoth.GetMaxHullMultiplier(behemothRank) +
-            LeviathanBehemoth.GetMaxHullFlatBonus(behemothRank) +
-            segmentCount *
-                LeviathanBehemoth.GetMaxHullFlatBonusPerSegment(
-                    behemothRank
-                );
+        // Native GameShip.HealthMax is an int. Keep tuning math in float so
+        // fractional multipliers/bonuses remain useful, then round once at the end.
+        __result = Mathf.RoundToInt(adjustedHull);
     }
 }

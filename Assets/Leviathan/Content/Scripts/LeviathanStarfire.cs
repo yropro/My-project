@@ -30,45 +30,46 @@ public static class LeviathanStarfireRuntime
     // burden and returns to the source Torch's native heat generation.
     private static readonly float[] HeatMultiplierByRank =
     {
-        2.00f, // Rank 1
-        1.75f, // Rank 2
-        1.50f, // Rank 3
-        1.25f, // Rank 4
-        1.00f  // Rank 5
+        1.50f, // Rank 1
+        1.45f, // Rank 2
+        1.40f, // Rank 3
+        1.35f, // Rank 4
+        1.30f  // Rank 5
     };
 
-    // Fraction of the equipped Torch's native current range. Native Torch charge
-    // scaling happens first, so partially charged breath remains proportionally
-    // shorter exactly as the source weapon expects.
+    // Multiplier on the selected Torch's native MaxRange result. This is applied at
+    // the same Equippable.ApplyModifier(MaxRange) boundary used by Striker, so
+    // Torch's own charge, VFX length and collider length all inherit it natively.
     private static readonly float[] LengthMultiplierByRank =
     {
-        0.5000f, // Rank 1
-        0.5625f, // Rank 2
-        0.6250f, // Rank 3
-        0.6875f, // Rank 4
-        0.7500f  // Rank 5
+        1.15f, // Rank 1
+        1.25f, // Rank 2
+        1.3f, // Rank 3
+        1.4f, // Rank 4
+        1.5f  // Rank 5
     };
 
-    // Multiplier on the source Torch spike's native width. Because native Torch
-    // damage overlaps the spike Collider2D, this widens both the VFX and hit area.
+    // Multiplier on the source Torch spike body's native Y scale. Torch damage uses
+    // the same spike Collider2D, so this widens both the native visual and hit area.
+    // Rank 1 is completely vanilla width; Rank 5 reaches 2.5x width.
     private static readonly float[] WidthMultiplierByRank =
     {
-        2.00f, // Rank 1
-        2.25f, // Rank 2
-        2.50f, // Rank 3
-        2.75f, // Rank 4
-        3.00f  // Rank 5
+        1.30f, // Rank 1
+        1.50f, // Rank 2
+        1.70f, // Rank 3
+        1.80f, // Rank 4
+        2.00f  // Rank 5
     };
 
     // Direct multiplier on the source Torch's native DamageData[] packet.
     // Neutral for now; future Starfire branches can change this independently.
     private static readonly float[] DamageMultiplierByRank =
     {
-        1.00f, // Rank 1
-        1.00f, // Rank 2
-        1.00f, // Rank 3
-        1.00f, // Rank 4
-        1.00f  // Rank 5
+        1.10f, // Rank 1
+        1.20f, // Rank 2
+        1.30f, // Rank 3
+        1.35f, // Rank 4
+        1.40f  // Rank 5
     };
 
     // Multiplier on the equipped Torch's native crit chance. 1.00 preserves the
@@ -157,18 +158,15 @@ public static class LeviathanStarfireRuntime
     private static readonly FieldInfo MirrorGameObjectField =
         AccessTools.Field(typeof(Equippable), "mirrorGameObject");
 
-    private static readonly MethodInfo RouteDamageMethod =
-        typeof(NetCombat)
-            .GetMethods(
-                BindingFlags.Static |
-                BindingFlags.Public |
-                BindingFlags.NonPublic
-            )
-            .FirstOrDefault(
-                m => m.Name == "RouteDamage" &&
-                     m.GetParameters().Length == 14 &&
-                     m.GetParameters()[2].ParameterType == typeof(DamageData[])
-            );
+    // GameShip caches the aggregate heat-per-second contribution of equipped
+    // activatables in this field. GameShip.AddHeat() has no amount parameter; it
+    // only opens a short heat-latency window. Starfire therefore adjusts this
+    // cached rate only while GameShip.UpdateHeat() executes.
+    private static readonly FieldInfo GameShipHeatPerSecondField =
+        AccessTools.Field(typeof(GameShip), "heatPerSecond");
+
+    private static readonly FieldInfo ActivatableActiveField =
+        AccessTools.Field(typeof(Activatable), "active");
 
     private static readonly HashSet<Torch> TouchedTorches =
         new HashSet<Torch>();
@@ -184,12 +182,6 @@ public static class LeviathanStarfireRuntime
     private static bool warnedNoSpikeFields;
     private static bool warnedNoSpikeObject;
 
-    // Context for identifying GameShip.AddHeat calls made from native Torch code.
-    [ThreadStatic]
-    private static Torch currentTorchContext;
-
-    [ThreadStatic]
-    private static int torchContextDepth;
 
     // Narrower context used only while the source Torch's native DoSpikeDamage
     // runs, so the DamageData[] RouteDamage packet can be scaled without touching
@@ -367,15 +359,14 @@ public static class LeviathanStarfireRuntime
         if (FullySuppressedTorches.Remove(torch))
             SetSpikeSuppressed(mainSpike, false);
 
-        // Starfire is exactly one breath. The source Torch's normal spike stays at
-        // its original native weapon/muzzle location; only its dimensions change.
+        // Starfire is exactly one breath. Keep the source Torch's normal native
+        // rectangular spike at its original mount and suppress only the mirror.
         SetSpikeSuppressed(mirrorSpike, true);
 
         if (applyScale)
         {
             ApplySpikeScale(
                 mainSpike,
-                GetRankValue(LengthMultiplierByRank, rank),
                 GetRankValue(WidthMultiplierByRank, rank)
             );
         }
@@ -402,19 +393,31 @@ public static class LeviathanStarfireRuntime
 
     private static void ApplySpikeScale(
         object nativeSpike,
-        float lengthMultiplier,
         float widthMultiplier)
     {
-        GameObject spikeObject = GetSpikeGameObject(nativeSpike);
-        if (spikeObject == null)
+        Transform body = GetSpikeBodyTransform(nativeSpike);
+        if (body == null)
             return;
 
-        // Torch.UpdateSpikeScale -> SetSpikeScale restores native current range
-        // before this postfix, so these multipliers do not compound each frame.
-        Vector3 scale = spikeObject.transform.localScale;
-        scale.x *= lengthMultiplier;
-        scale.y *= widthMultiplier;
-        spikeObject.transform.localScale = scale;
+        // Length is supplied through Torch.MaxRange at the native modifier boundary.
+        // Torch.SetSpikeScale has already put the correct mechanical length into X
+        // and resets Y to 1, so assign width absolutely to avoid compounding across
+        // FixedUpdate/LateUpdate. The native rectangular Collider2D scales with it.
+        Vector3 scale = body.localScale;
+        scale.y = widthMultiplier;
+        body.localScale = scale;
+    }
+
+    private static Transform GetSpikeBodyTransform(object nativeSpike)
+    {
+        if (nativeSpike == null)
+            return null;
+
+        FieldInfo bodyField = AccessTools.Field(nativeSpike.GetType(), "body");
+        if (bodyField == null)
+            return null;
+
+        return bodyField.GetValue(nativeSpike) as Transform;
     }
 
     private static void SetSpikeSuppressed(object nativeSpike, bool suppressed)
@@ -447,7 +450,8 @@ public static class LeviathanStarfireRuntime
 
         Type type = nativeSpike.GetType();
 
-        FieldInfo named = AccessTools.Field(type, "spike");
+        // Decompiled Torch.Spike stores its root GameObject in `obj`.
+        FieldInfo named = AccessTools.Field(type, "obj");
         GameObject result = GetGameObjectFromValue(
             named == null ? null : named.GetValue(nativeSpike)
         );
@@ -513,112 +517,148 @@ public static class LeviathanStarfireRuntime
         );
     }
 
-    // =========================================================================
-    // HEAT
-    // =========================================================================
-
-    public static bool BeginTorchContext(Torch torch)
+    // Mirrors the native Striker Laser/Bolt/Torch Range path. Torch.MaxRange
+    // calls Equippable.ApplyModifier(MaxRange, ..., includeParentShip: true);
+    // scale only the selected Starfire source at that native stat boundary.
+    public static void ScaleMaxRange(
+        Equippable equippable,
+        Modifier.Type modifierType,
+        bool includeParentShip,
+        ref float value)
     {
-        if (torch == null)
-            return false;
-
-        if (torchContextDepth == 0)
-            currentTorchContext = torch;
-
-        torchContextDepth++;
-        return true;
-    }
-
-    public static void EndTorchContext(bool entered)
-    {
-        if (!entered || torchContextDepth <= 0)
+        if (modifierType != Modifier.Type.MaxRange || !includeParentShip)
             return;
 
-        torchContextDepth--;
-
-        if (torchContextDepth == 0)
-            currentTorchContext = null;
-    }
-
-    public static void ScaleNativeTorchHeat(
-        GameShip player,
-        MethodBase originalMethod,
-        object[] args)
-    {
-        Torch torch = currentTorchContext;
-
-        if (torchContextDepth <= 0 ||
-            torch == null ||
-            player == null ||
-            originalMethod == null ||
-            args == null)
-        {
-            return;
-        }
-
-        GameShip owner;
+        Torch torch = equippable as Torch;
+        GameShip player;
         int rank;
 
-        if (!TryGetStarfireContext(torch, out owner, out rank) ||
-            owner != player)
+        if (torch == null ||
+            !TryGetStarfireContext(torch, out player, out rank) ||
+            !IsSourceTorch(torch, player))
         {
             return;
         }
 
-        int amountIndex = FindHeatAmountArgument(originalMethod, args);
-        if (amountIndex < 0)
-            return;
-
-        float amount = (float)args[amountIndex];
-
-        // Never alter cooling/heat removal.
-        if (amount <= 0f)
-            return;
-
-        if (!IsSourceTorch(torch, player))
-        {
-            // Extra equipped Primary Torches are completely suppressed by Starfire; they
-            // should not silently add heat for beams the player cannot use.
-            args[amountIndex] = 0f;
-            return;
-        }
-
-        args[amountIndex] = amount * GetRankValue(HeatMultiplierByRank, rank);
+        value *= GetRankValue(LengthMultiplierByRank, rank);
     }
 
-    private static int FindHeatAmountArgument(
-        MethodBase method,
-        object[] args)
+    // =========================================================================
+    // HEAT / EXTRA-TORCH SUPPRESSION
+    // =========================================================================
+
+    public struct HeatRateState
     {
-        ParameterInfo[] parameters = method.GetParameters();
-        int firstFloat = -1;
-        int count = Mathf.Min(parameters.Length, args.Length);
+        public bool changed;
+        public float originalHeatPerSecond;
+    }
 
-        for (int i = 0; i < count; i++)
+    // Starfire owns exactly one Primary Torch. Extra Primary Torches are true
+    // disabled weapons, not merely invisible damage sources. This runs before
+    // Torch.FixedUpdate -> Activatable.FixedUpdate -> UpdateHeat.
+    public static void SuppressNonSourceTorchActivation(Torch torch)
+    {
+        if (torch == null || ActivatableActiveField == null)
+            return;
+
+        GameShip player;
+        int rank;
+
+        if (!TryGetStarfireContext(torch, out player, out rank) ||
+            IsSourceTorch(torch, player))
         {
-            Type parameterType = parameters[i].ParameterType;
+            return;
+        }
 
-            if (parameterType.IsByRef)
-                parameterType = parameterType.GetElementType();
+        ActivatableActiveField.SetValue(torch, false);
+    }
 
-            if (parameterType != typeof(float) || !(args[i] is float))
-                continue;
+    // Native heat flow:
+    //   Activatable.UpdateHeat() -> GameShip.AddHeat() [no args, latency flag]
+    //   GameShip.UpdateHeat() -> heat += cached heatPerSecond * deltaTime
+    //
+    // Temporarily rewrite only that cached aggregate while UpdateHeat executes.
+    // Suppressed Primary Torches contribute zero. The source Torch keeps its
+    // native contribution, with the Starfire multiplier applied only while the
+    // source itself is active. Every non-Torch contribution remains untouched.
+    public static HeatRateState PrepareShipHeatRate(GameShip player)
+    {
+        HeatRateState state = new HeatRateState();
 
-            if (firstFloat < 0)
-                firstFloat = i;
+        if (player == null || GameShipHeatPerSecondField == null)
+            return state;
 
-            string name = parameters[i].Name ?? string.Empty;
-            name = name.ToLowerInvariant();
+        int rank;
+        if (!TryGetStarfireRank(player, out rank))
+            return state;
 
-            if (name.Contains("heat") ||
-                name.Contains("amount") ||
-                name.Contains("add"))
+        Torch source = FindSourceTorch(player);
+        if (source == null)
+            return state;
+
+        object raw = GameShipHeatPerSecondField.GetValue(player);
+        if (!(raw is float))
+            return state;
+
+        float original = (float)raw;
+        float adjusted = original;
+
+        if (player.slots != null)
+        {
+            for (int i = 0; i < player.slots.Length; i++)
             {
-                return i;
+                Slot slot = player.slots[i];
+
+                if (slot == null ||
+                    slot.type != Item.Type.PrimaryWeapon ||
+                    slot.equippable == null ||
+                    slot.equippable.durability == 0)
+                {
+                    continue;
+                }
+
+                Torch torch = slot.equippable as Torch;
+                if (torch == null || ReferenceEquals(torch, source))
+                    continue;
+
+                // GameShip.RegenerateModifiers included this value in its cached
+                // aggregate. Remove it because Starfire disables this Torch.
+                adjusted -= torch.heatPerSecond;
             }
         }
 
-        return firstFloat;
+        if (source.durability != 0 && source.IsActive())
+        {
+            float multiplier = GetRankValue(HeatMultiplierByRank, rank);
+            adjusted += source.heatPerSecond * (multiplier - 1f);
+        }
+
+        adjusted = Mathf.Max(0f, adjusted);
+
+        if (Mathf.Approximately(adjusted, original))
+            return state;
+
+        state.changed = true;
+        state.originalHeatPerSecond = original;
+        GameShipHeatPerSecondField.SetValue(player, adjusted);
+        return state;
+    }
+
+    public static void RestoreShipHeatRate(
+        GameShip player,
+        HeatRateState state)
+    {
+        if (!state.changed ||
+            player == null ||
+            GameShipHeatPerSecondField == null)
+        {
+            return;
+        }
+
+        GameShipHeatPerSecondField.SetValue(
+            player,
+            state.originalHeatPerSecond
+        );
     }
 
     // =========================================================================
@@ -945,22 +985,48 @@ public static class LeviathanStarfireRuntime
     }
 }
 
+// Native Striker range uses Equippable.ApplyModifier(MaxRange) and category
+// modifiers. Hook the same stat boundary, but only for Starfire's one source.
+[HarmonyPatch]
+public static class LeviathanStarfireMaxRangePatch
+{
+    public static MethodBase TargetMethod()
+    {
+        return AccessTools.Method(
+            typeof(Equippable),
+            "ApplyModifier",
+            new Type[]
+            {
+                typeof(Modifier.Type),
+                typeof(float),
+                typeof(bool),
+                typeof(bool)
+            }
+        );
+    }
+
+    public static void Postfix(
+        Equippable __instance,
+        Modifier.Type __0,
+        bool __3,
+        ref float __result)
+    {
+        LeviathanStarfireRuntime.ScaleMaxRange(
+            __instance,
+            __0,
+            __3,
+            ref __result
+        );
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Native Torch hooks
 // -----------------------------------------------------------------------------
 
-[HarmonyPatch]
+[HarmonyPatch(typeof(Torch), "BuildSpikes")]
 public static class LeviathanStarfireBuildSpikesPatch
 {
-    public static MethodBase TargetMethod()
-    {
-        return typeof(Torch).GetMethods(
-                BindingFlags.Instance |
-                BindingFlags.Public |
-                BindingFlags.NonPublic
-            )
-            .FirstOrDefault(m => m.Name == "BuildSpikes");
-    }
 
     public static void Postfix(Torch __instance)
     {
@@ -968,39 +1034,21 @@ public static class LeviathanStarfireBuildSpikesPatch
     }
 }
 
-[HarmonyPatch]
+[HarmonyPatch(typeof(Torch), "FollowSpikes")]
 public static class LeviathanStarfireFollowSpikesPatch
 {
-    public static MethodBase TargetMethod()
-    {
-        return typeof(Torch).GetMethods(
-                BindingFlags.Instance |
-                BindingFlags.Public |
-                BindingFlags.NonPublic
-            )
-            .FirstOrDefault(m => m.Name == "FollowSpikes");
-    }
 
     public static void Postfix(Torch __instance)
     {
         // Keep source/mirror/extra-Torch suppression enforced without relocating
         // the source. Native FollowSpikes remains fully responsible for its mount.
-        LeviathanStarfireRuntime.RefreshTorchGeometry(__instance, false);
+        LeviathanStarfireRuntime.RefreshTorchGeometry(__instance, true);
     }
 }
 
-[HarmonyPatch]
+[HarmonyPatch(typeof(Torch), "UpdateSpikeScale")]
 public static class LeviathanStarfireUpdateSpikeScalePatch
 {
-    public static MethodBase TargetMethod()
-    {
-        return typeof(Torch).GetMethods(
-                BindingFlags.Instance |
-                BindingFlags.Public |
-                BindingFlags.NonPublic
-            )
-            .FirstOrDefault(m => m.Name == "UpdateSpikeScale");
-    }
 
     public static void Postfix(Torch __instance)
     {
@@ -1008,84 +1056,42 @@ public static class LeviathanStarfireUpdateSpikeScalePatch
     }
 }
 
-/// <summary>
-/// Keep track of which Torch instance owns any GameShip.AddHeat call. Wrapping
-/// all concrete Torch instance methods avoids guessing which exact native update
-/// path applies heat, while the AddHeat patch below only modifies positive heat.
-/// </summary>
-[HarmonyPatch]
-public static class LeviathanStarfireTorchContextPatch
+// Extra Primary Torches must be inactive before Activatable.FixedUpdate performs
+// duration/cooldown/heat work. The selected source Torch is untouched.
+[HarmonyPatch(typeof(Torch), "FixedUpdate")]
+public static class LeviathanStarfireTorchFixedUpdatePatch
 {
-    public static IEnumerable<MethodBase> TargetMethods()
+    public static void Prefix(Torch __instance)
     {
-        return typeof(Torch).GetMethods(
-                BindingFlags.Instance |
-                BindingFlags.Public |
-                BindingFlags.NonPublic |
-                BindingFlags.DeclaredOnly
-            )
-            .Where(
-                m => !m.IsAbstract &&
-                     !m.ContainsGenericParameters &&
-                     m.GetMethodBody() != null
-            );
-    }
-
-    public static void Prefix(Torch __instance, out bool __state)
-    {
-        __state = LeviathanStarfireRuntime.BeginTorchContext(__instance);
-    }
-
-    public static void Postfix(bool __state)
-    {
-        LeviathanStarfireRuntime.EndTorchContext(__state);
+        LeviathanStarfireRuntime.SuppressNonSourceTorchActivation(__instance);
     }
 }
 
-[HarmonyPatch]
-public static class LeviathanStarfireAddHeatPatch
+// GameShip.AddHeat() is only a no-argument latency flag. Actual weapon heat is
+// applied here from GameShip's cached heatPerSecond field, so this is the narrow
+// native point where Starfire can change only Torch contributions.
+[HarmonyPatch(typeof(GameShip), "UpdateHeat")]
+public static class LeviathanStarfireGameShipUpdateHeatPatch
 {
-    public static IEnumerable<MethodBase> TargetMethods()
-    {
-        return typeof(GameShip).GetMethods(
-                BindingFlags.Instance |
-                BindingFlags.Public |
-                BindingFlags.NonPublic
-            )
-            .Where(
-                m => m.Name == "AddHeat" &&
-                     m.GetParameters().Any(
-                         p =>
-                         {
-                             Type type = p.ParameterType.IsByRef
-                                 ? p.ParameterType.GetElementType()
-                                 : p.ParameterType;
-                             return type == typeof(float);
-                         }
-                     )
-            );
-    }
 
     public static void Prefix(
         GameShip __instance,
-        MethodBase __originalMethod,
-        object[] __args)
+        out LeviathanStarfireRuntime.HeatRateState __state)
     {
-        LeviathanStarfireRuntime.ScaleNativeTorchHeat(
-            __instance,
-            __originalMethod,
-            __args
-        );
+        __state = LeviathanStarfireRuntime.PrepareShipHeatRate(__instance);
+    }
+
+    public static void Postfix(
+        GameShip __instance,
+        LeviathanStarfireRuntime.HeatRateState __state)
+    {
+        LeviathanStarfireRuntime.RestoreShipHeatRate(__instance, __state);
     }
 }
 
-[HarmonyPatch]
+[HarmonyPatch(typeof(Torch), "UpdatePower")]
 public static class LeviathanStarfireChargeRampPatch
 {
-    public static MethodBase TargetMethod()
-    {
-        return AccessTools.Method(typeof(Torch), "UpdatePower");
-    }
 
     public static void Prefix(
         Torch __instance,
@@ -1118,18 +1124,9 @@ public static class LeviathanStarfireChargeRampPatch
 /// For the one allowed source packet, establish a narrow context so RouteDamage
 /// can apply the Starfire damage multiplier without recreating Torch mechanics.
 /// </summary>
-[HarmonyPatch]
+[HarmonyPatch(typeof(Torch), "DoSpikeDamage")]
 public static class LeviathanStarfireDoSpikeDamagePatch
 {
-    public static MethodBase TargetMethod()
-    {
-        return typeof(Torch).GetMethods(
-                BindingFlags.Instance |
-                BindingFlags.Public |
-                BindingFlags.NonPublic
-            )
-            .FirstOrDefault(m => m.Name == "DoSpikeDamage");
-    }
 
     public static bool Prefix(
         Torch __instance,
@@ -1152,13 +1149,9 @@ public static class LeviathanStarfireDoSpikeDamagePatch
     }
 }
 
-[HarmonyPatch]
+[HarmonyPatch(typeof(Torch), "GetCritChance")]
 public static class LeviathanStarfireCritChancePatch
 {
-    public static MethodBase TargetMethod()
-    {
-        return AccessTools.Method(typeof(Torch), "GetCritChance");
-    }
 
     public static void Postfix(Torch __instance, ref float __result)
     {
@@ -1169,13 +1162,9 @@ public static class LeviathanStarfireCritChancePatch
     }
 }
 
-[HarmonyPatch]
+[HarmonyPatch(typeof(Torch), "GetCritModifier")]
 public static class LeviathanStarfireCritModifierPatch
 {
-    public static MethodBase TargetMethod()
-    {
-        return AccessTools.Method(typeof(Torch), "GetCritModifier");
-    }
 
     public static void Postfix(Torch __instance, ref float __result)
     {
@@ -1186,13 +1175,9 @@ public static class LeviathanStarfireCritModifierPatch
     }
 }
 
-[HarmonyPatch]
+[HarmonyPatch(typeof(Torch), "GetStatusEffectChance")]
 public static class LeviathanStarfireDebuffChancePatch
 {
-    public static MethodBase TargetMethod()
-    {
-        return AccessTools.Method(typeof(Torch), "GetStatusEffectChance");
-    }
 
     public static void Postfix(Torch __instance, ref float __result)
     {
