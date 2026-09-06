@@ -39,6 +39,14 @@ public static class LeviathanStarfireTree
         //     "Narrows the Starfire cone.",
         //     LeviathanFx.Increment(LeviathanStarfireKnobs.Width, -5f)
         // ));
+        //
+        // Typed functionality flags and multiplier knobs are also data-only:
+        //
+        // LeviathanFx.Flag(LeviathanStarfireFlags.RechargePull)
+        // LeviathanFx.Multiply(
+        //     LeviathanStarfireKnobs.BlastWaveDamageMultiplier,
+        //     1.25f
+        // )
 
         tree.Validate();
         return tree;

@@ -108,27 +108,25 @@ Forceful Exhalation (1):
 
 STAT MAPPING
 ------------
-Width:
-  multiplies Starfire WidthMultiplierByRank output.
+Starfire now exposes named knobs directly through LeviathanStarfireKnobs.cs.
 
-Length:
-  multiplies Starfire LengthMultiplierByRank output.
+Relative-percent knobs include Width, Length, Damage, Heat Generation,
+Charge Ramp Speed and overall Breath Duration.
 
-Damage:
-  multiplies Starfire DamageMultiplierByRank output.
+Critical Chance, Critical Damage and Status Chance use additive percentage
+points. Example: +5% Critical Chance changes a 10% source value to 15%.
 
-Debuff Chance:
-  multiplies Starfire DebuffChanceMultiplierByRank output.
+Breath timing is independently addressable through Full-Size Hold, Retreat
+Duration, Minimum Breath Length, Retreat Curve and Startup Delay. Duration is
+an overall multiplier on both hold and retreat time; it no longer changes
+charge-ramp speed.
 
-Duration:
-  inversely scales Starfire's ChargeRampSpeedMultiplierByRank. The current
-  Starfire charge ramp is also the longitudinal collapse clock, so +Duration
-  makes the breath shrink more slowly and -Duration makes it collapse faster.
+Native Activatable recovery can be changed together with RechargeTime or
+independently through Cooldown and RechargeSeconds.
 
-Recharge Time:
-  scales the source Torch's native Activatable.Cooldown and RechargeSeconds.
-  If a particular Torch has a zero native value for one of these, multiplying
-  zero naturally remains zero.
+Cone/hitbox/visual knobs also expose fan angle, muzzle width, hitbox width
+scale, center-length shaping, opacity, beam fill, minimum beam width, end
+feather, beam count and visual length-segment count.
 
 FILES
 -----

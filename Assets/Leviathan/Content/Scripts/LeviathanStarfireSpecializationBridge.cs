@@ -1,7 +1,5 @@
 using HarmonyLib;
 using StarVortex;
-using System;
-using System.Reflection;
 using UnityEngine;
 
 // Starfire is owned by its Evolution-tree unlock. The legacy native Starfire
@@ -38,112 +36,9 @@ public static class LeviathanStarfireSpecializationRootActivationPatch
     }
 }
 
-// Starfire's existing rank arrays remain the baseline implementation knobs.
-// Specialization nodes point at named knob objects; this bridge is the only
-// place that translates those knob modifiers into Starfire's runtime values.
-[HarmonyPatch]
-public static class LeviathanStarfireSpecializationRankValuePatch
-{
-    private static readonly FieldInfo LengthValues =
-        AccessTools.Field(typeof(LeviathanStarfireRuntime), "LengthMultiplierByRank");
-    private static readonly FieldInfo WidthValues =
-        AccessTools.Field(typeof(LeviathanStarfireRuntime), "WidthMultiplierByRank");
-    private static readonly FieldInfo DamageValues =
-        AccessTools.Field(typeof(LeviathanStarfireRuntime), "DamageMultiplierByRank");
-    private static readonly FieldInfo DebuffValues =
-        AccessTools.Field(typeof(LeviathanStarfireRuntime), "DebuffChanceMultiplierByRank");
-    private static readonly FieldInfo ChargeRampValues =
-        AccessTools.Field(typeof(LeviathanStarfireRuntime), "ChargeRampSpeedMultiplierByRank");
-
-    private static object lengthArray;
-    private static object widthArray;
-    private static object damageArray;
-    private static object debuffArray;
-    private static object chargeRampArray;
-
-    public static MethodBase TargetMethod()
-    {
-        return AccessTools.Method(
-            typeof(LeviathanStarfireRuntime),
-            "GetRankValue",
-            new Type[] { typeof(float[]), typeof(int) }
-        );
-    }
-
-    public static void Postfix(float[] __0, ref float __result)
-    {
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
-        if (pilot == null || __0 == null)
-            return;
-
-        ResolveArrays();
-
-        if (ReferenceEquals(__0, lengthArray))
-        {
-            __result *= LeviathanSpecializationRuntime.GetKnobMultiplier(
-                pilot,
-                LeviathanStarfireKnobs.Length
-            );
-            return;
-        }
-
-        if (ReferenceEquals(__0, widthArray))
-        {
-            __result *= LeviathanSpecializationRuntime.GetKnobMultiplier(
-                pilot,
-                LeviathanStarfireKnobs.Width
-            );
-            return;
-        }
-
-        if (ReferenceEquals(__0, damageArray))
-        {
-            __result *= LeviathanSpecializationRuntime.GetKnobMultiplier(
-                pilot,
-                LeviathanStarfireKnobs.Damage
-            );
-            return;
-        }
-
-        if (ReferenceEquals(__0, debuffArray))
-        {
-            __result *= LeviathanSpecializationRuntime.GetKnobMultiplier(
-                pilot,
-                LeviathanStarfireKnobs.DebuffChance
-            );
-            return;
-        }
-
-        if (ReferenceEquals(__0, chargeRampArray))
-        {
-            // More Duration slows Starfire's contraction clock; negative
-            // Duration nodes speed the contraction up using the same knob.
-            float duration = Mathf.Max(
-                0.05f,
-                LeviathanSpecializationRuntime.GetKnobMultiplier(
-                    pilot,
-                    LeviathanStarfireKnobs.Duration
-                )
-            );
-            __result /= duration;
-        }
-    }
-
-    private static void ResolveArrays()
-    {
-        if (lengthArray == null && LengthValues != null)
-            lengthArray = LengthValues.GetValue(null);
-        if (widthArray == null && WidthValues != null)
-            widthArray = WidthValues.GetValue(null);
-        if (damageArray == null && DamageValues != null)
-            damageArray = DamageValues.GetValue(null);
-        if (debuffArray == null && DebuffValues != null)
-            debuffArray = DebuffValues.GetValue(null);
-        if (chargeRampArray == null && ChargeRampValues != null)
-            chargeRampArray = ChargeRampValues.GetValue(null);
-    }
-}
-
+// Starfire-owned values read their named knobs directly inside
+// LeviathanStarfireRuntime. Native Activatable properties still need Harmony
+// hooks because those values live in Star Vortex rather than Starfire code.
 [HarmonyPatch(typeof(Activatable), "get_Cooldown")]
 public static class LeviathanStarfireSpecializationCooldownPatch
 {
@@ -153,7 +48,9 @@ public static class LeviathanStarfireSpecializationCooldownPatch
         if (!IsCurrentStarfireSource(torch))
             return;
 
-        __result *= GetRechargeMultiplier();
+        __result *= GetRecoveryMultiplier(
+            LeviathanStarfireKnobs.Cooldown
+        );
     }
 
     internal static bool IsCurrentStarfireSource(Torch torch)
@@ -190,15 +87,23 @@ public static class LeviathanStarfireSpecializationCooldownPatch
         return false;
     }
 
-    internal static float GetRechargeMultiplier()
+    internal static float GetRecoveryMultiplier(
+        LeviathanSpecializationKnob specificKnob)
     {
         Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
-        return pilot == null
-            ? 1f
-            : LeviathanSpecializationRuntime.GetKnobMultiplier(
-                pilot,
-                LeviathanStarfireKnobs.RechargeTime
-            );
+        if (pilot == null)
+            return 1f;
+
+        float common = LeviathanSpecializationRuntime.GetKnobMultiplier(
+            pilot,
+            LeviathanStarfireKnobs.RechargeTime
+        );
+        float specific = LeviathanSpecializationRuntime.GetKnobMultiplier(
+            pilot,
+            specificKnob
+        );
+
+        return Mathf.Max(0f, common * specific);
     }
 }
 
@@ -211,7 +116,8 @@ public static class LeviathanStarfireSpecializationRechargePatch
         if (!LeviathanStarfireSpecializationCooldownPatch.IsCurrentStarfireSource(torch))
             return;
 
-        __result *=
-            LeviathanStarfireSpecializationCooldownPatch.GetRechargeMultiplier();
+        __result *= LeviathanStarfireSpecializationCooldownPatch.GetRecoveryMultiplier(
+            LeviathanStarfireKnobs.RechargeSeconds
+        );
     }
 }

@@ -37,7 +37,9 @@ public enum LeviathanTreeUnlockKind
 public enum LeviathanKnobKind
 {
     Flat,
-    Percent
+    Percent,
+    PercentagePoints,
+    Multiplier
 }
 
 public interface ILeviathanSpecializationRankSource
@@ -260,6 +262,33 @@ public static class LeviathanReq
     }
 }
 
+public sealed class LeviathanSpecializationFlag
+{
+    public readonly string Id;
+    public readonly string Name;
+
+    private LeviathanSpecializationFlag(string id, string name)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentException("Flag id is required.", "id");
+
+        Id = id;
+        Name = string.IsNullOrWhiteSpace(name) ? id : name;
+    }
+
+    public static LeviathanSpecializationFlag Create(
+        string id,
+        string name)
+    {
+        return new LeviathanSpecializationFlag(id, name);
+    }
+
+    public static LeviathanSpecializationFlag Create(string id)
+    {
+        return Create(id, id);
+    }
+}
+
 public sealed class LeviathanSpecializationKnob
 {
     public readonly string Id;
@@ -307,9 +336,53 @@ public sealed class LeviathanSpecializationKnob
         );
     }
 
+    public static LeviathanSpecializationKnob Flat(
+        string id,
+        string name)
+    {
+        return Flat(id, name, string.Empty);
+    }
+
+    // Human-readable percentage points that aggregate additively.
+    // Example: +5 on a 10% crit chance becomes 15%, not 10.5%.
+    // Tree definitions still write 5f; runtime storage is 0.05f.
+    public static LeviathanSpecializationKnob PercentagePoints(
+        string id,
+        string name)
+    {
+        return new LeviathanSpecializationKnob(
+            id,
+            name,
+            LeviathanKnobKind.PercentagePoints,
+            "%"
+        );
+    }
+
+    // Multipliers are authored as actual factors. Example: 1.25 means x1.25.
+    public static LeviathanSpecializationKnob Multiplier(
+        string id,
+        string name)
+    {
+        return new LeviathanSpecializationKnob(
+            id,
+            name,
+            LeviathanKnobKind.Multiplier,
+            "x"
+        );
+    }
+
+    internal bool UsesPercentDefinition
+    {
+        get
+        {
+            return Kind == LeviathanKnobKind.Percent ||
+                Kind == LeviathanKnobKind.PercentagePoints;
+        }
+    }
+
     internal float ConvertDefinitionValue(float value)
     {
-        return Kind == LeviathanKnobKind.Percent
+        return UsesPercentDefinition
             ? value / 100f
             : value;
     }
@@ -318,8 +391,11 @@ public sealed class LeviathanSpecializationKnob
     {
         string sign = value >= 0f ? "+" : string.Empty;
 
-        if (Kind == LeviathanKnobKind.Percent)
+        if (UsesPercentDefinition)
             return sign + value.ToString("0.###") + "% " + Name;
+
+        if (Kind == LeviathanKnobKind.Multiplier)
+            return "x" + value.ToString("0.###") + " " + Name;
 
         return sign + value.ToString("0.###") +
             (string.IsNullOrEmpty(UnitSuffix) ? " " : UnitSuffix + " ") +
@@ -332,6 +408,7 @@ public sealed class LeviathanSpecializationEffect
     public readonly LeviathanSpecializationEffectType Type;
     public readonly string Key;
     public readonly LeviathanSpecializationKnob Knob;
+    public LeviathanSpecializationFlag FlagDefinition { get; private set; }
 
     private readonly bool hasConstantIncrement;
     private readonly float constantIncrement;
@@ -363,9 +440,11 @@ public sealed class LeviathanSpecializationEffect
             throw new ArgumentNullException("knob");
 
         return new LeviathanSpecializationEffect(
-            knob.Kind == LeviathanKnobKind.Percent
-                ? LeviathanSpecializationEffectType.Percent
-                : LeviathanSpecializationEffectType.Flat,
+            knob.Kind == LeviathanKnobKind.Multiplier
+                ? LeviathanSpecializationEffectType.Multiplier
+                : knob.Kind == LeviathanKnobKind.Percent
+                    ? LeviathanSpecializationEffectType.Percent
+                    : LeviathanSpecializationEffectType.Flat,
             knob.Id,
             knob,
             true,
@@ -389,9 +468,11 @@ public sealed class LeviathanSpecializationEffect
             converted[i] = knob.ConvertDefinitionValue(valuesByRank[i]);
 
         return new LeviathanSpecializationEffect(
-            knob.Kind == LeviathanKnobKind.Percent
-                ? LeviathanSpecializationEffectType.Percent
-                : LeviathanSpecializationEffectType.Flat,
+            knob.Kind == LeviathanKnobKind.Multiplier
+                ? LeviathanSpecializationEffectType.Multiplier
+                : knob.Kind == LeviathanKnobKind.Percent
+                    ? LeviathanSpecializationEffectType.Percent
+                    : LeviathanSpecializationEffectType.Flat,
             knob.Id,
             knob,
             false,
@@ -458,6 +539,17 @@ public sealed class LeviathanSpecializationEffect
         );
     }
 
+    public static LeviathanSpecializationEffect Flag(
+        LeviathanSpecializationFlag flag)
+    {
+        if (flag == null)
+            throw new ArgumentNullException("flag");
+
+        LeviathanSpecializationEffect effect = Flag(flag.Id);
+        effect.FlagDefinition = flag;
+        return effect;
+    }
+
     public static LeviathanSpecializationEffect UnlockTree(string treeId)
     {
         return new LeviathanSpecializationEffect(
@@ -520,7 +612,9 @@ public sealed class LeviathanSpecializationEffect
 
         if (Type == LeviathanSpecializationEffectType.Flag)
         {
-            string flagName = fallbackResolver == null ? Key : fallbackResolver(Key);
+            string flagName = FlagDefinition != null
+                ? FlagDefinition.Name
+                : fallbackResolver == null ? Key : fallbackResolver(Key);
             return "Enables " + flagName;
         }
 
@@ -536,14 +630,14 @@ public sealed class LeviathanSpecializationEffect
             float rawDefinitionValue;
             if (hasConstantIncrement)
             {
-                rawDefinitionValue = Knob.Kind == LeviathanKnobKind.Percent
+                rawDefinitionValue = Knob.UsesPercentDefinition
                     ? constantIncrement * 100f
                     : constantIncrement;
             }
             else
             {
                 int index = Math.Min(rankIndex - 1, perRankIncrements.Length - 1);
-                rawDefinitionValue = Knob.Kind == LeviathanKnobKind.Percent
+                rawDefinitionValue = Knob.UsesPercentDefinition
                     ? perRankIncrements[index] * 100f
                     : perRankIncrements[index];
             }
@@ -598,9 +692,53 @@ public static class LeviathanFx
         return LeviathanSpecializationEffect.KnobRanks(knob, valuesByRank);
     }
 
+    // Explicit multiplier helper for multiplier knobs. Example:
+    // Multiply(knob, 1.25f) => x1.25 for each purchased rank.
+    public static LeviathanSpecializationEffect Multiply(
+        LeviathanSpecializationKnob knob,
+        float factorPerRank)
+    {
+        if (knob == null)
+            throw new ArgumentNullException("knob");
+        if (knob.Kind != LeviathanKnobKind.Multiplier)
+            throw new ArgumentException(
+                "Multiply requires a Multiplier knob.",
+                "knob"
+            );
+
+        return LeviathanSpecializationEffect.KnobIncrement(
+            knob,
+            factorPerRank
+        );
+    }
+
+    public static LeviathanSpecializationEffect MultiplyRanks(
+        LeviathanSpecializationKnob knob,
+        params float[] factorsByRank)
+    {
+        if (knob == null)
+            throw new ArgumentNullException("knob");
+        if (knob.Kind != LeviathanKnobKind.Multiplier)
+            throw new ArgumentException(
+                "MultiplyRanks requires a Multiplier knob.",
+                "knob"
+            );
+
+        return LeviathanSpecializationEffect.KnobRanks(
+            knob,
+            factorsByRank
+        );
+    }
+
     public static LeviathanSpecializationEffect Flag(string flagId)
     {
         return LeviathanSpecializationEffect.Flag(flagId);
+    }
+
+    public static LeviathanSpecializationEffect Flag(
+        LeviathanSpecializationFlag flag)
+    {
+        return LeviathanSpecializationEffect.Flag(flag);
     }
 
     public static LeviathanSpecializationEffect UnlockTree(string treeId)

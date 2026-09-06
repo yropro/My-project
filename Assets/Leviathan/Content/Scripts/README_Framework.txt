@@ -42,13 +42,18 @@ Tree definitions:
     LeviathanBehemothTree.cs
     LeviathanStellarConverterTree.cs
 
-Skill-side knob bridge (first example):
+Skill-side knob surface / integration (first example):
     LeviathanStarfireKnobs.cs
+    LeviathanStarfire.cs
     LeviathanStarfireSpecializationBridge.cs
 
 The framework does not know what Width, Damage, LungeDistance, etc. mean.
-A skill exposes named knobs. Tree nodes point at those knobs. The skill-side
-bridge reads the final knob result and applies it to the skill's actual code.
+A skill exposes named knobs and tree nodes point at those knobs.
+
+Preferred integration:
+    Values owned by mod skill code read their knobs directly in that skill.
+    A Harmony bridge is only needed for values owned by native Star Vortex code
+    or for activation/unlock boundaries that cannot be changed directly.
 
 
 NODE -> KNOB SYNTAX
@@ -111,7 +116,7 @@ Percent knob:
     public static readonly LeviathanSpecializationKnob Width =
         LeviathanSpecializationKnob.Percent("starfire.width", "Width");
 
-Flat knob (example for future skill code):
+Flat knob:
 
     public static readonly LeviathanSpecializationKnob ChargeTimeSeconds =
         LeviathanSpecializationKnob.Flat(
@@ -126,6 +131,26 @@ Then the tree can say:
 
 and the effect is +0.20 seconds each rank rather than +20%.
 
+Additive percentage-points knob:
+
+    public static readonly LeviathanSpecializationKnob CritChance =
+        LeviathanSpecializationKnob.PercentagePoints(
+            "starfire.crit_chance",
+            "Critical Chance"
+        );
+
+Then:
+
+    LeviathanFx.Increment(CritChance, 5f)
+
+means +5 percentage points. A source weapon with 10% crit becomes 15%.
+This is intentionally different from Percent(), where +5 means multiply the
+existing value by 1.05.
+
+PercentagePoints is also appropriate for status chance, crit-damage bonus,
+opacity, and other values stored internally as decimal fractions where the
+authored talent should say things like +5%.
+
 
 READING A KNOB FROM SKILL FUNCTIONALITY
 ---------------------------------------
@@ -136,12 +161,14 @@ For percentage-style scaling:
         LeviathanStarfireKnobs.Width
     );
 
-For a flat knob:
+For a flat or percentage-points knob:
 
     value += LeviathanSpecializationRuntime.GetKnobFlat(
         pilot,
         SomeSkillKnobs.SomeFlatValue
     );
+
+PercentagePoints returns decimal flat values here: authored +5% returns 0.05.
 
 Or let the framework do both:
 
@@ -198,5 +225,129 @@ ADDING A NEW TREE
 1. Create a tree definition file with a stable tree ID and granted root.
 2. Register it in LeviathanSpecializationCatalog.cs.
 3. Add an Evolution node with LeviathanFx.UnlockTree(newTreeId).
-4. Expose knobs from that skill's functionality/bridge as needed.
-5. Add nodes to its tree definition. Renderer/runtime/save logic does not change.
+4. Expose named knobs for the skill.
+5. Read mod-owned values directly through those knobs; use a bridge only when
+   the underlying value belongs to native Star Vortex code.
+6. Add nodes to its tree definition. Renderer/runtime/save logic does not change.
+
+
+STARFIRE EXPOSED KNOBS
+----------------------
+Core gameplay:
+    HeatGeneration
+    Length
+    Width
+    Damage
+    CritChance             additive percentage points
+    CritDamage             additive percentage points
+    StatusChance           additive percentage points
+
+Breath / charge timing:
+    Duration               overall percent multiplier on hold + retreat
+    FullSizeHoldSeconds
+    RetreatSeconds
+    MinimumLength          additive percentage points
+    RetreatCurveExponent
+    StartupDelaySeconds
+    ChargeRampSpeed
+    RechargeTime           common native recovery multiplier
+    Cooldown               native Activatable cooldown only
+    RechargeSeconds        native Activatable recharge only
+
+Cone / hitbox:
+    BaseFanHalfAngleDegrees
+    MuzzleWidth            additive percentage points
+    HitboxWidthPadding     additive percentage points
+    CenterLengthBonus      additive percentage points
+
+Cosmetic plume:
+    VisualOpacity          additive percentage points
+    VisualBeamFill         additive percentage points
+    VisualMinimumBeamWidth additive percentage points
+    VisualEndFeather       additive percentage points
+    VisualBeamCount        flat integer after rounding
+    VisualLengthSegments   flat integer after rounding
+
+All Starfire-owned values are read directly through these knobs. Native
+Activatable cooldown/recharge values remain in the Starfire specialization
+bridge because those properties belong to Star Vortex itself.
+
+FRAMEWORK v4 ADDITIONS
+----------------------
+Named multiplier knobs:
+
+    public static readonly LeviathanSpecializationKnob DamageFactor =
+        LeviathanSpecializationKnob.Multiplier(
+            "example.damage_factor",
+            "Damage Factor"
+        );
+
+    LeviathanFx.Multiply(DamageFactor, 1.25f)
+
+means x1.25 per purchased rank. MultiplyRanks() is also available for explicit
+per-rank factors. Generic Ranks() also works with Multiplier knobs.
+
+Typed feature flags:
+
+    public static readonly LeviathanSpecializationFlag SomeMode =
+        LeviathanSpecializationFlag.Create(
+            "example.some_mode",
+            "Some Mode"
+        );
+
+    LeviathanFx.Flag(SomeMode)
+
+Runtime feature code can then use:
+
+    LeviathanSpecializationRuntime.HasFlag(pilot, SomeMode)
+
+Named flag lookup scans every unlocked registered tree, just like named knob
+aggregation. Runtime functionality therefore does not need a source tree ID.
+
+
+STARFIRE PERSISTENT BREATH MODEL
+--------------------------------
+Starfire now owns a persistent breath reservoir instead of resetting its falloff
+clock on every trigger release.
+
+Baseline specialization Starfire:
+    Full-power capacity:        1.50 seconds
+    Falloff capacity:           2.00 seconds
+    Total reservoir:            3.50 breath-seconds
+    Active drain:               1.00 breath-second / second
+    Idle recovery:              0.50 breath-second / second
+    Empty-to-full recovery:     about 7 seconds
+    Recovery delay:             0 seconds
+
+Windup does not consume breath. Releasing preserves the remaining reservoir and
+starts recovery. Damage, length and angular width all read the same reservoir,
+but have independent minimum values and falloff curves.
+
+Persistent-breath knobs:
+    Duration
+    FullSizeHoldSeconds
+    RetreatSeconds
+    ActiveDrainRate
+    RecoveryRate
+    RecoverySecondsPerSecond
+    RecoveryDelaySeconds
+    RecoveryCurveExponent
+    RetreatCurveExponent
+    DamageFalloffCurveExponent
+    LengthFalloffCurveExponent
+    WidthFalloffCurveExponent
+    MinimumDamage
+    MinimumLength
+    MinimumWidth
+
+Starfire exposes public state helpers for future conditional talents:
+    GetBreathPower01(torch)
+    GetBreathRemainingSeconds(torch)
+    IsBreathRecovering(torch)
+
+This is the intended hook for effects such as Recharge Pull / Big Succ.
+
+Additional Starfire feature surfaces are already named for future tree content:
+    RechargePull flag + radius/strength/falloff/max-speed knobs
+    BlastWave flag + arc/damage-seconds/damage-multiplier/speed/range/width/
+        duration/falloff/opacity/knockback knobs

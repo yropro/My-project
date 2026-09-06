@@ -939,6 +939,39 @@ public static class LeviathanSpecializationRuntime
             state.HasFlag(tree, flagId);
     }
 
+    // Named flags resolve globally across every unlocked specialization tree,
+    // mirroring named knob aggregation. Runtime functionality no longer needs to
+    // know which tree granted a feature.
+    public static bool HasFlag(
+        Pilot pilot,
+        LeviathanSpecializationFlag flag)
+    {
+        if (pilot == null || flag == null)
+            return false;
+
+        RegisterDefaults();
+        IList<LeviathanSpecializationTree> trees =
+            LeviathanSpecializationRegistry.All();
+
+        for (int i = 0; i < trees.Count; i++)
+        {
+            LeviathanSpecializationTree tree = trees[i];
+            if (!IsTreeUnlockedRaw(pilot, tree))
+                continue;
+
+            LeviathanSpecializationState state = GetState(pilot, tree.Id);
+            if (state != null && state.HasFlag(tree, flag.Id))
+                return true;
+        }
+
+        return false;
+    }
+
+    public static bool HasFlag(LeviathanSpecializationFlag flag)
+    {
+        return HasFlag(GetCurrentPilot(), flag);
+    }
+
     public static Pilot GetCurrentPilot()
     {
         if (WorldController.instance != null)
