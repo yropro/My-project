@@ -3,12 +3,9 @@ using StarVortex;
 using System;
 using System.Reflection;
 using UnityEngine;
-using static StarVortex.Damageable;
 
-// A purchased specialization root owns Starfire. While it is active, the old
-// native Starfire rank is ignored and Starfire runs from its rank-1 baseline;
-// all additional scaling comes from specialization nodes. If the root is absent,
-// the old native Starfire skill remains a legacy fallback.
+// Starfire is owned by its Evolution-tree unlock. The legacy native Starfire
+// skill remains a fallback only when the specialization tree is not unlocked.
 [HarmonyPatch(typeof(LeviathanStarfireRuntime), "TryGetStarfireRank")]
 public static class LeviathanStarfireSpecializationRootActivationPatch
 {
@@ -24,10 +21,9 @@ public static class LeviathanStarfireSpecializationRootActivationPatch
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
         if (pilot == null ||
-            !LeviathanSpecializationRuntime.HasNode(
+            !LeviathanSpecializationRuntime.IsTreeActive(
                 pilot,
-                LeviathanStarfireSpecialization.TreeId,
-                LeviathanStarfireSpecialization.RootNodeId) ||
+                LeviathanStarfireTree.TreeId) ||
             pilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade) < 1 ||
             LeviathanMod.Controller.GetActiveSectionCount(player) <
                 LeviathanGrowth.GetBodySegmentCountForRank(1) + 2)
@@ -35,14 +31,16 @@ public static class LeviathanStarfireSpecializationRootActivationPatch
             return;
         }
 
+        // Tree unlock grants the skill's rank-1 baseline. Specialization nodes
+        // modify exposed knobs instead of pretending to be native skill ranks.
         rank = 1;
         __result = true;
     }
 }
 
-// Applies generic Starfire specialization stats at the same rank-value boundary
-// already used by LeviathanStarfireRuntime. This keeps the tree data-driven:
-// adding another +X% Width node does not require another gameplay patch.
+// Starfire's existing rank arrays remain the baseline implementation knobs.
+// Specialization nodes point at named knob objects; this bridge is the only
+// place that translates those knob modifiers into Starfire's runtime values.
 [HarmonyPatch]
 public static class LeviathanStarfireSpecializationRankValuePatch
 {
@@ -54,8 +52,6 @@ public static class LeviathanStarfireSpecializationRankValuePatch
         AccessTools.Field(typeof(LeviathanStarfireRuntime), "DamageMultiplierByRank");
     private static readonly FieldInfo DebuffValues =
         AccessTools.Field(typeof(LeviathanStarfireRuntime), "DebuffChanceMultiplierByRank");
-    private static readonly FieldInfo StartupValues =
-        AccessTools.Field(typeof(LeviathanStarfireRuntime), "StartupDelaySecondsByRank");
     private static readonly FieldInfo ChargeRampValues =
         AccessTools.Field(typeof(LeviathanStarfireRuntime), "ChargeRampSpeedMultiplierByRank");
 
@@ -63,7 +59,6 @@ public static class LeviathanStarfireSpecializationRankValuePatch
     private static object widthArray;
     private static object damageArray;
     private static object debuffArray;
-    private static object startupArray;
     private static object chargeRampArray;
 
     public static MethodBase TargetMethod()
@@ -85,76 +80,53 @@ public static class LeviathanStarfireSpecializationRankValuePatch
 
         if (ReferenceEquals(__0, lengthArray))
         {
-            __result *= Get(
+            __result *= LeviathanSpecializationRuntime.GetKnobMultiplier(
                 pilot,
-                LeviathanStarfireSpecialization.Stats.Length
+                LeviathanStarfireKnobs.Length
             );
             return;
         }
 
         if (ReferenceEquals(__0, widthArray))
         {
-            __result *= Get(
+            __result *= LeviathanSpecializationRuntime.GetKnobMultiplier(
                 pilot,
-                LeviathanStarfireSpecialization.Stats.Width
+                LeviathanStarfireKnobs.Width
             );
             return;
         }
 
         if (ReferenceEquals(__0, damageArray))
         {
-            __result *= Get(
+            __result *= LeviathanSpecializationRuntime.GetKnobMultiplier(
                 pilot,
-                LeviathanStarfireSpecialization.Stats.Damage
+                LeviathanStarfireKnobs.Damage
             );
             return;
         }
 
         if (ReferenceEquals(__0, debuffArray))
         {
-            __result *= Get(
+            __result *= LeviathanSpecializationRuntime.GetKnobMultiplier(
                 pilot,
-                LeviathanStarfireSpecialization.Stats.DebuffChance
+                LeviathanStarfireKnobs.DebuffChance
             );
             return;
         }
 
         if (ReferenceEquals(__0, chargeRampArray))
         {
-            // Native Starfire's charge ramp is also its longitudinal contraction
-            // clock. More Duration means a slower ramp; less Duration collapses it
-            // faster. This makes the generic Duration stat immediately tangible.
+            // More Duration slows Starfire's contraction clock; negative
+            // Duration nodes speed the contraction up using the same knob.
             float duration = Mathf.Max(
                 0.05f,
-                Get(pilot, LeviathanStarfireSpecialization.Stats.Duration)
+                LeviathanSpecializationRuntime.GetKnobMultiplier(
+                    pilot,
+                    LeviathanStarfireKnobs.Duration
+                )
             );
             __result /= duration;
-            return;
         }
-
-        if (ReferenceEquals(__0, startupArray) &&
-            Has(pilot, LeviathanStarfireSpecialization.Flags.DeepBreath))
-        {
-            __result += 0.75f;
-        }
-    }
-
-    private static float Get(Pilot pilot, string stat)
-    {
-        return LeviathanSpecializationRuntime.GetMultiplier(
-            pilot,
-            LeviathanStarfireSpecialization.TreeId,
-            stat
-        );
-    }
-
-    private static bool Has(Pilot pilot, string flag)
-    {
-        return LeviathanSpecializationRuntime.HasFlag(
-            pilot,
-            LeviathanStarfireSpecialization.TreeId,
-            flag
-        );
     }
 
     private static void ResolveArrays()
@@ -167,15 +139,11 @@ public static class LeviathanStarfireSpecializationRankValuePatch
             damageArray = DamageValues.GetValue(null);
         if (debuffArray == null && DebuffValues != null)
             debuffArray = DebuffValues.GetValue(null);
-        if (startupArray == null && StartupValues != null)
-            startupArray = StartupValues.GetValue(null);
         if (chargeRampArray == null && ChargeRampValues != null)
             chargeRampArray = ChargeRampValues.GetValue(null);
     }
 }
 
-// Recharge is a generic specialization stat too. Apply it to both native
-// cooldown and charge-recharge timing for Starfire's selected source Torch.
 [HarmonyPatch(typeof(Activatable), "get_Cooldown")]
 public static class LeviathanStarfireSpecializationCooldownPatch
 {
@@ -227,10 +195,9 @@ public static class LeviathanStarfireSpecializationCooldownPatch
         Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
         return pilot == null
             ? 1f
-            : LeviathanSpecializationRuntime.GetMultiplier(
+            : LeviathanSpecializationRuntime.GetKnobMultiplier(
                 pilot,
-                LeviathanStarfireSpecialization.TreeId,
-                LeviathanStarfireSpecialization.Stats.RechargeTime
+                LeviathanStarfireKnobs.RechargeTime
             );
     }
 }
@@ -246,62 +213,5 @@ public static class LeviathanStarfireSpecializationRechargePatch
 
         __result *=
             LeviathanStarfireSpecializationCooldownPatch.GetRechargeMultiplier();
-    }
-}
-
-// Forceful Exhalation gets a genuinely bursty opening window instead of only a
-// generic damage bonus. The normal specialization Damage multiplier has already
-// been applied when this Postfix runs.
-[HarmonyPatch(typeof(LeviathanStarfireRuntime), "ScaleNativeTorchDamage")]
-public static class LeviathanForcefulExhalationBurstPatch
-{
-    private static readonly FieldInfo CurrentDamageTorchField =
-        AccessTools.Field(typeof(LeviathanStarfireRuntime), "currentDamageTorch");
-
-    private static readonly FieldInfo ChargeField =
-        AccessTools.Field(typeof(Torch), "charge");
-
-    private const float OpeningChargeThreshold = 0.22f;
-    private const float OpeningBurstMultiplier = 1.60f;
-
-    public static void Postfix(object[] args)
-    {
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
-        if (pilot == null ||
-            !LeviathanSpecializationRuntime.HasFlag(
-                pilot,
-                LeviathanStarfireSpecialization.TreeId,
-                LeviathanStarfireSpecialization.Flags.ForcefulExhalation) ||
-            args == null ||
-            args.Length < 3)
-        {
-            return;
-        }
-
-        Torch torch = CurrentDamageTorchField == null
-            ? null
-            : CurrentDamageTorchField.GetValue(null) as Torch;
-
-        if (torch == null || ChargeField == null)
-            return;
-
-        object rawCharge = ChargeField.GetValue(torch);
-        if (!(rawCharge is float) || (float)rawCharge > OpeningChargeThreshold)
-            return;
-
-        DamageData[] packet = args[2] as DamageData[];
-        if (packet == null || packet.Length == 0)
-            return;
-
-        DamageData[] burst = new DamageData[packet.Length];
-        for (int i = 0; i < packet.Length; i++)
-        {
-            DamageData datum = packet[i];
-            datum.damage *= OpeningBurstMultiplier;
-            datum.dps *= OpeningBurstMultiplier;
-            burst[i] = datum;
-        }
-
-        args[2] = burst;
     }
 }

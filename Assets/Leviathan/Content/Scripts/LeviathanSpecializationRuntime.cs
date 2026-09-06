@@ -14,9 +14,6 @@ public interface ILeviathanSpecializationPointBank
     bool TryRefund(Pilot pilot, int amount, out string reason);
 }
 
-// Specialization currency is derived, not separately mutated:
-// Evolution rank * PointsPerRank - specialization ranks currently invested.
-// The native Evolution rank itself is persisted by Pilot as a normal Upgrade.
 public sealed class LeviathanGrowthPointBank : ILeviathanSpecializationPointBank
 {
     public bool IsAvailable(Pilot pilot, out string reason)
@@ -79,8 +76,6 @@ public sealed class LeviathanGrowthPointBank : ILeviathanSpecializationPointBank
             return false;
         }
 
-        // Spending is represented by the node rank itself. No second counter is
-        // mutated, so currency cannot drift out of sync with specialization state.
         return true;
     }
 
@@ -159,7 +154,7 @@ public static class LeviathanSpecializationPersistence
                     continue;
 
                 LeviathanSpecializationNode node = tree.GetNode(parts[1]);
-                if (node == null)
+                if (node == null || node.AutoGranted)
                     continue;
 
                 LeviathanSpecializationState state;
@@ -170,36 +165,6 @@ public static class LeviathanSpecializationPersistence
                 }
 
                 state.SetRank(node.Id, Math.Min(rank, node.MaxRank));
-            }
-
-            // Tree definitions will change during development. Remove only ranks
-            // that became illegal instead of rejecting the whole save file.
-            foreach (KeyValuePair<string, LeviathanSpecializationState> pair in states)
-            {
-                LeviathanSpecializationTree tree =
-                    LeviathanSpecializationRegistry.Get(pair.Key);
-
-                if (tree == null)
-                    continue;
-
-                bool changed = true;
-                while (changed)
-                {
-                    changed = false;
-                    string invalid;
-
-                    if (pair.Value.ValidateInvestedState(tree, out invalid))
-                        break;
-
-                    LeviathanSpecializationNode bad = tree.Nodes
-                        .FirstOrDefault(x => x.Name == invalid);
-
-                    if (bad == null)
-                        break;
-
-                    pair.Value.SetRank(bad.Id, 0);
-                    changed = true;
-                }
             }
 
             return true;
@@ -230,7 +195,7 @@ public static class LeviathanSpecializationPersistence
                 Directory.CreateDirectory(folder);
 
             List<string> lines = new List<string>();
-            lines.Add("# Leviathan specialization state v2");
+            lines.Add("# Leviathan specialization state v3");
 
             foreach (KeyValuePair<string, LeviathanSpecializationState> treeState in states)
             {
@@ -243,6 +208,9 @@ public static class LeviathanSpecializationPersistence
                 IList<LeviathanSpecializationNode> nodes = tree.Nodes;
                 for (int i = 0; i < nodes.Count; i++)
                 {
+                    if (nodes[i].AutoGranted)
+                        continue;
+
                     int rank = treeState.Value.GetRank(nodes[i].Id);
                     if (rank > 0)
                     {
@@ -334,39 +302,10 @@ public static class LeviathanSpecializationRuntime
             return;
 
         registeredDefaults = true;
-
-        LeviathanSpecializationRegistry.Register(
-            LeviathanStarfireSpecialization.Create(
-                (int)LeviathanSpecializationCurrency.UpgradeKey
-            )
-        );
+        LeviathanSpecializationCatalog.RegisterAll();
     }
 
-    private static void RetryPersistenceIfNeeded(
-        Pilot pilot,
-        LeviathanPilotSpecializationData playerData)
-    {
-        if (pilot == null ||
-            playerData == null ||
-            playerData.PersistenceReady)
-        {
-            return;
-        }
-
-        string retryReason;
-        bool ready = LeviathanSpecializationPersistence.Load(
-            pilot,
-            playerData.Trees,
-            out retryReason
-        );
-
-        playerData.PersistenceReady = ready;
-        playerData.PersistenceReason = retryReason;
-    }
-
-    public static LeviathanSpecializationState GetState(
-        Pilot pilot,
-        string treeId)
+    private static LeviathanPilotSpecializationData GetPilotData(Pilot pilot)
     {
         RegisterDefaults();
 
@@ -386,16 +325,39 @@ public static class LeviathanSpecializationRuntime
                 out persistenceReason
             );
             playerData.PersistenceReason = persistenceReason;
+
+            // Auto-granted roots are derived state and are intentionally not
+            // serialized. Rebuild them immediately after loading so persisted
+            // child nodes can satisfy their normal root prerequisites.
+            if (playerData.PersistenceReady)
+                SynchronizeAllAutoGrantedNodes(pilot);
         }
-        else
+        else if (!playerData.PersistenceReady)
         {
-            // F10 can be opened during scene transitions before Player.metaData is
-            // populated. Retry later instead of permanently pinning that Pilot to
-            // safety mode for the rest of the session. No spending is possible
-            // while persistence is unavailable, so re-loading here cannot overwrite
-            // legal unsaved investments.
-            RetryPersistenceIfNeeded(pilot, playerData);
+            string retryReason;
+            bool ready = LeviathanSpecializationPersistence.Load(
+                pilot,
+                playerData.Trees,
+                out retryReason
+            );
+
+            playerData.PersistenceReady = ready;
+            playerData.PersistenceReason = retryReason;
+
+            if (ready)
+                SynchronizeAllAutoGrantedNodes(pilot);
         }
+
+        return playerData;
+    }
+
+    private static LeviathanSpecializationState GetRawState(
+        Pilot pilot,
+        string treeId)
+    {
+        LeviathanPilotSpecializationData playerData = GetPilotData(pilot);
+        if (playerData == null)
+            return null;
 
         LeviathanSpecializationState state;
         if (!playerData.Trees.TryGetValue(treeId, out state))
@@ -407,12 +369,133 @@ public static class LeviathanSpecializationRuntime
         return state;
     }
 
+    public static LeviathanSpecializationState GetState(
+        Pilot pilot,
+        string treeId)
+    {
+        RegisterDefaults();
+        LeviathanSpecializationTree tree = LeviathanSpecializationRegistry.Get(treeId);
+        LeviathanSpecializationState state = GetRawState(pilot, treeId);
+
+        if (tree != null && state != null)
+            SynchronizeAutoGrantedNodes(pilot, tree, state);
+
+        return state;
+    }
+
+    private static void SynchronizeAllAutoGrantedNodes(Pilot pilot)
+    {
+        IList<LeviathanSpecializationTree> trees =
+            LeviathanSpecializationRegistry.All();
+
+        for (int i = 0; i < trees.Count; i++)
+        {
+            LeviathanSpecializationState state = GetRawState(pilot, trees[i].Id);
+            SynchronizeAutoGrantedNodes(pilot, trees[i], state);
+        }
+    }
+
+    private static void SynchronizeAutoGrantedNodes(
+        Pilot pilot,
+        LeviathanSpecializationTree tree,
+        LeviathanSpecializationState state)
+    {
+        if (tree == null || state == null)
+            return;
+
+        bool unlocked = IsTreeUnlockedRaw(pilot, tree);
+        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            if (!nodes[i].AutoGranted)
+                continue;
+
+            state.SetRank(nodes[i].Id, unlocked ? nodes[i].MaxRank : 0);
+        }
+    }
+
+    public static bool IsTreeUnlocked(Pilot pilot, string treeId)
+    {
+        RegisterDefaults();
+        LeviathanSpecializationTree tree = LeviathanSpecializationRegistry.Get(treeId);
+        return IsTreeUnlockedRaw(pilot, tree);
+    }
+
     public static bool IsTreeUnlocked(Pilot pilot, LeviathanSpecializationTree tree)
+    {
+        RegisterDefaults();
+        return IsTreeUnlockedRaw(pilot, tree);
+    }
+
+    public static bool IsTreeActive(Pilot pilot, string treeId)
+    {
+        return IsTreeUnlocked(pilot, treeId);
+    }
+
+    private static bool IsTreeUnlockedRaw(
+        Pilot pilot,
+        LeviathanSpecializationTree tree)
+    {
+        return IsTreeUnlockedRaw(
+            pilot,
+            tree,
+            new HashSet<string>(StringComparer.Ordinal)
+        );
+    }
+
+    private static bool IsTreeUnlockedRaw(
+        Pilot pilot,
+        LeviathanSpecializationTree tree,
+        HashSet<string> path)
     {
         if (pilot == null || tree == null)
             return false;
 
-        return pilot.GetUpgradeLevel((Upgrade.Key)tree.OwnerUpgradeKey) >= 1;
+        if (!path.Add(tree.Id))
+            return false;
+
+        try
+        {
+            if (tree.UnlockKind == LeviathanTreeUnlockKind.Always)
+                return true;
+
+            if (tree.UnlockKind == LeviathanTreeUnlockKind.NativeUpgrade)
+            {
+                return pilot.GetUpgradeLevel(
+                    (Upgrade.Key)tree.NativeUnlockUpgradeKey
+                ) >= 1;
+            }
+
+            IList<LeviathanSpecializationTree> all =
+                LeviathanSpecializationRegistry.All();
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                LeviathanSpecializationTree sourceTree = all[i];
+
+                if (sourceTree.Id == tree.Id ||
+                    !IsTreeUnlockedRaw(pilot, sourceTree, path))
+                {
+                    continue;
+                }
+
+                LeviathanSpecializationState state =
+                    GetRawState(pilot, sourceTree.Id);
+
+                if (state != null &&
+                    state.HasUnlockTreeEffect(sourceTree, tree.Id))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            path.Remove(tree.Id);
+        }
     }
 
     public static bool CanSafelySpend(Pilot pilot, out string reason)
@@ -426,8 +509,12 @@ public static class LeviathanSpecializationRuntime
             return false;
         }
 
-        GetState(pilot, LeviathanStarfireSpecialization.TreeId);
-        LeviathanPilotSpecializationData playerData = data[pilot];
+        LeviathanPilotSpecializationData playerData = GetPilotData(pilot);
+        if (playerData == null)
+        {
+            reason = "No specialization state.";
+            return false;
+        }
 
         if (!playerData.PersistenceReady)
         {
@@ -438,7 +525,7 @@ public static class LeviathanSpecializationRuntime
         return PointBank != null && PointBank.IsAvailable(pilot, out reason);
     }
 
-    public static bool TryInvest(
+    public static bool CanInvest(
         Pilot pilot,
         string treeId,
         string nodeId,
@@ -454,9 +541,9 @@ public static class LeviathanSpecializationRuntime
             return false;
         }
 
-        if (!IsTreeUnlocked(pilot, tree))
+        if (!IsTreeUnlockedRaw(pilot, tree))
         {
-            reason = "Evolution is not unlocked.";
+            reason = tree.Name + " is locked. Unlock it from Evolution first.";
             return false;
         }
 
@@ -467,27 +554,66 @@ public static class LeviathanSpecializationRuntime
         if (!state.CanInvest(tree, nodeId, out reason))
             return false;
 
-        if (!PointBank.TrySpend(pilot, 1, out reason))
-            return false;
+        LeviathanSpecializationNode node = tree.GetNode(nodeId);
+        int cost = node == null ? 1 : node.PointCostPerRank;
 
-        if (!state.TryInvest(tree, nodeId, out reason))
-            return false;
-
-        LeviathanPilotSpecializationData playerData = data[pilot];
-        if (!LeviathanSpecializationPersistence.Save(
-                pilot,
-                playerData.Trees,
-                out reason))
+        if (GetAvailablePoints(pilot) < cost)
         {
-            string ignored;
-            state.TryRefund(tree, nodeId, out ignored);
+            reason = "Not enough Growth Points.";
             return false;
         }
 
         return true;
     }
 
-    public static bool TryRefund(
+    public static bool TryInvest(
+        Pilot pilot,
+        string treeId,
+        string nodeId,
+        out string reason)
+    {
+        reason = string.Empty;
+
+        if (!CanInvest(pilot, treeId, nodeId, out reason))
+            return false;
+
+        LeviathanSpecializationTree tree = LeviathanSpecializationRegistry.Get(treeId);
+        LeviathanSpecializationState state = GetState(pilot, treeId);
+        LeviathanSpecializationNode node = tree.GetNode(nodeId);
+        int cost = node.PointCostPerRank;
+
+        if (!PointBank.TrySpend(pilot, cost, out reason))
+            return false;
+
+        if (!state.TryInvest(tree, nodeId, out reason))
+            return false;
+
+        SynchronizeAllAutoGrantedNodes(pilot);
+
+        string invalid;
+        if (!ValidateAllInvestedState(pilot, out invalid))
+        {
+            state.SetRank(nodeId, state.GetRank(nodeId) - 1);
+            SynchronizeAllAutoGrantedNodes(pilot);
+            reason = invalid;
+            return false;
+        }
+
+        LeviathanPilotSpecializationData playerData = GetPilotData(pilot);
+        if (!LeviathanSpecializationPersistence.Save(
+                pilot,
+                playerData.Trees,
+                out reason))
+        {
+            state.SetRank(nodeId, state.GetRank(nodeId) - 1);
+            SynchronizeAllAutoGrantedNodes(pilot);
+            return false;
+        }
+
+        return true;
+    }
+
+    public static bool CanRefund(
         Pilot pilot,
         string treeId,
         string nodeId,
@@ -508,21 +634,95 @@ public static class LeviathanSpecializationRuntime
         if (!CanSafelySpend(pilot, out reason))
             return false;
 
-        if (!state.TryRefund(tree, nodeId, out reason))
+        if (!state.CanRefund(tree, nodeId, out reason))
             return false;
 
-        LeviathanPilotSpecializationData playerData = data[pilot];
+        int oldRank = state.GetRank(nodeId);
+        state.SetRank(nodeId, oldRank - 1);
+        SynchronizeAllAutoGrantedNodes(pilot);
+
+        string invalid;
+        bool valid = ValidateAllInvestedState(pilot, out invalid);
+
+        state.SetRank(nodeId, oldRank);
+        SynchronizeAllAutoGrantedNodes(pilot);
+
+        if (!valid)
+        {
+            reason = invalid;
+            return false;
+        }
+
+        return true;
+    }
+
+    public static bool TryRefund(
+        Pilot pilot,
+        string treeId,
+        string nodeId,
+        out string reason)
+    {
+        if (!CanRefund(pilot, treeId, nodeId, out reason))
+            return false;
+
+        LeviathanSpecializationTree tree = LeviathanSpecializationRegistry.Get(treeId);
+        LeviathanSpecializationState state = GetState(pilot, treeId);
+        LeviathanSpecializationNode node = tree.GetNode(nodeId);
+        int oldRank = state.GetRank(nodeId);
+
+        state.SetRank(nodeId, oldRank - 1);
+        SynchronizeAllAutoGrantedNodes(pilot);
+
+        LeviathanPilotSpecializationData playerData = GetPilotData(pilot);
         if (!LeviathanSpecializationPersistence.Save(
                 pilot,
                 playerData.Trees,
                 out reason))
         {
-            // Save failed; restore the refunded rank. The pre-refund state was
-            // valid, so direct SetRank is safer than re-running current prereqs.
-            LeviathanSpecializationNode node = tree.GetNode(nodeId);
-            if (node != null)
-                state.SetRank(node.Id, state.GetRank(node.Id) + 1);
+            state.SetRank(nodeId, oldRank);
+            SynchronizeAllAutoGrantedNodes(pilot);
             return false;
+        }
+
+        if (PointBank != null)
+        {
+            string ignored;
+            PointBank.TryRefund(pilot, node.PointCostPerRank, out ignored);
+        }
+
+        return true;
+    }
+
+    private static bool ValidateAllInvestedState(Pilot pilot, out string reason)
+    {
+        reason = string.Empty;
+        IList<LeviathanSpecializationTree> trees =
+            LeviathanSpecializationRegistry.All();
+
+        for (int i = 0; i < trees.Count; i++)
+        {
+            LeviathanSpecializationTree tree = trees[i];
+            LeviathanSpecializationState state = GetRawState(pilot, tree.Id);
+            if (state == null)
+                continue;
+
+            int paid = state.GetSpentPointCost(tree);
+            if (paid > 0 && !IsTreeUnlockedRaw(pilot, tree))
+            {
+                reason = "Refund points from " + tree.Name +
+                    " before removing its Evolution unlock.";
+                return false;
+            }
+
+            if (IsTreeUnlockedRaw(pilot, tree))
+            {
+                string invalid;
+                if (!state.ValidateInvestedState(tree, out invalid))
+                {
+                    reason = "Invalid " + tree.Name + " node: " + invalid + ".";
+                    return false;
+                }
+            }
         }
 
         return true;
@@ -534,23 +734,27 @@ public static class LeviathanSpecializationRuntime
             return 0;
 
         RegisterDefaults();
+        SynchronizeAllAutoGrantedNodes(pilot);
 
         int spent = 0;
         IList<LeviathanSpecializationTree> trees =
             LeviathanSpecializationRegistry.All();
 
-        for (int t = 0; t < trees.Count; t++)
+        for (int i = 0; i < trees.Count; i++)
         {
-            LeviathanSpecializationState state = GetState(pilot, trees[t].Id);
-            if (state == null)
-                continue;
-
-            IList<LeviathanSpecializationNode> nodes = trees[t].Nodes;
-            for (int n = 0; n < nodes.Count; n++)
-                spent += Math.Max(0, state.GetRank(nodes[n].Id));
+            LeviathanSpecializationState state = GetRawState(pilot, trees[i].Id);
+            if (state != null)
+                spent += state.GetSpentPointCost(trees[i]);
         }
 
         return spent;
+    }
+
+    public static int GetTreeSpentPoints(Pilot pilot, string treeId)
+    {
+        LeviathanSpecializationTree tree = LeviathanSpecializationRegistry.Get(treeId);
+        LeviathanSpecializationState state = GetState(pilot, treeId);
+        return tree == null || state == null ? 0 : state.GetSpentPointCost(tree);
     }
 
     public static int GetGrantedPoints(Pilot pilot)
@@ -581,16 +785,18 @@ public static class LeviathanSpecializationRuntime
             return false;
 
         RegisterDefaults();
-        GetState(pilot, LeviathanStarfireSpecialization.TreeId);
+        LeviathanPilotSpecializationData playerData = GetPilotData(pilot);
+        if (playerData == null)
+            return false;
 
-        LeviathanPilotSpecializationData playerData = data[pilot];
         playerData.Trees.Clear();
 
-        // Recreate empty registered states so current UI references remain sane.
         IList<LeviathanSpecializationTree> trees =
             LeviathanSpecializationRegistry.All();
         for (int i = 0; i < trees.Count; i++)
             playerData.Trees[trees[i].Id] = new LeviathanSpecializationState();
+
+        SynchronizeAllAutoGrantedNodes(pilot);
 
         return LeviathanSpecializationPersistence.Save(
             pilot,
@@ -623,6 +829,7 @@ public static class LeviathanSpecializationRuntime
         return GetNodeRank(pilot, treeId, nodeId) > 0;
     }
 
+    // Legacy tree-specific lookup retained for current bridges.
     public static float GetMultiplier(
         Pilot pilot,
         string treeId,
@@ -631,9 +838,91 @@ public static class LeviathanSpecializationRuntime
         RegisterDefaults();
         LeviathanSpecializationTree tree = LeviathanSpecializationRegistry.Get(treeId);
         LeviathanSpecializationState state = GetState(pilot, treeId);
-        return tree == null || state == null
-            ? 1f
-            : state.GetMultiplier(tree, statId);
+        if (tree == null || state == null || !IsTreeUnlockedRaw(pilot, tree))
+            return 1f;
+
+        float flat = 0f;
+        float percent = 0f;
+        float multiplier = 1f;
+        state.Aggregate(tree, statId, ref flat, ref percent, ref multiplier);
+        return (1f + percent) * multiplier;
+    }
+
+    public static float GetKnobMultiplier(
+        Pilot pilot,
+        LeviathanSpecializationKnob knob)
+    {
+        if (pilot == null || knob == null)
+            return 1f;
+
+        float flat;
+        float percent;
+        float multiplier;
+        AggregateKnob(pilot, knob, out flat, out percent, out multiplier);
+        return (1f + percent) * multiplier;
+    }
+
+    public static float GetKnobFlat(
+        Pilot pilot,
+        LeviathanSpecializationKnob knob)
+    {
+        if (pilot == null || knob == null)
+            return 0f;
+
+        float flat;
+        float percent;
+        float multiplier;
+        AggregateKnob(pilot, knob, out flat, out percent, out multiplier);
+        return flat;
+    }
+
+    public static float ApplyKnob(
+        Pilot pilot,
+        LeviathanSpecializationKnob knob,
+        float baseValue)
+    {
+        if (pilot == null || knob == null)
+            return baseValue;
+
+        float flat;
+        float percent;
+        float multiplier;
+        AggregateKnob(pilot, knob, out flat, out percent, out multiplier);
+        return (baseValue + flat) * (1f + percent) * multiplier;
+    }
+
+    private static void AggregateKnob(
+        Pilot pilot,
+        LeviathanSpecializationKnob knob,
+        out float flat,
+        out float percent,
+        out float multiplier)
+    {
+        flat = 0f;
+        percent = 0f;
+        multiplier = 1f;
+
+        RegisterDefaults();
+        IList<LeviathanSpecializationTree> trees =
+            LeviathanSpecializationRegistry.All();
+
+        for (int i = 0; i < trees.Count; i++)
+        {
+            if (!IsTreeUnlockedRaw(pilot, trees[i]))
+                continue;
+
+            LeviathanSpecializationState state = GetState(pilot, trees[i].Id);
+            if (state != null)
+            {
+                state.Aggregate(
+                    trees[i],
+                    knob.Id,
+                    ref flat,
+                    ref percent,
+                    ref multiplier
+                );
+            }
+        }
     }
 
     public static bool HasFlag(
@@ -644,7 +933,10 @@ public static class LeviathanSpecializationRuntime
         RegisterDefaults();
         LeviathanSpecializationTree tree = LeviathanSpecializationRegistry.Get(treeId);
         LeviathanSpecializationState state = GetState(pilot, treeId);
-        return tree != null && state != null && state.HasFlag(tree, flagId);
+        return tree != null &&
+            state != null &&
+            IsTreeUnlockedRaw(pilot, tree) &&
+            state.HasFlag(tree, flagId);
     }
 
     public static Pilot GetCurrentPilot()

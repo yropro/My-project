@@ -24,18 +24,18 @@ public static class LeviathanSpecializationUiBootstrapPatch
 
 public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 {
-    // Prototype entry point. Once the framework is proven, this should be opened
-    // from the selected Leviathan skill rather than a debug hotkey.
     private const KeyCode ToggleKey = KeyCode.F10;
 
     private GameObject root;
     private RectTransform graphContent;
+    private RectTransform treeBar;
     private Text titleText;
     private Text pointsText;
     private Text detailsText;
     private Text statusText;
     private Button spendButton;
     private Button refundButton;
+    private string selectedTreeId;
     private string selectedNodeId;
     private Font font;
 
@@ -65,27 +65,51 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
     {
         font = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-        root = new GameObject("LeviathanSpecializationPrototype");
+        root = new GameObject("LeviathanSpecializationFramework");
         DontDestroyOnLoad(root);
 
         Canvas canvas = root.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 5000;
 
-        root.AddComponent<CanvasScaler>().uiScaleMode =
-            CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        root.GetComponent<CanvasScaler>().referenceResolution =
-            new Vector2(1920f, 1080f);
+        CanvasScaler scaler = root.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
         root.AddComponent<GraphicRaycaster>();
 
-        Image backdrop = CreateImage(root.transform, "Backdrop", new Color(0.025f, 0.035f, 0.055f, 0.97f));
+        Image backdrop = CreateImage(
+            root.transform,
+            "Backdrop",
+            new Color(0.025f, 0.035f, 0.055f, 0.97f)
+        );
         Stretch(backdrop.rectTransform, 40f, 40f, 40f, 40f);
 
         titleText = CreateText(backdrop.transform, "Title", 28, TextAnchor.MiddleLeft);
-        SetRect(titleText.rectTransform, new Vector2(30f, -20f), new Vector2(900f, 55f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+        SetRect(
+            titleText.rectTransform,
+            new Vector2(30f, -20f),
+            new Vector2(900f, 55f),
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f)
+        );
 
         pointsText = CreateText(backdrop.transform, "Points", 20, TextAnchor.MiddleRight);
-        SetRect(pointsText.rectTransform, new Vector2(-30f, -20f), new Vector2(600f, 55f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+        SetRect(
+            pointsText.rectTransform,
+            new Vector2(-30f, -20f),
+            new Vector2(700f, 55f),
+            new Vector2(1f, 1f),
+            new Vector2(1f, 1f)
+        );
+
+        GameObject treeBarObject = new GameObject("TreeBar");
+        treeBarObject.transform.SetParent(backdrop.transform, false);
+        treeBar = treeBarObject.AddComponent<RectTransform>();
+        treeBar.anchorMin = new Vector2(0f, 1f);
+        treeBar.anchorMax = new Vector2(1f, 1f);
+        treeBar.pivot = new Vector2(0f, 1f);
+        treeBar.offsetMin = new Vector2(24f, -132f);
+        treeBar.offsetMax = new Vector2(-24f, -74f);
 
         GameObject viewportObject = new GameObject("GraphViewport");
         viewportObject.transform.SetParent(backdrop.transform, false);
@@ -93,7 +117,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         viewport.anchorMin = new Vector2(0f, 0f);
         viewport.anchorMax = new Vector2(0.74f, 1f);
         viewport.offsetMin = new Vector2(24f, 80f);
-        viewport.offsetMax = new Vector2(-12f, -90f);
+        viewport.offsetMax = new Vector2(-12f, -146f);
 
         Image viewportImage = viewportObject.AddComponent<Image>();
         viewportImage.color = new Color(0.05f, 0.07f, 0.11f, 0.96f);
@@ -114,12 +138,16 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         scroll.movementType = ScrollRect.MovementType.Clamped;
         scroll.scrollSensitivity = 35f;
 
-        Image detailsPanel = CreateImage(backdrop.transform, "DetailsPanel", new Color(0.055f, 0.07f, 0.10f, 0.98f));
+        Image detailsPanel = CreateImage(
+            backdrop.transform,
+            "DetailsPanel",
+            new Color(0.055f, 0.07f, 0.10f, 0.98f)
+        );
         RectTransform detailsRect = detailsPanel.rectTransform;
         detailsRect.anchorMin = new Vector2(0.75f, 0f);
         detailsRect.anchorMax = new Vector2(1f, 1f);
         detailsRect.offsetMin = new Vector2(8f, 80f);
-        detailsRect.offsetMax = new Vector2(-24f, -90f);
+        detailsRect.offsetMax = new Vector2(-24f, -146f);
 
         detailsText = CreateText(detailsPanel.transform, "Details", 18, TextAnchor.UpperLeft);
         Stretch(detailsText.rectTransform, 20f, 20f, 20f, 150f);
@@ -150,15 +178,33 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
     private void Refresh()
     {
         LeviathanSpecializationRuntime.RegisterDefaults();
+        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+
+        IList<LeviathanSpecializationTree> trees =
+            LeviathanSpecializationRegistry.All();
+
+        if (trees.Count == 0)
+            return;
+
+        LeviathanSpecializationTree selectedTree =
+            string.IsNullOrEmpty(selectedTreeId)
+                ? null
+                : LeviathanSpecializationRegistry.Get(selectedTreeId);
+
+        if (selectedTree == null ||
+            !LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, selectedTree))
+        {
+            selectedTreeId = FindFirstUnlockedTreeId(pilot, trees);
+            selectedNodeId = null;
+        }
 
         LeviathanSpecializationTree tree =
-            LeviathanSpecializationRegistry.Get(LeviathanStarfireSpecialization.TreeId);
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+            LeviathanSpecializationRegistry.Get(selectedTreeId);
 
         if (tree == null)
             return;
 
-        titleText.text = "STARFIRE SPECIALIZATION";
+        titleText.text = tree.Name.ToUpperInvariant() + " SPECIALIZATION";
 
         string pointReason;
         bool canSpend = LeviathanSpecializationRuntime.CanSafelySpend(pilot, out pointReason);
@@ -182,12 +228,76 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
             : "Spending disabled";
 
         statusText.text = canSpend
-            ? "Spend 1 Growth Point per node rank. " +
-              spent.ToString() + " currently invested. F10 closes this window."
+            ? spent.ToString() +
+              " Growth Points invested. Unlock skill trees from Evolution; granted roots cost 0. F10 closes."
             : "PERSISTENCE SAFETY MODE: " + pointReason;
 
+        RefreshTreeTabs(pilot, trees);
         RenderGraph(tree, pilot);
         RefreshDetails(tree, pilot);
+    }
+
+    private void RefreshTreeTabs(
+        Pilot pilot,
+        IList<LeviathanSpecializationTree> trees)
+    {
+        for (int i = treeBar.childCount - 1; i >= 0; i--)
+            Destroy(treeBar.GetChild(i).gameObject);
+
+        float x = 0f;
+        for (int i = 0; i < trees.Count; i++)
+        {
+            LeviathanSpecializationTree tree = trees[i];
+            bool unlocked = LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, tree);
+            if (!unlocked)
+                continue;
+
+            bool selected = string.Equals(
+                selectedTreeId,
+                tree.Id,
+                StringComparison.Ordinal
+            );
+
+            Button button = CreateTopButton(
+                treeBar,
+                tree.Name,
+                new Vector2(x, 0f),
+                selected,
+                true
+            );
+
+            string captured = tree.Id;
+            button.onClick.AddListener(delegate
+            {
+                selectedTreeId = captured;
+                selectedNodeId = null;
+                Refresh();
+            });
+
+            x += 190f;
+        }
+    }
+
+    private static string FindFirstUnlockedTreeId(
+        Pilot pilot,
+        IList<LeviathanSpecializationTree> trees)
+    {
+        LeviathanSpecializationTree evolution =
+            LeviathanSpecializationRegistry.Get(LeviathanEvolutionTree.TreeId);
+
+        if (evolution != null &&
+            LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, evolution))
+        {
+            return evolution.Id;
+        }
+
+        for (int i = 0; i < trees.Count; i++)
+        {
+            if (LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, trees[i]))
+                return trees[i].Id;
+        }
+
+        return trees.Count > 0 ? trees[0].Id : null;
     }
 
     private void RenderGraph(LeviathanSpecializationTree tree, Pilot pilot)
@@ -198,14 +308,15 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         nodeButtons.Clear();
 
         LeviathanSpecializationLayout layout =
-            LeviathanSpecializationAutoLayout.Build(tree);
+            string.Equals(tree.Id, LeviathanEvolutionTree.TreeId, StringComparison.Ordinal)
+                ? BuildEvolutionLayout(tree)
+                : LeviathanSpecializationAutoLayout.Build(tree);
 
         graphContent.sizeDelta = new Vector2(layout.Width, layout.Height);
 
         float left = 130f;
         float centerY = layout.Height * 0.5f;
 
-        // Connections first so nodes render above them.
         for (int i = 0; i < layout.Edges.Count; i++)
         {
             LeviathanSpecializationLayoutEdge edge = layout.Edges[i];
@@ -225,6 +336,8 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         LeviathanSpecializationState state =
             LeviathanSpecializationRuntime.GetState(pilot, tree.Id);
 
+        bool treeUnlocked = LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, tree);
+
         IList<LeviathanSpecializationNode> nodes = tree.Nodes;
         for (int i = 0; i < nodes.Count; i++)
         {
@@ -232,32 +345,47 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
             LeviathanSpecializationLayoutNode nodeLayout = layout.Nodes[node.Id];
 
             string reason;
-            bool available = state != null && state.CanInvest(tree, node.Id, out reason);
+            bool available = treeUnlocked &&
+                LeviathanSpecializationRuntime.CanInvest(
+                    pilot,
+                    tree.Id,
+                    node.Id,
+                    out reason
+                );
             bool invested = state != null && state.GetRank(node.Id) > 0;
 
             string label = node.Name + "\n" +
                 (state == null ? "0" : state.GetRank(node.Id).ToString()) +
                 "/" + node.MaxRank.ToString();
 
+            if (node.AutoGranted)
+                label += "\nGRANTED";
+
             Button button = CreateNodeButton(
                 graphContent,
                 label,
-                new Vector2(left + nodeLayout.Position.X, centerY - nodeLayout.Position.Y),
+                new Vector2(
+                    left + nodeLayout.Position.X,
+                    centerY - nodeLayout.Position.Y
+                ),
                 node.Type,
                 invested,
-                available
+                available,
+                treeUnlocked
             );
 
             string captured = node.Id;
             button.onClick.AddListener(delegate
             {
                 selectedNodeId = captured;
-                RefreshDetails(tree, LeviathanSpecializationRuntime.GetCurrentPilot());
+                RefreshDetails(
+                    LeviathanSpecializationRegistry.Get(selectedTreeId),
+                    LeviathanSpecializationRuntime.GetCurrentPilot()
+                );
             });
 
             nodeButtons[node.Id] = button;
 
-            // Explicit ALL/ANY gateway label for simple multi-parent relationships.
             List<string> simpleParents;
             if ((node.Requirement.Kind == LeviathanRequirementKind.All ||
                  node.Requirement.Kind == LeviathanRequirementKind.Any) &&
@@ -285,17 +413,97 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         }
     }
 
+    private static LeviathanSpecializationLayout BuildEvolutionLayout(
+        LeviathanSpecializationTree tree)
+    {
+        LeviathanSpecializationLayout layout =
+            new LeviathanSpecializationLayout();
+
+        const float childSpacing = 230f;
+        const float rowSpacing = 220f;
+        const float topY = -120f;
+
+        List<LeviathanSpecializationNode> children =
+            new List<LeviathanSpecializationNode>();
+
+        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+        LeviathanSpecializationNode rootNode = null;
+
+        for (int i = 0; i < nodes.Count; i++)
+        {
+            if (string.Equals(nodes[i].Id, tree.RootNodeId, StringComparison.Ordinal))
+                rootNode = nodes[i];
+            else
+                children.Add(nodes[i]);
+        }
+
+        float rowWidth = Math.Max(0f, (children.Count - 1) * childSpacing);
+        float centerX = rowWidth * 0.5f;
+
+        if (rootNode != null)
+        {
+            layout.Nodes[rootNode.Id] = new LeviathanSpecializationLayoutNode
+            {
+                NodeId = rootNode.Id,
+                Layer = 0,
+                Order = 0,
+                Position = new LeviathanLayoutPoint(centerX, topY)
+            };
+        }
+
+        for (int i = 0; i < children.Count; i++)
+        {
+            LeviathanSpecializationNode node = children[i];
+            layout.Nodes[node.Id] = new LeviathanSpecializationLayoutNode
+            {
+                NodeId = node.Id,
+                Layer = 1,
+                Order = i,
+                Position = new LeviathanLayoutPoint(i * childSpacing, topY + rowSpacing)
+            };
+
+            if (rootNode != null)
+            {
+                layout.Edges.Add(new LeviathanSpecializationLayoutEdge
+                {
+                    FromNodeId = rootNode.Id,
+                    ToNodeId = node.Id,
+                    TargetRequirementKind = node.Requirement.Kind
+                });
+            }
+        }
+
+        layout.Width = Math.Max(1200f, rowWidth + 420f);
+        layout.Height = 620f;
+        return layout;
+    }
+
     private void RefreshDetails(LeviathanSpecializationTree tree, Pilot pilot)
     {
+        if (tree == null)
+            return;
+
         LeviathanSpecializationState state =
             LeviathanSpecializationRuntime.GetState(pilot, tree.Id);
 
+        bool unlocked = LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, tree);
+
         if (string.IsNullOrEmpty(selectedNodeId))
         {
+            string layoutHelp = string.Equals(
+                tree.Id,
+                LeviathanEvolutionTree.TreeId,
+                StringComparison.Ordinal
+            )
+                ? "Evolution uses a compact top-down layout; unlocked skill trees use prerequisite-driven automatic layout."
+                : "The graph is generated from prerequisite relationships; node positions and lines are not hand-authored.";
+
             detailsText.text =
-                "Select a node.\n\n" +
-                "The graph is generated entirely from prerequisite relationships. " +
-                "ALL/ANY labels are renderer-generated; exclusivity is independent of layout.";
+                tree.Name + "\n\n" +
+                (unlocked
+                    ? "Tree unlocked. Select a node."
+                    : "LOCKED\n\nPurchase " + tree.Name + " in the Evolution tree to unlock this tree.") +
+                "\n\n" + layoutHelp;
             spendButton.interactable = false;
             refundButton.interactable = false;
             return;
@@ -303,14 +511,30 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
         LeviathanSpecializationNode node = tree.GetNode(selectedNodeId);
         if (node == null)
+        {
+            selectedNodeId = null;
+            RefreshDetails(tree, pilot);
             return;
+        }
 
         int rank = state == null ? 0 : state.GetRank(node.Id);
         string text = node.Name + "\n";
-        text += node.Type.ToString().ToUpperInvariant() + "   " + rank + "/" + node.MaxRank + "\n\n";
+        text += node.Type.ToString().ToUpperInvariant() +
+            "   " + rank.ToString() + "/" + node.MaxRank.ToString() + "\n\n";
 
         if (!string.IsNullOrEmpty(node.Description))
             text += node.Description + "\n\n";
+
+        if (node.AutoGranted)
+        {
+            text += "Cost: Granted automatically\n";
+        }
+        else
+        {
+            text += "Cost: " + node.PointCostPerRank.ToString() +
+                " Growth Point" + (node.PointCostPerRank == 1 ? string.Empty : "s") +
+                " per rank\n";
+        }
 
         text += "Requires: " + node.Requirement.Describe(tree.GetNodeName) + "\n";
 
@@ -322,57 +546,68 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
             for (int i = 0; i < members.Count; i++)
             {
-                if (i > 0) text += ", ";
+                if (i > 0)
+                    text += ", ";
                 text += members[i].Name;
             }
             text += "\n";
         }
 
-        text += "\nEffects at next/current rank:\n";
-        int displayRank = Math.Max(1, Math.Min(node.MaxRank, rank + (rank < node.MaxRank ? 1 : 0)));
-
-        for (int i = 0; i < node.Effects.Length; i++)
+        if (node.Effects.Length > 0)
         {
-            text += "• " + node.Effects[i].Describe(
-                displayRank,
-                LeviathanStarfireSpecialization.GetStatName
-            ) + "\n";
+            int displayRank = rank < node.MaxRank
+                ? rank + 1
+                : Math.Max(1, rank);
+
+            text += "\nRank " + displayRank.ToString() + " adds:\n";
+            for (int i = 0; i < node.Effects.Length; i++)
+            {
+                text += "• " + node.Effects[i].DescribeRankContribution(
+                    displayRank,
+                    LeviathanSpecializationRegistry.ResolveEffectName
+                ) + "\n";
+            }
+        }
+
+        if (!unlocked)
+        {
+            text += "\nUnlock " + tree.Name + " from Evolution first.";
         }
 
         detailsText.text = text;
 
         string reason;
-        bool safe = LeviathanSpecializationRuntime.CanSafelySpend(pilot, out reason);
-        bool unlocked = LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, tree);
-        bool hasPoint = safe && LeviathanSpecializationRuntime.GetAvailablePoints(pilot) > 0;
-        spendButton.interactable = unlocked && hasPoint && state != null &&
-            state.CanInvest(tree, node.Id, out reason);
-        refundButton.interactable = safe && state != null && state.CanRefund(tree, node.Id, out reason);
-
-        if (!unlocked)
-        {
-            detailsText.text += "\nPurchase Evolution before spending Growth Points in specialization trees.";
-        }
+        spendButton.interactable = LeviathanSpecializationRuntime.CanInvest(
+            pilot,
+            tree.Id,
+            node.Id,
+            out reason
+        );
+        refundButton.interactable = LeviathanSpecializationRuntime.CanRefund(
+            pilot,
+            tree.Id,
+            node.Id,
+            out reason
+        );
     }
 
     private void SpendSelected()
     {
         Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
-        string reason;
-        string nodeName = selectedNodeId;
-
         LeviathanSpecializationTree tree =
-            LeviathanSpecializationRegistry.Get(LeviathanStarfireSpecialization.TreeId);
-        if (tree != null)
-        {
-            LeviathanSpecializationNode node = tree.GetNode(selectedNodeId);
-            if (node != null)
-                nodeName = node.Name;
-        }
+            LeviathanSpecializationRegistry.Get(selectedTreeId);
 
+        if (tree == null || string.IsNullOrEmpty(selectedNodeId))
+            return;
+
+        LeviathanSpecializationNode node = tree.GetNode(selectedNodeId);
+        string nodeName = node == null ? selectedNodeId : node.Name;
+        int cost = node == null ? 1 : node.PointCostPerRank;
+
+        string reason;
         bool success = LeviathanSpecializationRuntime.TryInvest(
             pilot,
-            LeviathanStarfireSpecialization.TreeId,
+            tree.Id,
             selectedNodeId,
             out reason
         );
@@ -380,28 +615,28 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         Refresh();
 
         statusText.text = success
-            ? "Spent 1 Growth Point on " + nodeName + "."
+            ? "Spent " + cost.ToString() + " Growth Point" +
+              (cost == 1 ? string.Empty : "s") + " on " + nodeName + "."
             : "Could not spend Growth Point: " + reason;
     }
 
     private void RefundSelected()
     {
         Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
-        string reason;
-        string nodeName = selectedNodeId;
-
         LeviathanSpecializationTree tree =
-            LeviathanSpecializationRegistry.Get(LeviathanStarfireSpecialization.TreeId);
-        if (tree != null)
-        {
-            LeviathanSpecializationNode node = tree.GetNode(selectedNodeId);
-            if (node != null)
-                nodeName = node.Name;
-        }
+            LeviathanSpecializationRegistry.Get(selectedTreeId);
 
+        if (tree == null || string.IsNullOrEmpty(selectedNodeId))
+            return;
+
+        LeviathanSpecializationNode node = tree.GetNode(selectedNodeId);
+        string nodeName = node == null ? selectedNodeId : node.Name;
+        int cost = node == null ? 1 : node.PointCostPerRank;
+
+        string reason;
         bool success = LeviathanSpecializationRuntime.TryRefund(
             pilot,
-            LeviathanStarfireSpecialization.TreeId,
+            tree.Id,
             selectedNodeId,
             out reason
         );
@@ -409,7 +644,8 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         Refresh();
 
         statusText.text = success
-            ? "Refunded 1 Growth Point from " + nodeName + "."
+            ? "Refunded " + cost.ToString() + " Growth Point" +
+              (cost == 1 ? string.Empty : "s") + " from " + nodeName + "."
             : "Could not refund Growth Point: " + reason;
     }
 
@@ -419,21 +655,24 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         Vector2 position,
         LeviathanSpecializationNodeType type,
         bool invested,
-        bool available)
+        bool available,
+        bool treeUnlocked)
     {
         Vector2 size = type == LeviathanSpecializationNodeType.Root
-            ? new Vector2(178f, 86f)
+            ? new Vector2(178f, 90f)
             : type == LeviathanSpecializationNodeType.Keystone
                 ? new Vector2(170f, 82f)
                 : type == LeviathanSpecializationNodeType.Major
                     ? new Vector2(150f, 70f)
-                    : new Vector2(132f, 62f);
+                    : new Vector2(142f, 66f);
 
-        Color color = invested
-            ? new Color(0.14f, 0.48f, 0.72f, 1f)
-            : available
-                ? new Color(0.18f, 0.25f, 0.34f, 1f)
-                : new Color(0.10f, 0.12f, 0.16f, 1f);
+        Color color = !treeUnlocked
+            ? new Color(0.07f, 0.08f, 0.10f, 1f)
+            : invested
+                ? new Color(0.14f, 0.48f, 0.72f, 1f)
+                : available
+                    ? new Color(0.18f, 0.25f, 0.34f, 1f)
+                    : new Color(0.10f, 0.12f, 0.16f, 1f);
 
         Image image = CreateImage(parent, "Node", color);
         RectTransform rect = image.rectTransform;
@@ -456,9 +695,41 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         return button;
     }
 
+    private Button CreateTopButton(
+        Transform parent,
+        string label,
+        Vector2 anchored,
+        bool selected,
+        bool unlocked)
+    {
+        Color color = selected
+            ? new Color(0.17f, 0.42f, 0.64f, 1f)
+            : unlocked
+                ? new Color(0.12f, 0.22f, 0.32f, 1f)
+                : new Color(0.08f, 0.09f, 0.12f, 1f);
+
+        Image image = CreateImage(parent, "TreeTab_" + label, color);
+        RectTransform rect = image.rectTransform;
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = anchored;
+        rect.sizeDelta = new Vector2(180f, 46f);
+
+        Button button = image.gameObject.AddComponent<Button>();
+        Text text = CreateText(image.transform, "Label", 13, TextAnchor.MiddleCenter);
+        Stretch(text.rectTransform, 4f, 4f, 4f, 4f);
+        text.text = label;
+        return button;
+    }
+
     private Button CreateButton(Transform parent, string label, Vector2 anchored)
     {
-        Image image = CreateImage(parent, "Button_" + label, new Color(0.14f, 0.28f, 0.40f, 1f));
+        Image image = CreateImage(
+            parent,
+            "Button_" + label,
+            new Color(0.14f, 0.28f, 0.40f, 1f)
+        );
         RectTransform rect = image.rectTransform;
         rect.anchorMin = new Vector2(0f, 0f);
         rect.anchorMax = new Vector2(0f, 0f);

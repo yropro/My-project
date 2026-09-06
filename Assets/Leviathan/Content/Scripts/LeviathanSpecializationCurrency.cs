@@ -191,8 +191,8 @@ public static class LeviathanEvolutionUpgradeDescriptionPatch
             return true;
 
         __result =
-            "Grants 3 Growth Points per rank. Growth Points are spent in " +
-            "Leviathan skill specialization trees.";
+            "Grants 3 Growth Points per rank. Spend Growth Points in the " +
+            "Evolution tree to unlock Leviathan skill trees, then specialize them.";
         return false;
     }
 }
