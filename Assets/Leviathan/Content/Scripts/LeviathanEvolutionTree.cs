@@ -1,68 +1,61 @@
+using static LeviathanTreeDsl;
+
+// Evolution is the root specialization tree. Native Evolution ranks grant Growth
+// Points; nodes here spend those points to unlock the individual Leviathan trees.
 public static class LeviathanEvolutionTree
 {
     public const string TreeId = "evolution";
-    public const string RootNodeId = "evolution_root";
+    public const string RootNodeId = "evolution";
 
     public static LeviathanSpecializationTree Create()
     {
-        LeviathanSpecializationTree tree = new LeviathanSpecializationTree(
+        LeviathanSpecializationTree tree = NativeTree(
             TreeId,
             "Evolution",
             RootNodeId,
             0,
-            LeviathanTreeUnlockKind.NativeUpgrade,
             LeviathanSpecializationCurrency.UpgradeKeyValue
         );
 
-        tree.Add(LeviathanNode.GrantedRoot(
+        tree.Add(Root(
             RootNodeId,
             "Evolution",
-            "The root of Leviathan specialization. Evolution ranks grant Growth Points; this tree spends them to unlock individual Leviathan skill trees."
+            "Evolution ranks grant Growth Points. Spend them here to unlock Leviathan skill trees."
         ));
 
-        tree.Add(LeviathanNode.Passive(
+        tree.Add(NodeId(
             "unlock_starfire",
             "Starfire",
-            1,
-            LeviathanReq.Rank(RootNodeId),
-            "Unlocks Starfire and grants the root of its specialization tree.",
-            LeviathanFx.UnlockTree(LeviathanStarfireTree.TreeId)
+            Requires("Evolution"),
+            UnlockTree(LeviathanStarfireTree.TreeId)
         ));
 
-        tree.Add(LeviathanNode.Passive(
+        tree.Add(NodeId(
             "unlock_constrictor",
             "Constrictor",
-            1,
-            LeviathanReq.Rank(RootNodeId),
-            "Unlocks Constrictor and grants the root of its specialization tree.",
-            LeviathanFx.UnlockTree(LeviathanConstrictorTree.TreeId)
+            Requires("Evolution"),
+            UnlockTree(LeviathanConstrictorTree.TreeId)
         ));
 
-        tree.Add(LeviathanNode.Passive(
+        tree.Add(NodeId(
             "unlock_predator",
             "Predator",
-            1,
-            LeviathanReq.Rank(RootNodeId),
-            "Unlocks Predator and grants the root of its specialization tree.",
-            LeviathanFx.UnlockTree(LeviathanPredatorTree.TreeId)
+            Requires("Evolution"),
+            UnlockTree(LeviathanPredatorTree.TreeId)
         ));
 
-        tree.Add(LeviathanNode.Passive(
+        tree.Add(NodeId(
             "unlock_behemoth",
             "Behemoth",
-            1,
-            LeviathanReq.Rank(RootNodeId),
-            "Unlocks Behemoth and grants the root of its specialization tree.",
-            LeviathanFx.UnlockTree(LeviathanBehemothTree.TreeId)
+            Requires("Evolution"),
+            UnlockTree(LeviathanBehemothTree.TreeId)
         ));
 
-        tree.Add(LeviathanNode.Passive(
+        tree.Add(NodeId(
             "unlock_stellar_converter",
             "Stellar Converter",
-            1,
-            LeviathanReq.Rank(RootNodeId),
-            "Unlocks Stellar Converter and grants the root of its specialization tree.",
-            LeviathanFx.UnlockTree(LeviathanStellarConverterTree.TreeId)
+            Requires("Evolution"),
+            UnlockTree(LeviathanStellarConverterTree.TreeId)
         ));
 
         tree.Validate();

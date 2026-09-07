@@ -1,23 +1,20 @@
+using static LeviathanTreeDsl;
+
+// Predator specialization config. Add nodes here; gameplay knobs/flags belong
+// in LeviathanPredator.cs.
 public static class LeviathanPredatorTree
 {
     public const string TreeId = "predator";
-    public const string RootNodeId = "predator_root";
+    public const string RootNodeId = "predator";
 
     public static LeviathanSpecializationTree Create()
     {
-        LeviathanSpecializationTree tree = new LeviathanSpecializationTree(
-            TreeId,
-            "Predator",
-            RootNodeId,
-            30,
-            LeviathanTreeUnlockKind.SpecializationEffect,
-            -1
-        );
+        LeviathanSpecializationTree tree = Tree(TreeId, "Predator", RootNodeId, 30);
 
-        tree.Add(LeviathanNode.GrantedRoot(
+        tree.Add(Root(
             RootNodeId,
             "Predator",
-            "Granted automatically when Predator is purchased in the Evolution tree."
+            "Granted automatically when Predator is unlocked in Evolution."
         ));
 
         tree.Validate();

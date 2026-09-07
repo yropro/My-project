@@ -1,17 +1,19 @@
 ManifestFileVersion: 0
-CRC: 1906583385
+CRC: 2845882329
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 551bafe3ec11f6a85817eda3f255f965
+    Hash: 120440d2c0686f75e08ebe44c5c9c8ec
   TypeTreeHash:
     serializedVersion: 2
-    Hash: f7ceb0cdbb0490ee02091ab59f631a80
+    Hash: 60826caf9e4093cf380398df28f8afe5
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: 551bafe3ec11f6a85817eda3f255f965
+    Hash: 120440d2c0686f75e08ebe44c5c9c8ec
 HashAppended: 0
 ClassTypes:
+- Class: 83
+  Script: {instanceID: 0}
 - Class: 114
   Script: {fileID: 2050711256, guid: 06dd3d5416bf43ea368cc39ff96e6d5a, type: 3}
 - Class: 114
@@ -75,4 +77,5 @@ SerializeReferenceClassIdentifiers:
   ClassName: StarVortex.Thruster
 Assets:
 - Assets/Leviathan/Content/LeviathanTest.asset
+- Assets/Leviathan/Content/Audio/seismic_charge.wav
 Dependencies: []

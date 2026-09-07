@@ -48,7 +48,7 @@ public static class LeviathanStarfireRuntime
     // Torch's own charge, VFX length and collider length all inherit it natively.
     private static readonly float[] LengthMultiplierByRank =
     {
-        1.07f, // Rank 1
+        1.15f, // Rank 1
         1.25f, // Rank 2
         1.3f, // Rank 3
         1.4f, // Rank 4
@@ -61,7 +61,7 @@ public static class LeviathanStarfireRuntime
     // half-angles of 13 / 15 / 17 / 18 / 20 degrees by rank.
     private static readonly float[] WidthMultiplierByRank =
     {
-        1.15f, // Rank 1
+        1.30f, // Rank 1
         1.50f, // Rank 2
         1.70f, // Rank 3
         1.80f, // Rank 4
@@ -74,11 +74,11 @@ public static class LeviathanStarfireRuntime
 
     // Rank spread = this angle * WidthMultiplierByRank. This is the main cone
     // angle knob. Example: 10 degrees * Rank 5's 2.0 = 20 degree half-angle.
-    private const float BaseFanHalfAngleDegrees = 13.0f;
+    private const float BaseFanHalfAngleDegrees = 15.0f;
 
     // Width at the muzzle as a fraction of the native Torch half-width. The
     // far end then expands according to the fan angle and current beam length.
-    private const float BaseMuzzleHalfWidthMultiplier = 0.55f;
+    private const float BaseMuzzleHalfWidthMultiplier = 0.65f;
 
     // 1.0 means neighboring cosmetic strips just touch at their center spacing.
     // Below 1 leaves visible seams; above 1 deliberately overlaps neighboring
@@ -97,7 +97,7 @@ public static class LeviathanStarfireRuntime
 
     // Global opacity of the cosmetic Starfire plume. 1.00 is fully opaque;
     // 0.50 is half opacity. This affects visuals only, never hit detection.
-    private const float BaseVisualOpacity = 0.50f;
+    private const float BaseVisualOpacity = 0.70f;
 
     // Terminal shaping shared by visuals and the single mechanical collider.
     // The outermost beam pair keeps the base breath length while progressively
@@ -110,21 +110,21 @@ public static class LeviathanStarfireRuntime
     // phase without changing the geometry/damage implementation.
     private static readonly float[] FullSizeHoldSecondsByRank =
     {
-        0.90f, // Rank 1
-        1.20f, // Rank 2
-        1.20f, // Rank 3
-        1.20f, // Rank 4
-        1.20f  // Rank 5
+        1.50f, // Rank 1
+        2.00f, // Rank 2
+        2.00f, // Rank 3
+        2.00f, // Rank 4
+        2.00f  // Rank 5
     };
 
     // Time spent shrinking from full range to the minimum breath-length fraction.
     private static readonly float[] BreathRetreatSecondsByRank =
     {
-        2.80f, // Rank 1
-        2.80f, // Rank 2
-        2.80f, // Rank 3
-        2.80f, // Rank 4
-        2.80f  // Rank 5
+        2.00f, // Rank 1
+        2.00f, // Rank 2
+        2.00f, // Rank 3
+        2.00f, // Rank 4
+        2.00f  // Rank 5
     };
 
     // Remaining longitudinal breath length after the retreat completes. Baseline
@@ -236,6 +236,430 @@ public static class LeviathanStarfireRuntime
         0.30f  // Rank 5
     };
 
+
+    // =========================================================================
+    // SPECIALIZATION INTERFACE
+    // =========================================================================
+    // Tree definitions point at these named knobs/flags. Starfire owns what the
+    // values mean and where they are applied. Ordinary tree edits should never
+    // require new Harmony/UI/framework code.
+
+    public static class Knobs
+    {
+        // -------------------------------------------------------------------------
+        // Core gameplay
+        // -------------------------------------------------------------------------
+
+        public static readonly LeviathanSpecializationKnob HeatGeneration =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.heat_generation",
+                "Heat Generation"
+            );
+
+        public static readonly LeviathanSpecializationKnob Length =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.length",
+                "Length"
+            );
+
+        public static readonly LeviathanSpecializationKnob Width =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.width",
+                "Width"
+            );
+
+        public static readonly LeviathanSpecializationKnob Damage =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.damage",
+                "Damage"
+            );
+
+        // Percentage-points are additive. +5 on a 10% source weapon becomes 15%.
+        public static readonly LeviathanSpecializationKnob CritChance =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.crit_chance",
+                "Critical Chance"
+            );
+
+        // Native Torch crit modifier is the bonus portion only. +5 means +5
+        // percentage points of crit damage, e.g. +50% -> +55%.
+        public static readonly LeviathanSpecializationKnob CritDamage =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.crit_damage",
+                "Critical Damage"
+            );
+
+        public static readonly LeviathanSpecializationKnob StatusChance =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.status_chance",
+                "Status Chance"
+            );
+
+        public static readonly LeviathanSpecializationKnob DebuffChance =
+            StatusChance;
+
+        // -------------------------------------------------------------------------
+        // Persistent breath reservoir
+        // -------------------------------------------------------------------------
+
+        // Common multiplier on both full-power and falloff capacity.
+        public static readonly LeviathanSpecializationKnob Duration =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.duration",
+                "Breath Capacity"
+            );
+
+        public static readonly LeviathanSpecializationKnob FullSizeHoldSeconds =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.full_size_hold_seconds",
+                "Full-Power Capacity",
+                "s"
+            );
+
+        public static readonly LeviathanSpecializationKnob RetreatSeconds =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.retreat_seconds",
+                "Falloff Capacity",
+                "s"
+            );
+
+        // Multiplier on reservoir consumption while actively breathing.
+        public static readonly LeviathanSpecializationKnob ActiveDrainRate =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.active_drain_rate",
+                "Breath Drain Rate"
+            );
+
+        // Multiplier on the baseline amount of reservoir restored per idle second.
+        public static readonly LeviathanSpecializationKnob RecoveryRate =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.recovery_rate",
+                "Breath Recovery Rate"
+            );
+
+        // Low-level flat adjustment to the baseline breath-seconds restored each
+        // second. Exposed in addition to RecoveryRate for future exact tuning.
+        public static readonly LeviathanSpecializationKnob RecoverySecondsPerSecond =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.recovery_seconds_per_second",
+                "Breath Recovery",
+                " breath-s/s"
+            );
+
+        public static readonly LeviathanSpecializationKnob RecoveryDelaySeconds =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.recovery_delay_seconds",
+                "Breath Recovery Delay",
+                "s"
+            );
+
+        // 1 = linear recovery. >1 recovers quickly when empty and slows near full.
+        public static readonly LeviathanSpecializationKnob RecoveryCurveExponent =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.recovery_curve_exponent",
+                "Recovery Curve Exponent"
+            );
+
+        // Common falloff curve retained as a master shaping knob.
+        public static readonly LeviathanSpecializationKnob RetreatCurveExponent =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.retreat_curve_exponent",
+                "Falloff Curve Exponent"
+            );
+
+        public static readonly LeviathanSpecializationKnob DamageFalloffCurveExponent =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.damage_falloff_curve_exponent",
+                "Damage Falloff Curve Exponent"
+            );
+
+        public static readonly LeviathanSpecializationKnob LengthFalloffCurveExponent =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.length_falloff_curve_exponent",
+                "Length Falloff Curve Exponent"
+            );
+
+        public static readonly LeviathanSpecializationKnob WidthFalloffCurveExponent =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.width_falloff_curve_exponent",
+                "Width Falloff Curve Exponent"
+            );
+
+        public static readonly LeviathanSpecializationKnob MinimumDamage =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.minimum_damage",
+                "Minimum Damage"
+            );
+
+        public static readonly LeviathanSpecializationKnob MinimumLength =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.minimum_length",
+                "Minimum Breath Length"
+            );
+
+        public static readonly LeviathanSpecializationKnob MinimumWidth =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.minimum_width",
+                "Minimum Breath Width"
+            );
+
+        // -------------------------------------------------------------------------
+        // Windup / native Torch timing
+        // -------------------------------------------------------------------------
+
+        public static readonly LeviathanSpecializationKnob StartupDelaySeconds =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.startup_delay_seconds",
+                "Startup Delay",
+                "s"
+            );
+
+        public static readonly LeviathanSpecializationKnob NativeChargeRampSpeed =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.native_charge_ramp_speed",
+                "Native Charge Ramp Speed"
+            );
+
+        // Compatibility alias for previous node examples/code.
+        public static readonly LeviathanSpecializationKnob ChargeRampSpeed =
+            NativeChargeRampSpeed;
+
+        // Common multiplier on native Activatable cooldown/recharge values.
+        public static readonly LeviathanSpecializationKnob NativeRecoveryTime =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.native_recovery_time",
+                "Native Recovery Time"
+            );
+
+        public static readonly LeviathanSpecializationKnob RechargeTime =
+            NativeRecoveryTime;
+
+        public static readonly LeviathanSpecializationKnob Cooldown =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.cooldown",
+                "Native Cooldown"
+            );
+
+        public static readonly LeviathanSpecializationKnob RechargeSeconds =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.recharge_seconds",
+                "Native Recharge Time"
+            );
+
+        // -------------------------------------------------------------------------
+        // Cone geometry / hitbox
+        // -------------------------------------------------------------------------
+
+        public static readonly LeviathanSpecializationKnob BaseFanHalfAngleDegrees =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.base_fan_half_angle_degrees",
+                "Base Fan Half-Angle",
+                "°"
+            );
+
+        public static readonly LeviathanSpecializationKnob MuzzleWidth =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.muzzle_width",
+                "Muzzle Width"
+            );
+
+        public static readonly LeviathanSpecializationKnob HitboxWidthPadding =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.hitbox_width_padding",
+                "Hitbox Width Scale"
+            );
+
+        public static readonly LeviathanSpecializationKnob HitboxLengthPadding =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.hitbox_length_padding",
+                "Hitbox Length Scale"
+            );
+
+        public static readonly LeviathanSpecializationKnob CenterLengthBonus =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.center_length_bonus",
+                "Center Length Bonus"
+            );
+
+        // -------------------------------------------------------------------------
+        // Cosmetic plume
+        // -------------------------------------------------------------------------
+
+        public static readonly LeviathanSpecializationKnob VisualOpacity =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.visual_opacity",
+                "Visual Opacity"
+            );
+
+        public static readonly LeviathanSpecializationKnob VisualBeamFill =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.visual_beam_fill",
+                "Visual Beam Fill"
+            );
+
+        public static readonly LeviathanSpecializationKnob VisualMinimumBeamWidth =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.visual_minimum_beam_width",
+                "Visual Minimum Beam Width"
+            );
+
+        public static readonly LeviathanSpecializationKnob VisualEndFeather =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.visual_end_feather",
+                "Visual End Feather"
+            );
+
+        public static readonly LeviathanSpecializationKnob VisualStartupExtendSeconds =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.visual_startup_extend_seconds",
+                "Visual Startup Extend Time",
+                "s"
+            );
+
+        public static readonly LeviathanSpecializationKnob VisualBeamCount =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.visual_beam_count",
+                "Visual Beam Count"
+            );
+
+        public static readonly LeviathanSpecializationKnob VisualLengthSegments =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.visual_length_segments",
+                "Visual Length Segments"
+            );
+
+        // -------------------------------------------------------------------------
+        // Recharge-pull / Big Succ feature
+        // -------------------------------------------------------------------------
+
+        public static readonly LeviathanSpecializationKnob RechargePullRadius =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.recharge_pull_radius",
+                "Recharge Pull Radius",
+                "m"
+            );
+
+        public static readonly LeviathanSpecializationKnob RechargePullStrength =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.recharge_pull_strength",
+                "Recharge Pull Strength"
+            );
+
+        public static readonly LeviathanSpecializationKnob RechargePullFalloffExponent =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.recharge_pull_falloff_exponent",
+                "Recharge Pull Falloff Exponent"
+            );
+
+        public static readonly LeviathanSpecializationKnob RechargePullMaxSpeed =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.recharge_pull_max_speed",
+                "Recharge Pull Max Speed",
+                "m/s"
+            );
+
+        // -------------------------------------------------------------------------
+        // Blast Wave mode
+        // -------------------------------------------------------------------------
+
+        public static readonly LeviathanSpecializationKnob BlastWaveArcDegrees =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_arc_degrees",
+                "Blast Wave Arc",
+                "°"
+            );
+
+        // Reserved compatibility knob. The current Blast Wave implementation does
+        // not use an authored damage-duration value; it integrates the actual
+        // remaining resolved Breath Power damage profile instead.
+        public static readonly LeviathanSpecializationKnob BlastWaveDamageSeconds =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_damage_seconds",
+                "Blast Wave Damage Seconds",
+                "s"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveDamageMultiplier =
+            LeviathanSpecializationKnob.Multiplier(
+                "starfire.blast_wave_damage_multiplier",
+                "Blast Wave Damage"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveSpeed =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_speed",
+                "Blast Wave Speed",
+                "m/s"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveRange =
+            LeviathanSpecializationKnob.Percent(
+                "starfire.blast_wave_range",
+                "Blast Wave Range"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveWidth =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_width",
+                "Blast Wave Front Thickness",
+                "m"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveDuration =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_duration",
+                "Blast Wave Duration",
+                "s"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveFalloffExponent =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_falloff_exponent",
+                "Blast Wave Falloff Exponent"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveVisualOpacity =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "starfire.blast_wave_visual_opacity",
+                "Blast Wave Visual Opacity"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveStartRadius =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_start_radius",
+                "Blast Wave Start Radius",
+                "m"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveEndRadius =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_end_radius",
+                "Blast Wave End Radius",
+                "m"
+            );
+
+        public static readonly LeviathanSpecializationKnob BlastWaveKnockback =
+            LeviathanSpecializationKnob.Flat(
+                "starfire.blast_wave_knockback",
+                "Blast Wave Knockback"
+            );
+    }
+
+    public static class Flags
+    {
+        public static readonly LeviathanSpecializationFlag RechargePull =
+            LeviathanSpecializationFlag.Create(
+                "starfire.recharge_pull",
+                "Recharge Pull"
+            );
+
+        public static readonly LeviathanSpecializationFlag BlastWave =
+            LeviathanSpecializationFlag.Create(
+                "starfire.blast_wave",
+                "Blast Wave"
+            );
+    }
+
     // =========================================================================
     // NATIVE ACCESS
     // =========================================================================
@@ -341,16 +765,44 @@ public static class LeviathanStarfireRuntime
         public float maxRange;
         public float speed;
         public float radialThickness;
+        public float startRadius;
+        public float endRadius;
         public float halfArcDegrees;
         public float damageTickEquivalent;
         public GameObject visualObject;
-        public LineRenderer lineRenderer;
+        public Mesh visualMesh;
+        public MeshRenderer visualRenderer;
+        public GameObject visualAnimationObject;
+        public SpriteRenderer visualAnimationRenderer;
+        public Animator visualAnimationAnimator;
+        public Sprite visualLastSprite;
+        public bool visualFlipX;
+        public bool visualFlipY;
+        public float visualRadius;
+        public LineRenderer fallbackLineRenderer;
         public Material visualMaterial;
         public readonly HashSet<GameShip> hitShips = new HashSet<GameShip>();
     }
 
+    private sealed class BlastWaveExplosionVisualSource
+    {
+        public SpriteRenderer sourceRenderer;
+        public Sprite sprite;
+        public Material material;
+        public RuntimeAnimatorController animatorController;
+        public bool flipX;
+        public bool flipY;
+        public int sortingLayerID;
+        public int sortingOrder;
+    }
+
     private static readonly Dictionary<Torch, BlastWaveState> BlastWaves =
         new Dictionary<Torch, BlastWaveState>();
+
+    // Blast Wave reuses the same common vanilla ExplosiveArea prefab selected by
+    // Event Horizon. Only its sprite/material/animation are borrowed; none of the
+    // ExplosiveArea damage, sound, shake or pooling behavior is instantiated.
+    private static BlastWaveExplosionVisualSource blastWaveExplosionVisualSource;
 
     private static readonly HashSet<GameShip> RechargePullTargets =
         new HashSet<GameShip>();
@@ -458,6 +910,7 @@ public static class LeviathanStarfireRuntime
         foreach (KeyValuePair<Torch, BlastWaveState> pair in BlastWaves)
             CleanupBlastWaveVisual(pair.Value);
         BlastWaves.Clear();
+        blastWaveExplosionVisualSource = null;
 
         BreathStates.Clear();
         StartupBeginTimes.Clear();
@@ -500,8 +953,69 @@ public static class LeviathanStarfireRuntime
             return false;
         }
 
+        // The Evolution-tree Starfire unlock is the canonical v2 ownership path.
+        // It grants the rank-1 baseline; specialization nodes then modify named
+        // knobs rather than masquerading as native Starfire ranks.
+        if (LeviathanSpecializationRuntime.IsTreeActive(
+            pilot,
+            LeviathanStarfireTree.TreeId))
+        {
+            rank = 1;
+            return true;
+        }
+
+        // Legacy fallback while existing saves/native Starfire registration still
+        // exist. This can be removed after the specialization migration settles.
         rank = pilot.GetUpgradeLevel(LeviathanMod.StarfireUpgrade);
         return rank >= 1;
+    }
+
+    internal static bool IsCurrentStarfireSource(Torch torch)
+    {
+        if (torch == null || WorldController.instance == null)
+            return false;
+
+        GameShip player = WorldController.instance.GetCurrentPlayerShip();
+        if (player == null || player.slots == null)
+            return false;
+
+        int rank;
+        if (!TryGetStarfireRank(player, out rank))
+            return false;
+
+        for (int i = 0; i < player.slots.Length; i++)
+        {
+            Slot slot = player.slots[i];
+            if (slot == null ||
+                slot.type != Item.Type.PrimaryWeapon ||
+                slot.equippable == null)
+            {
+                continue;
+            }
+
+            Torch candidate = slot.equippable as Torch;
+            if (candidate != null && candidate.type == Item.Type.PrimaryWeapon)
+                return ReferenceEquals(candidate, torch);
+        }
+
+        return false;
+    }
+
+    internal static float GetNativeRecoveryMultiplier(
+        LeviathanSpecializationKnob specificKnob)
+    {
+        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+        if (pilot == null)
+            return 1f;
+
+        float common = LeviathanSpecializationRuntime.GetKnobMultiplier(
+            pilot,
+            Knobs.RechargeTime);
+        float specific = LeviathanSpecializationRuntime.GetKnobMultiplier(
+            pilot,
+            specificKnob);
+
+        return Mathf.Max(0f, common * specific);
     }
 
     private static bool TryGetStarfireContext(
@@ -2432,6 +2946,14 @@ public static class LeviathanStarfireRuntime
             0.05f,
             state.BlastWaveFrontThickness
         );
+        wave.startRadius = Mathf.Max(
+            0.05f,
+            state.BlastWaveStartRadius
+        );
+        wave.endRadius = Mathf.Max(
+            0.05f,
+            state.BlastWaveEndRadius
+        );
         wave.halfArcDegrees = Mathf.Clamp(
             state.BlastWaveArcDegrees * 0.5f,
             0f,
@@ -2459,11 +2981,432 @@ public static class LeviathanStarfireRuntime
         if (wave == null || state == null || state.BlastWaveVisualOpacity <= 0f)
             return;
 
+        BlastWaveExplosionVisualSource source = ResolveBlastWaveExplosionSource();
+        if (source == null || source.sprite == null)
+        {
+            CreateFallbackBlastWaveVisual(wave, state);
+            return;
+        }
+
+        Shader fallbackShader = Shader.Find("Sprites/Default");
+        if (source.material == null && fallbackShader == null)
+        {
+            CreateFallbackBlastWaveVisual(wave, state);
+            return;
+        }
+
+        GameObject obj = new GameObject("Leviathan Starfire Blast Wave Explosion Crescent");
+        obj.transform.position = wave.origin;
+        float facingDegrees = Mathf.Atan2(wave.direction.y, wave.direction.x) *
+            Mathf.Rad2Deg;
+        obj.transform.rotation = Quaternion.Euler(0f, 0f, facingDegrees);
+        obj.transform.localScale = Vector3.one;
+
+        float visualRadius = Mathf.Max(
+            0.05f,
+            wave.startRadius
+        );
+
+        MeshFilter filter = obj.AddComponent<MeshFilter>();
+        MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
+        Mesh mesh = BuildExplosionCrescentMesh(
+            source.sprite,
+            source.flipX,
+            source.flipY,
+            wave.halfArcDegrees,
+            visualRadius,
+            wave.radialThickness
+        );
+
+        if (mesh == null)
+        {
+            UnityEngine.Object.Destroy(obj);
+            CreateFallbackBlastWaveVisual(wave, state);
+            return;
+        }
+
+        Material material = source.material != null
+            ? new Material(source.material)
+            : new Material(fallbackShader);
+        if (material.HasProperty("_MainTex"))
+            material.mainTexture = source.sprite.texture;
+        if (material.HasProperty("_Color"))
+            material.SetColor("_Color", Color.white);
+
+        filter.sharedMesh = mesh;
+        renderer.sharedMaterial = material;
+        renderer.sortingLayerID = source.sortingLayerID;
+        renderer.sortingOrder = source.sortingOrder;
+
+        Color tint = GetBlastWaveVisualColor(wave.sourceTorch);
+        tint.a = Mathf.Clamp01(state.BlastWaveVisualOpacity);
+        ApplyBlastWaveVisualTint(renderer, source.sprite, tint);
+
+        // Hidden SpriteRenderer + Animator drive the explosion prefab's native
+        // sprite animation. The cropped mesh simply follows whichever sprite frame
+        // is current; none of the prefab's gameplay/sound/shake components run.
+        GameObject animationObject = new GameObject(
+            "Leviathan Starfire Blast Wave Explosion Animation"
+        );
+        animationObject.transform.SetParent(obj.transform, false);
+        SpriteRenderer animationRenderer =
+            animationObject.AddComponent<SpriteRenderer>();
+        animationRenderer.sprite = source.sprite;
+        animationRenderer.enabled = false;
+
+        Animator animationAnimator = null;
+        if (source.animatorController != null)
+        {
+            animationAnimator = animationObject.AddComponent<Animator>();
+            animationAnimator.runtimeAnimatorController = source.animatorController;
+            animationAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        }
+
+        // Prefer the Torch draw order over the source explosion's draw order.
+        FanState fan;
+        if (wave.sourceTorch != null &&
+            FanStates.TryGetValue(wave.sourceTorch, out fan) &&
+            fan != null &&
+            fan.visualLayers.Count > 0 &&
+            fan.visualLayers[0].sourceRenderer)
+        {
+            SpriteRenderer torchRenderer = fan.visualLayers[0].sourceRenderer;
+            renderer.sortingLayerID = torchRenderer.sortingLayerID;
+            renderer.sortingOrder = torchRenderer.sortingOrder;
+        }
+
+        wave.visualObject = obj;
+        wave.visualMesh = mesh;
+        wave.visualRenderer = renderer;
+        wave.visualAnimationObject = animationObject;
+        wave.visualAnimationRenderer = animationRenderer;
+        wave.visualAnimationAnimator = animationAnimator;
+        wave.visualLastSprite = source.sprite;
+        wave.visualFlipX = source.flipX;
+        wave.visualFlipY = source.flipY;
+        wave.visualRadius = visualRadius;
+        wave.visualMaterial = material;
+        UpdateBlastWaveVisual(wave, 0f);
+    }
+
+    private static Mesh BuildExplosionCrescentMesh(
+        Sprite sprite,
+        bool flipX,
+        bool flipY,
+        float halfArcDegrees,
+        float visualRadius,
+        float bandThickness)
+    {
+        if (sprite == null)
+            return null;
+
+        const int arcSegments = 48;
+        const int radialSegments = 8;
+
+        float outerRadius = Mathf.Max(0.05f, visualRadius);
+        float thickness = Mathf.Clamp(
+            bandThickness,
+            0.01f,
+            outerRadius * 0.95f
+        );
+        float innerRadius = Mathf.Max(0.01f, outerRadius - thickness);
+        float clampedHalfArc = Mathf.Clamp(halfArcDegrees, 0.1f, 179f);
+
+        int columns = arcSegments + 1;
+        int rows = radialSegments + 1;
+        Vector3[] vertices = new Vector3[columns * rows];
+        int[] triangles = new int[arcSegments * radialSegments * 6];
+        Color[] colors = new Color[vertices.Length];
+
+        for (int radial = 0; radial <= radialSegments; radial++)
+        {
+            float radialT = radial / (float)radialSegments;
+            float radius = Mathf.Lerp(innerRadius, outerRadius, radialT);
+
+            for (int angular = 0; angular <= arcSegments; angular++)
+            {
+                float angularT = angular / (float)arcSegments;
+                float angle = Mathf.Lerp(
+                    -clampedHalfArc,
+                    clampedHalfArc,
+                    angularT
+                ) * Mathf.Deg2Rad;
+                int index = radial * columns + angular;
+
+                // Put the crescent's leading midpoint at local x=0. The circle
+                // center sits behind it, producing a moon/arc that travels forward.
+                vertices[index] = new Vector3(
+                    -outerRadius + Mathf.Cos(angle) * radius,
+                    Mathf.Sin(angle) * radius,
+                    0f
+                );
+                colors[index] = Color.white;
+            }
+        }
+
+        int tri = 0;
+        for (int radial = 0; radial < radialSegments; radial++)
+        {
+            for (int angular = 0; angular < arcSegments; angular++)
+            {
+                int a = radial * columns + angular;
+                int b = a + 1;
+                int c = (radial + 1) * columns + angular;
+                int d = c + 1;
+
+                triangles[tri++] = a;
+                triangles[tri++] = c;
+                triangles[tri++] = b;
+                triangles[tri++] = b;
+                triangles[tri++] = c;
+                triangles[tri++] = d;
+            }
+        }
+
+        Mesh mesh = new Mesh();
+        mesh.name = "Starfire Explosion Crescent";
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.colors = colors;
+        UpdateExplosionCrescentUvs(
+            mesh,
+            sprite,
+            flipX,
+            flipY,
+            outerRadius
+        );
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    private static void UpdateExplosionCrescentGeometry(
+        Mesh mesh,
+        float halfArcDegrees,
+        float visualRadius,
+        float bandThickness)
+    {
+        if (mesh == null)
+            return;
+
+        const int arcSegments = 48;
+        const int radialSegments = 8;
+
+        float outerRadius = Mathf.Max(0.05f, visualRadius);
+        float thickness = Mathf.Clamp(
+            bandThickness,
+            0.01f,
+            outerRadius * 0.95f
+        );
+        float innerRadius = Mathf.Max(0.01f, outerRadius - thickness);
+        float clampedHalfArc = Mathf.Clamp(halfArcDegrees, 0.1f, 179f);
+
+        int columns = arcSegments + 1;
+        int expectedVertices = columns * (radialSegments + 1);
+        Vector3[] vertices = mesh.vertices;
+        if (vertices == null || vertices.Length != expectedVertices)
+            return;
+
+        for (int radial = 0; radial <= radialSegments; radial++)
+        {
+            float radialT = radial / (float)radialSegments;
+            float radius = Mathf.Lerp(innerRadius, outerRadius, radialT);
+
+            for (int angular = 0; angular <= arcSegments; angular++)
+            {
+                float angularT = angular / (float)arcSegments;
+                float angle = Mathf.Lerp(
+                    -clampedHalfArc,
+                    clampedHalfArc,
+                    angularT
+                ) * Mathf.Deg2Rad;
+                int index = radial * columns + angular;
+
+                vertices[index] = new Vector3(
+                    -outerRadius + Mathf.Cos(angle) * radius,
+                    Mathf.Sin(angle) * radius,
+                    0f
+                );
+            }
+        }
+
+        mesh.vertices = vertices;
+        mesh.RecalculateBounds();
+    }
+
+    private static float GetBlastWaveCurrentSizeRadius(
+        BlastWaveState wave,
+        float travelDistance)
+    {
+        if (wave == null)
+            return 0.05f;
+
+        float travel01 = wave.maxRange <= 0.0001f
+            ? 1f
+            : Mathf.Clamp01(travelDistance / wave.maxRange);
+
+        return Mathf.Max(
+            0.05f,
+            Mathf.Lerp(wave.startRadius, wave.endRadius, travel01)
+        );
+    }
+
+    private static void UpdateExplosionCrescentUvs(
+        Mesh mesh,
+        Sprite sprite,
+        bool flipX,
+        bool flipY,
+        float outerRadius)
+    {
+        if (mesh == null || sprite == null || outerRadius <= 0.0001f)
+            return;
+
+        Vector3[] vertices = mesh.vertices;
+        Vector2[] uv = new Vector2[vertices.Length];
+        Vector4 outerUv = UnityEngine.Sprites.DataUtility.GetOuterUV(sprite);
+
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector3 vertex = vertices[i];
+            float normalizedX = 0.5f +
+                ((vertex.x + outerRadius) / outerRadius) * 0.5f;
+            float normalizedY = 0.5f +
+                (vertex.y / outerRadius) * 0.5f;
+
+            normalizedX = Mathf.Clamp01(normalizedX);
+            normalizedY = Mathf.Clamp01(normalizedY);
+
+            if (flipX)
+                normalizedX = 1f - normalizedX;
+            if (flipY)
+                normalizedY = 1f - normalizedY;
+
+            switch (sprite.packingRotation)
+            {
+                case SpritePackingRotation.FlipHorizontal:
+                    normalizedX = 1f - normalizedX;
+                    break;
+                case SpritePackingRotation.FlipVertical:
+                    normalizedY = 1f - normalizedY;
+                    break;
+                case SpritePackingRotation.Rotate180:
+                    normalizedX = 1f - normalizedX;
+                    normalizedY = 1f - normalizedY;
+                    break;
+            }
+
+            uv[i] = new Vector2(
+                Mathf.Lerp(outerUv.x, outerUv.z, normalizedX),
+                Mathf.Lerp(outerUv.y, outerUv.w, normalizedY)
+            );
+        }
+
+        mesh.uv = uv;
+    }
+
+    private static BlastWaveExplosionVisualSource ResolveBlastWaveExplosionSource()
+    {
+        if (blastWaveExplosionVisualSource != null)
+            return blastWaveExplosionVisualSource;
+
+        GameObject prefab =
+            LeviathanStellarConverter.GetCommonExplosiveAreaVisualPrefab();
+        if (prefab == null)
+            return null;
+
+        SpriteRenderer renderer = prefab.GetComponent<SpriteRenderer>();
+        if (renderer == null)
+            renderer = prefab.GetComponentInChildren<SpriteRenderer>(true);
+        if (renderer == null || renderer.sprite == null)
+            return null;
+
+        Animator animator = prefab.GetComponent<Animator>();
+        if (animator == null)
+            animator = prefab.GetComponentInChildren<Animator>(true);
+
+        BlastWaveExplosionVisualSource source =
+            new BlastWaveExplosionVisualSource();
+        source.sourceRenderer = renderer;
+        source.sprite = renderer.sprite;
+        source.material = renderer.sharedMaterial;
+        source.animatorController = animator == null
+            ? null
+            : animator.runtimeAnimatorController;
+        source.flipX = renderer.flipX;
+        source.flipY = renderer.flipY;
+        source.sortingLayerID = renderer.sortingLayerID;
+        source.sortingOrder = renderer.sortingOrder;
+
+        blastWaveExplosionVisualSource = source;
+        return source;
+    }
+
+    private static Color GetBlastWaveVisualColor(Torch torch)
+    {
+        FanState fan;
+        if (torch != null &&
+            FanStates.TryGetValue(torch, out fan) &&
+            fan != null &&
+            fan.visualLayers.Count > 0 &&
+            fan.visualLayers[0].sourceRenderer)
+        {
+            Color color = fan.visualLayers[0].sourceRenderer.color;
+            color.a = 1f;
+            return color;
+        }
+
+        Color fallback = torch == null
+            ? Color.white
+            : GetTorchDamageTypeColor(torch.damageType);
+        fallback.a = 1f;
+        return fallback;
+    }
+
+    private static void ApplyBlastWaveVisualTint(
+        MeshRenderer renderer,
+        Sprite sprite,
+        Color tint)
+    {
+        if (renderer == null || sprite == null)
+            return;
+
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(block);
+        block.SetTexture(Shader.PropertyToID("_MainTex"), sprite.texture);
+        block.SetColor(Shader.PropertyToID("_Color"), tint);
+        block.SetColor(Shader.PropertyToID("_RendererColor"), tint);
+        renderer.SetPropertyBlock(block);
+    }
+
+    // Mirrors Torch.EditorGetDamageColor so Blast Wave always matches the source
+    // Torch element even though the shared explosion art is element-neutral.
+    private static Color GetTorchDamageTypeColor(Damageable.DamageType damageType)
+    {
+        switch (damageType)
+        {
+            case Damageable.DamageType.Cold:
+                return new Color(0.4f, 0.98f, 0.98f, 1f);
+            case Damageable.DamageType.Corrosive:
+                return new Color(0.7f, 0.4f, 0.99f, 1f);
+            case Damageable.DamageType.Electric:
+                return new Color(0.99f, 0.92f, 0.4f, 1f);
+            case Damageable.DamageType.Thermal:
+                return new Color(0.99f, 0.4f, 0.43f, 1f);
+            case Damageable.DamageType.Radiation:
+                return new Color(0.4f, 0.99f, 0.43f, 1f);
+            default:
+                return Color.white;
+        }
+    }
+
+    private static void CreateFallbackBlastWaveVisual(
+        BlastWaveState wave,
+        ResolvedStarfireState state)
+    {
         Shader shader = Shader.Find("Sprites/Default");
         if (shader == null)
             return;
 
-        GameObject obj = new GameObject("Leviathan Starfire Blast Wave");
+        GameObject obj = new GameObject("Leviathan Starfire Blast Wave Fallback");
         LineRenderer line = obj.AddComponent<LineRenderer>();
         line.useWorldSpace = true;
         line.loop = false;
@@ -2473,9 +3416,12 @@ public static class LeviathanStarfireRuntime
         line.numCornerVertices = 2;
         Material visualMaterial = new Material(shader);
         line.sharedMaterial = visualMaterial;
-        wave.visualMaterial = visualMaterial;
 
-        Color color = Color.white;
+        Color color = GetTorchDamageTypeColor(
+            wave.sourceTorch == null
+                ? Damageable.DamageType.Kinetic
+                : wave.sourceTorch.damageType
+        );
         FanState fan;
         if (wave.sourceTorch != null &&
             FanStates.TryGetValue(wave.sourceTorch, out fan) &&
@@ -2494,20 +3440,100 @@ public static class LeviathanStarfireRuntime
         line.endColor = color;
 
         wave.visualObject = obj;
-        wave.lineRenderer = line;
+        wave.fallbackLineRenderer = line;
+        wave.visualMaterial = visualMaterial;
         UpdateBlastWaveVisual(wave, 0f);
     }
 
     private static void UpdateBlastWaveVisual(
         BlastWaveState wave,
-        float radius)
+        float travelDistance)
     {
-        if (wave == null || wave.lineRenderer == null)
+        if (wave == null)
             return;
 
-        int count = Mathf.Max(2, wave.lineRenderer.positionCount);
+        float currentSizeRadius = GetBlastWaveCurrentSizeRadius(
+            wave,
+            travelDistance
+        );
+        Vector2 anchor =
+            wave.origin + wave.direction * travelDistance;
+
+        if (wave.visualObject != null &&
+            wave.visualMesh != null &&
+            wave.visualRenderer != null)
+        {
+            wave.visualObject.transform.position = anchor;
+            wave.visualObject.transform.localScale = Vector3.one;
+
+            UpdateExplosionCrescentGeometry(
+                wave.visualMesh,
+                wave.halfArcDegrees,
+                currentSizeRadius,
+                wave.radialThickness
+            );
+            wave.visualRadius = currentSizeRadius;
+
+            if (wave.visualAnimationAnimator != null)
+            {
+                AnimatorStateInfo info =
+                    wave.visualAnimationAnimator.GetCurrentAnimatorStateInfo(0);
+                if (info.normalizedTime >= 1f && info.fullPathHash != 0)
+                {
+                    wave.visualAnimationAnimator.Play(
+                        info.fullPathHash,
+                        0,
+                        info.normalizedTime - Mathf.Floor(info.normalizedTime)
+                    );
+                }
+            }
+
+            Sprite currentSprite = wave.visualAnimationRenderer == null
+                ? wave.visualLastSprite
+                : wave.visualAnimationRenderer.sprite;
+            if (currentSprite != null)
+            {
+                bool spriteChanged = currentSprite != wave.visualLastSprite;
+                if (spriteChanged)
+                    wave.visualLastSprite = currentSprite;
+
+                UpdateExplosionCrescentUvs(
+                    wave.visualMesh,
+                    currentSprite,
+                    wave.visualFlipX,
+                    wave.visualFlipY,
+                    currentSizeRadius
+                );
+
+                if (spriteChanged &&
+                    wave.visualMaterial != null &&
+                    wave.visualMaterial.HasProperty("_MainTex"))
+                {
+                    wave.visualMaterial.mainTexture = currentSprite.texture;
+                }
+
+                Color tint = GetBlastWaveVisualColor(wave.sourceTorch);
+                tint.a = GetResolvedStarfireState().BlastWaveVisualOpacity;
+                ApplyBlastWaveVisualTint(
+                    wave.visualRenderer,
+                    currentSprite,
+                    tint
+                );
+            }
+
+            return;
+        }
+
+        if (wave.fallbackLineRenderer == null)
+            return;
+
+        int count = Mathf.Max(2, wave.fallbackLineRenderer.positionCount);
         float baseAngle = Mathf.Atan2(wave.direction.y, wave.direction.x) *
             Mathf.Rad2Deg;
+        Vector2 circleCenter =
+            anchor - wave.direction * currentSizeRadius;
+
+        wave.fallbackLineRenderer.widthMultiplier = wave.radialThickness;
 
         for (int i = 0; i < count; i++)
         {
@@ -2519,9 +3545,9 @@ public static class LeviathanStarfireRuntime
             );
             Vector3 radial3 = Quaternion.Euler(0f, 0f, angle) * Vector3.right;
             Vector2 radial = new Vector2(radial3.x, radial3.y);
-            wave.lineRenderer.SetPosition(
+            wave.fallbackLineRenderer.SetPosition(
                 i,
-                wave.origin + radial * radius
+                circleCenter + radial * currentSizeRadius
             );
         }
     }
@@ -2534,11 +3560,20 @@ public static class LeviathanStarfireRuntime
         if (wave.visualObject)
             UnityEngine.Object.Destroy(wave.visualObject);
 
+        if (wave.visualMesh)
+            UnityEngine.Object.Destroy(wave.visualMesh);
+
         if (wave.visualMaterial)
             UnityEngine.Object.Destroy(wave.visualMaterial);
 
         wave.visualObject = null;
-        wave.lineRenderer = null;
+        wave.visualMesh = null;
+        wave.visualRenderer = null;
+        wave.visualAnimationObject = null;
+        wave.visualAnimationRenderer = null;
+        wave.visualAnimationAnimator = null;
+        wave.visualLastSprite = null;
+        wave.fallbackLineRenderer = null;
         wave.visualMaterial = null;
     }
 
@@ -2571,24 +3606,42 @@ public static class LeviathanStarfireRuntime
         }
 
         float elapsed = Mathf.Max(0f, Time.time - wave.startedTime);
-        float currentRadius = wave.speed <= 0.0001f
+        float currentTravel = wave.speed <= 0.0001f
             ? wave.maxRange
             : Mathf.Min(wave.maxRange, elapsed * wave.speed);
 
-        UpdateBlastWaveVisual(wave, currentRadius);
+        UpdateBlastWaveVisual(wave, currentTravel);
 
-        float outer = Mathf.Min(
-            wave.maxRange,
-            currentRadius + wave.radialThickness * 0.5f
+        float currentSizeRadius = GetBlastWaveCurrentSizeRadius(
+            wave,
+            currentTravel
         );
-        float inner = Mathf.Max(
+        Vector2 anchor =
+            wave.origin + wave.direction * currentTravel;
+        Vector2 circleCenter =
+            anchor - wave.direction * currentSizeRadius;
+
+        // The authored front thickness stays in meters while the crescent radius
+        // grows from Start Radius to End Radius. Add the distance travelled since
+        // the previous FixedUpdate only to the inner edge as anti-tunnelling sweep.
+        float travelStep = Mathf.Max(
             0f,
-            wave.previousRadius - wave.radialThickness * 0.5f
+            currentTravel - wave.previousRadius
+        );
+        float outerRadius = currentSizeRadius;
+        float innerRadius = Mathf.Max(
+            0f,
+            currentSizeRadius -
+                wave.radialThickness -
+                travelStep
         );
 
         Collider2D[] colliders = PhysicsController.instance == null
             ? null
-            : PhysicsController.instance.OverlapCircle(wave.origin, outer);
+            : PhysicsController.instance.OverlapCircle(
+                circleCenter,
+                outerRadius
+            );
 
         if (colliders != null)
         {
@@ -2615,10 +3668,10 @@ public static class LeviathanStarfireRuntime
                     continue;
                 }
 
-                Vector2 hitPoint = collider.ClosestPoint(wave.origin);
-                Vector2 offset = hitPoint - wave.origin;
+                Vector2 hitPoint = collider.ClosestPoint(circleCenter);
+                Vector2 offset = hitPoint - circleCenter;
                 float distance = offset.magnitude;
-                if (distance < inner || distance > outer)
+                if (distance < innerRadius || distance > outerRadius)
                     continue;
 
                 if (distance > 0.0001f &&
@@ -2641,9 +3694,9 @@ public static class LeviathanStarfireRuntime
             }
         }
 
-        wave.previousRadius = currentRadius;
+        wave.previousRadius = currentTravel;
 
-        if (currentRadius >= wave.maxRange - 0.0001f)
+        if (currentTravel >= wave.maxRange - 0.0001f)
             DestroyBlastWave(torch, wave);
     }
 
@@ -3246,6 +4299,8 @@ public static class LeviathanStarfireRuntime
         public float BlastWaveDuration;
         public float BlastWaveFalloffExponent;
         public float BlastWaveVisualOpacity;
+        public float BlastWaveStartRadius;
+        public float BlastWaveEndRadius;
         public float BlastWaveKnockback;
     }
 
@@ -3286,198 +4341,204 @@ public static class LeviathanStarfireRuntime
 
         state.HeatMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.HeatGeneration,
+            Knobs.HeatGeneration,
             GetRankValue(HeatMultiplierByRank, rank)));
         state.LengthMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.Length,
+            Knobs.Length,
             GetRankValue(LengthMultiplierByRank, rank)));
         state.WidthMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.Width,
+            Knobs.Width,
             GetRankValue(WidthMultiplierByRank, rank)));
         state.DamageMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.Damage,
+            Knobs.Damage,
             GetRankValue(DamageMultiplierByRank, rank)));
         state.CritChanceBonus = ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.CritChance,
+            Knobs.CritChance,
             GetRankValue(CritChanceBonusByRank, rank));
         state.CritDamageBonus = ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.CritDamage,
+            Knobs.CritDamage,
             GetRankValue(CritDamageBonusByRank, rank));
         state.StatusChanceBonus = ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.StatusChance,
+            Knobs.StatusChance,
             GetRankValue(StatusChanceBonusByRank, rank));
 
         state.StartupDelaySeconds = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.StartupDelaySeconds,
+            Knobs.StartupDelaySeconds,
             GetRankValue(StartupDelaySecondsByRank, rank)));
         state.NativeChargeRampSpeedMultiplier = Mathf.Max(0.0001f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.NativeChargeRampSpeed,
+            Knobs.NativeChargeRampSpeed,
             GetRankValue(ChargeRampSpeedMultiplierByRank, rank)));
 
         float durationMultiplier = Mathf.Max(0f, GetSpecializationMultiplier(
             pilot,
-            LeviathanStarfireKnobs.Duration));
+            Knobs.Duration));
         state.FullSizeHoldSeconds = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.FullSizeHoldSeconds,
+            Knobs.FullSizeHoldSeconds,
             GetRankValue(FullSizeHoldSecondsByRank, rank)) * durationMultiplier);
         state.RetreatSeconds = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RetreatSeconds,
+            Knobs.RetreatSeconds,
             GetRankValue(BreathRetreatSecondsByRank, rank)) * durationMultiplier);
         state.CapacitySeconds = Mathf.Max(0f,
             state.FullSizeHoldSeconds + state.RetreatSeconds);
         state.ActiveDrainRate = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.ActiveDrainRate,
+            Knobs.ActiveDrainRate,
             BaseBreathActiveDrainRate));
 
         float recoveryRateMultiplier = Mathf.Max(0f, GetSpecializationMultiplier(
             pilot,
-            LeviathanStarfireKnobs.RecoveryRate));
+            Knobs.RecoveryRate));
         state.RecoverySecondsPerSecond = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RecoverySecondsPerSecond,
+            Knobs.RecoverySecondsPerSecond,
             BaseBreathRecoverySecondsPerSecond) * recoveryRateMultiplier);
         state.RecoveryDelaySeconds = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RecoveryDelaySeconds,
+            Knobs.RecoveryDelaySeconds,
             BaseBreathRecoveryDelaySeconds));
         state.RecoveryCurveExponent = Mathf.Max(0.05f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RecoveryCurveExponent,
+            Knobs.RecoveryCurveExponent,
             BaseBreathRecoveryCurveExponent));
 
         state.MinimumDamageFraction = Mathf.Clamp01(ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.MinimumDamage,
+            Knobs.MinimumDamage,
             BaseBreathMinimumDamageFraction));
         state.MinimumLengthFraction = Mathf.Clamp01(ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.MinimumLength,
+            Knobs.MinimumLength,
             BaseBreathMinimumLengthFraction));
         state.MinimumWidthFraction = Mathf.Clamp01(ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.MinimumWidth,
+            Knobs.MinimumWidth,
             BaseBreathMinimumWidthFraction));
         state.RetreatCurveExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RetreatCurveExponent,
+            Knobs.RetreatCurveExponent,
             GetRankValue(BreathRetreatCurveExponentByRank, rank)));
         state.DamageFalloffCurveExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.DamageFalloffCurveExponent,
+            Knobs.DamageFalloffCurveExponent,
             state.RetreatCurveExponent));
         state.LengthFalloffCurveExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.LengthFalloffCurveExponent,
+            Knobs.LengthFalloffCurveExponent,
             state.RetreatCurveExponent));
         state.WidthFalloffCurveExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.WidthFalloffCurveExponent,
+            Knobs.WidthFalloffCurveExponent,
             state.RetreatCurveExponent));
 
         state.BaseFanHalfAngleDegrees = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BaseFanHalfAngleDegrees,
+            Knobs.BaseFanHalfAngleDegrees,
             BaseFanHalfAngleDegrees));
         state.MuzzleHalfWidthMultiplier = Mathf.Max(0.01f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.MuzzleWidth,
+            Knobs.MuzzleWidth,
             BaseMuzzleHalfWidthMultiplier));
         state.HitboxWidthPaddingMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.HitboxWidthPadding,
+            Knobs.HitboxWidthPadding,
             BaseHitboxWidthPaddingMultiplier));
         state.HitboxLengthPaddingMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.HitboxLengthPadding,
+            Knobs.HitboxLengthPadding,
             BaseHitboxLengthPaddingMultiplier));
         state.VisualCenterLengthBonusFraction = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.CenterLengthBonus,
+            Knobs.CenterLengthBonus,
             BaseVisualCenterLengthBonusFraction));
         state.VisualOpacity = Mathf.Clamp01(ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.VisualOpacity,
+            Knobs.VisualOpacity,
             BaseVisualOpacity));
         state.VisualBeamFillFraction = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.VisualBeamFill,
+            Knobs.VisualBeamFill,
             BaseVisualBeamFillFraction));
         state.VisualMinimumHalfWidthMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.VisualMinimumBeamWidth,
+            Knobs.VisualMinimumBeamWidth,
             BaseVisualMinimumHalfWidthMultiplier));
         state.VisualEndFeatherFraction = Mathf.Clamp(ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.VisualEndFeather,
+            Knobs.VisualEndFeather,
             BaseVisualEndFeatherFraction), 0f, 0.50f);
         state.VisualStartupExtendSeconds = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.VisualStartupExtendSeconds,
+            Knobs.VisualStartupExtendSeconds,
             BaseVisualStartupExtendSeconds));
         state.VisualBeamCount = Mathf.Max(1, Mathf.RoundToInt(ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.VisualBeamCount,
+            Knobs.VisualBeamCount,
             BaseVisualBeamCount)));
         state.VisualLengthSegments = Mathf.Max(2, Mathf.RoundToInt(ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.VisualLengthSegments,
+            Knobs.VisualLengthSegments,
             BaseVisualLengthSegments)));
 
         state.RechargePullEnabled = LeviathanSpecializationRuntime.HasFlag(
-            LeviathanStarfireFlags.RechargePull);
+            Flags.RechargePull);
         state.RechargePullRadius = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RechargePullRadius, 0f)) * WorldUnitsPerMeter;
+            Knobs.RechargePullRadius, 0f)) * WorldUnitsPerMeter;
         state.RechargePullStrength = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RechargePullStrength, 0f));
+            Knobs.RechargePullStrength, 0f));
         state.RechargePullFalloffExponent = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RechargePullFalloffExponent, 0f));
+            Knobs.RechargePullFalloffExponent, 0f));
         state.RechargePullMaxSpeed = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.RechargePullMaxSpeed, 0f)) * WorldUnitsPerMeter;
+            Knobs.RechargePullMaxSpeed, 0f)) * WorldUnitsPerMeter;
 
         state.BlastWaveEnabled = LeviathanSpecializationRuntime.HasFlag(
-            LeviathanStarfireFlags.BlastWave);
+            Flags.BlastWave);
         state.BlastWaveArcDegrees = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveArcDegrees, 0f));
+            Knobs.BlastWaveArcDegrees, 0f));
         state.BlastWaveDamageMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveDamageMultiplier, 1f));
+            Knobs.BlastWaveDamageMultiplier, 1f));
         state.BlastWaveSpeed = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveSpeed, 0f)) * WorldUnitsPerMeter;
+            Knobs.BlastWaveSpeed, 0f)) * WorldUnitsPerMeter;
         state.BlastWaveRangeMultiplier = Mathf.Max(0f, GetSpecializationMultiplier(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveRange));
+            Knobs.BlastWaveRange));
         state.BlastWaveFrontThickness = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveWidth, 0f)) * WorldUnitsPerMeter;
+            Knobs.BlastWaveWidth, 0f)) * WorldUnitsPerMeter;
         state.BlastWaveDuration = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveDuration, 0f));
+            Knobs.BlastWaveDuration, 0f));
         state.BlastWaveFalloffExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveFalloffExponent, 1f));
+            Knobs.BlastWaveFalloffExponent, 1f));
         state.BlastWaveVisualOpacity = Mathf.Clamp01(ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveVisualOpacity, 0f));
+            Knobs.BlastWaveVisualOpacity, 0f));
+        state.BlastWaveStartRadius = Mathf.Max(0.05f, ApplySpecializationKnob(
+            pilot,
+            Knobs.BlastWaveStartRadius, 0f)) * WorldUnitsPerMeter;
+        state.BlastWaveEndRadius = Mathf.Max(0.05f, ApplySpecializationKnob(
+            pilot,
+            Knobs.BlastWaveEndRadius, 0f)) * WorldUnitsPerMeter;
         state.BlastWaveKnockback = Mathf.Max(0f, ApplySpecializationKnob(
             pilot,
-            LeviathanStarfireKnobs.BlastWaveKnockback, 0f));
+            Knobs.BlastWaveKnockback, 0f));
 
         resolvedStatePilot = pilot;
         resolvedStateRank = rank;
@@ -3556,6 +4617,8 @@ public static class LeviathanStarfireRuntime
     public static float GetBlastWaveDuration() { return GetResolvedStarfireState().BlastWaveDuration; }
     public static float GetBlastWaveFalloffExponent() { return GetResolvedStarfireState().BlastWaveFalloffExponent; }
     public static float GetBlastWaveVisualOpacity() { return GetResolvedStarfireState().BlastWaveVisualOpacity; }
+    public static float GetBlastWaveStartRadius() { return GetResolvedStarfireState().BlastWaveStartRadius; }
+    public static float GetBlastWaveEndRadius() { return GetResolvedStarfireState().BlastWaveEndRadius; }
     public static float GetBlastWaveKnockback() { return GetResolvedStarfireState().BlastWaveKnockback; }
 
     private static float GetRankValue(float[] values, int rank)
@@ -3810,5 +4873,36 @@ public static class LeviathanStarfireRouteDamagePatch
     public static void Prefix(object[] __args)
     {
         LeviathanStarfireRuntime.ScaleNativeTorchDamage(__args);
+    }
+}
+
+// Native Activatable timing belongs to Starfire even though the values live on
+// Star Vortex's Activatable base class. Kept in this file so the skill owns all
+// implementation needed by the knobs exposed above.
+[HarmonyPatch(typeof(Activatable), "get_Cooldown")]
+public static class LeviathanStarfireSpecializationCooldownPatch
+{
+    public static void Postfix(Activatable __instance, ref float __result)
+    {
+        Torch torch = __instance as Torch;
+        if (!LeviathanStarfireRuntime.IsCurrentStarfireSource(torch))
+            return;
+
+        __result *= LeviathanStarfireRuntime.GetNativeRecoveryMultiplier(
+            LeviathanStarfireRuntime.Knobs.Cooldown);
+    }
+}
+
+[HarmonyPatch(typeof(Activatable), "get_RechargeSeconds")]
+public static class LeviathanStarfireSpecializationRechargePatch
+{
+    public static void Postfix(Activatable __instance, ref float __result)
+    {
+        Torch torch = __instance as Torch;
+        if (!LeviathanStarfireRuntime.IsCurrentStarfireSource(torch))
+            return;
+
+        __result *= LeviathanStarfireRuntime.GetNativeRecoveryMultiplier(
+            LeviathanStarfireRuntime.Knobs.RechargeSeconds);
     }
 }

@@ -2,6 +2,7 @@ using HarmonyLib;
 using StarVortex;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -29,6 +30,8 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
     private GameObject root;
     private RectTransform graphContent;
     private RectTransform treeBar;
+    private ScrollRect graphScroll;
+    private string lastRenderedTreeId;
     private Text titleText;
     private Text pointsText;
     private Text detailsText;
@@ -58,7 +61,12 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
         root.SetActive(!root.activeSelf);
         if (root.activeSelf)
+        {
+            LeviathanSpecializationRuntime.RefreshTreeDefinitions();
+            lastRenderedTreeId = null;
+            selectedNodeId = null;
             Refresh();
+        }
     }
 
     private void Build()
@@ -130,13 +138,13 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         graphContent.anchorMax = new Vector2(0f, 0.5f);
         graphContent.pivot = new Vector2(0f, 0.5f);
 
-        ScrollRect scroll = viewportObject.AddComponent<ScrollRect>();
-        scroll.viewport = viewport;
-        scroll.content = graphContent;
-        scroll.horizontal = true;
-        scroll.vertical = true;
-        scroll.movementType = ScrollRect.MovementType.Clamped;
-        scroll.scrollSensitivity = 35f;
+        graphScroll = viewportObject.AddComponent<ScrollRect>();
+        graphScroll.viewport = viewport;
+        graphScroll.content = graphContent;
+        graphScroll.horizontal = true;
+        graphScroll.vertical = true;
+        graphScroll.movementType = ScrollRect.MovementType.Clamped;
+        graphScroll.scrollSensitivity = 35f;
 
         Image detailsPanel = CreateImage(
             backdrop.transform,
@@ -232,9 +240,42 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
               " Growth Points invested. Unlock skill trees from Evolution; granted roots cost 0. F10 closes."
             : "PERSISTENCE SAFETY MODE: " + pointReason;
 
+        bool treeChanged = !string.Equals(
+            lastRenderedTreeId,
+            tree.Id,
+            StringComparison.Ordinal
+        );
+
         RefreshTreeTabs(pilot, trees);
         RenderGraph(tree, pilot);
+
+        if (treeChanged)
+        {
+            ResetGraphView();
+            lastRenderedTreeId = tree.Id;
+        }
+
         RefreshDetails(tree, pilot);
+    }
+
+    private void ResetGraphView()
+    {
+        if (graphScroll != null)
+            graphScroll.StopMovement();
+
+        if (graphContent != null)
+            graphContent.anchoredPosition = Vector2.zero;
+
+        Canvas.ForceUpdateCanvases();
+
+        if (graphScroll != null)
+        {
+            // Tree graphs progress left-to-right and should open at the root,
+            // vertically centered. This also prevents a scroll offset from a
+            // previously selected tree from hiding sibling capstones.
+            graphScroll.horizontalNormalizedPosition = 0f;
+            graphScroll.verticalNormalizedPosition = 0.5f;
+        }
     }
 
     private void RefreshTreeTabs(
@@ -311,6 +352,9 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
             string.Equals(tree.Id, LeviathanEvolutionTree.TreeId, StringComparison.Ordinal)
                 ? BuildEvolutionLayout(tree)
                 : LeviathanSpecializationAutoLayout.Build(tree);
+
+        int definitionNodeCount = tree.Nodes.Count;
+        int layoutNodeCount = layout.Nodes.Count;
 
         graphContent.sizeDelta = new Vector2(layout.Width, layout.Height);
 
@@ -411,6 +455,29 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
                 );
             }
         }
+
+        string[] renderedNames = tree.Nodes
+            .Select(n => n.Name)
+            .ToArray();
+
+        titleText.text =
+            tree.Name.ToUpperInvariant() +
+            " SPECIALIZATION   [" +
+            LeviathanSpecializationRuntime.DiagnosticBuildMarker +
+            " | DEF " + definitionNodeCount.ToString() +
+            " | LAYOUT " + layoutNodeCount.ToString() +
+            " | BUTTONS " + nodeButtons.Count.ToString() +
+            "]";
+
+        Debug.Log(
+            "[Leviathan SpecDiag] " +
+            LeviathanSpecializationRuntime.DiagnosticBuildMarker +
+            " tree=" + tree.Id +
+            " def=" + definitionNodeCount.ToString() +
+            " layout=" + layoutNodeCount.ToString() +
+            " buttons=" + nodeButtons.Count.ToString() +
+            " nodes=[" + string.Join(", ", renderedNames) + "]"
+        );
     }
 
     private static LeviathanSpecializationLayout BuildEvolutionLayout(
@@ -421,7 +488,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
         const float childSpacing = 230f;
         const float rowSpacing = 220f;
-        const float topY = -120f;
+        const float topY = 120f;
 
         List<LeviathanSpecializationNode> children =
             new List<LeviathanSpecializationNode>();
@@ -459,7 +526,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
                 NodeId = node.Id,
                 Layer = 1,
                 Order = i,
-                Position = new LeviathanLayoutPoint(i * childSpacing, topY + rowSpacing)
+                Position = new LeviathanLayoutPoint(i * childSpacing, topY - rowSpacing)
             };
 
             if (rootNode != null)
