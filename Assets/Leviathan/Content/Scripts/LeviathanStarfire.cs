@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using static StarVortex.Damageable;
 
 /// <summary>
@@ -20,6 +21,11 @@ using static StarVortex.Damageable;
 /// </summary>
 public static class LeviathanStarfireRuntime
 {
+    // Star Vortex displays Unity world distance at 20 meters per world unit.
+    // User-facing meter/meter-per-second knobs are converted once when the
+    // resolved Starfire state is built.
+    private const float WorldUnitsPerMeter = 1f / 20f;
+
     // =========================================================================
     // BALANCE TUNING
     // =========================================================================
@@ -42,7 +48,7 @@ public static class LeviathanStarfireRuntime
     // Torch's own charge, VFX length and collider length all inherit it natively.
     private static readonly float[] LengthMultiplierByRank =
     {
-        1.15f, // Rank 1
+        1.07f, // Rank 1
         1.25f, // Rank 2
         1.3f, // Rank 3
         1.4f, // Rank 4
@@ -55,7 +61,7 @@ public static class LeviathanStarfireRuntime
     // half-angles of 13 / 15 / 17 / 18 / 20 degrees by rank.
     private static readonly float[] WidthMultiplierByRank =
     {
-        1.30f, // Rank 1
+        1.15f, // Rank 1
         1.50f, // Rank 2
         1.70f, // Rank 3
         1.80f, // Rank 4
@@ -68,11 +74,11 @@ public static class LeviathanStarfireRuntime
 
     // Rank spread = this angle * WidthMultiplierByRank. This is the main cone
     // angle knob. Example: 10 degrees * Rank 5's 2.0 = 20 degree half-angle.
-    private const float BaseFanHalfAngleDegrees = 15.0f;
+    private const float BaseFanHalfAngleDegrees = 13.0f;
 
     // Width at the muzzle as a fraction of the native Torch half-width. The
     // far end then expands according to the fan angle and current beam length.
-    private const float BaseMuzzleHalfWidthMultiplier = 0.65f;
+    private const float BaseMuzzleHalfWidthMultiplier = 0.55f;
 
     // 1.0 means neighboring cosmetic strips just touch at their center spacing.
     // Below 1 leaves visible seams; above 1 deliberately overlaps neighboring
@@ -91,7 +97,7 @@ public static class LeviathanStarfireRuntime
 
     // Global opacity of the cosmetic Starfire plume. 1.00 is fully opaque;
     // 0.50 is half opacity. This affects visuals only, never hit detection.
-    private const float BaseVisualOpacity = 0.70f;
+    private const float BaseVisualOpacity = 0.50f;
 
     // Terminal shaping shared by visuals and the single mechanical collider.
     // The outermost beam pair keeps the base breath length while progressively
@@ -104,32 +110,32 @@ public static class LeviathanStarfireRuntime
     // phase without changing the geometry/damage implementation.
     private static readonly float[] FullSizeHoldSecondsByRank =
     {
-        1.50f, // Rank 1
-        2.00f, // Rank 2
-        2.00f, // Rank 3
-        2.00f, // Rank 4
-        2.00f  // Rank 5
+        0.90f, // Rank 1
+        1.20f, // Rank 2
+        1.20f, // Rank 3
+        1.20f, // Rank 4
+        1.20f  // Rank 5
     };
 
     // Time spent shrinking from full range to the minimum breath-length fraction.
     private static readonly float[] BreathRetreatSecondsByRank =
     {
-        2.00f, // Rank 1
-        2.00f, // Rank 2
-        2.00f, // Rank 3
-        2.00f, // Rank 4
-        2.00f  // Rank 5
+        2.80f, // Rank 1
+        2.80f, // Rank 2
+        2.80f, // Rank 3
+        2.80f, // Rank 4
+        2.80f  // Rank 5
     };
 
-    // Remaining longitudinal breath length after the retreat completes. 0.25
-    // leaves one quarter of the initial breath range at an empty reservoir.
-    private const float BaseBreathMinimumLengthFraction = 0.25f;
+    // Remaining longitudinal breath length after the retreat completes. Baseline
+    // reaches zero at an empty reservoir; talents may raise the floor through knobs.
+    private const float BaseBreathMinimumLengthFraction = 0.00f;
 
-    // Damage and angular width now fall with the same persistent breath reserve,
-    // but each component has its own floor and curve so talents can shape them
-    // independently.
-    private const float BaseBreathMinimumDamageFraction = 0.25f;
-    private const float BaseBreathMinimumWidthFraction = 0.25f;
+    // Damage, length and angular width fall with the same persistent breath reserve.
+    // Baseline reaches zero for all three at exhaustion, while each component keeps
+    // its own floor and curve knob so talents can reshape the profile independently.
+    private const float BaseBreathMinimumDamageFraction = 0.00f;
+    private const float BaseBreathMinimumWidthFraction = 0.00f;
 
     // Baseline Starfire restores half a breath-second per real idle second. A
     // 3.5-second empty reservoir therefore takes roughly seven seconds to refill.
@@ -154,9 +160,13 @@ public static class LeviathanStarfireRuntime
     // each cosmetic ribbon without narrowing it.
     private const float BaseVisualEndFeatherFraction = 0.10f;
 
-    // More longitudinal sections make the endpoint alpha feather smoother without
-    // adding more Torch strips. This is still a very small cosmetic mesh.
-    private const int BaseVisualLengthSegments = 32;
+    // The ribbons are linear, so 16 longitudinal sections are enough for the
+    // endpoint alpha feather while cutting dynamic vertex work roughly in half.
+    private const int BaseVisualLengthSegments = 16;
+
+    // Cosmetic-only startup grow. Mechanics immediately use the resolved breath
+    // size; the plume rapidly extends to that size instead of popping in fully formed.
+    private const float BaseVisualStartupExtendSeconds = 0.25f;
 
     // Direct multiplier on the source Torch's native DamageData[] packet.
     // Neutral for now; future Starfire branches can change this independently.
@@ -264,6 +274,35 @@ public static class LeviathanStarfireRuntime
     private static readonly FieldInfo ActivatableActiveField =
         AccessTools.Field(typeof(Activatable), "active");
 
+    // Internal native combat helpers are resolved by shape so Starfire can route
+    // custom Blast Wave packets through exactly the same network/damage path as
+    // native Torch hits without taking a compile-time dependency on IDamageable.
+    private static readonly MethodInfo RouteDamageMethod =
+        typeof(NetCombat)
+            .GetMethods(
+                BindingFlags.Static |
+                BindingFlags.Public |
+                BindingFlags.NonPublic
+            )
+            .FirstOrDefault(
+                m => m.Name == "RouteDamage" &&
+                     m.GetParameters().Length == 14 &&
+                     m.GetParameters()[2].ParameterType == typeof(DamageData[])
+            );
+
+    private static readonly MethodInfo ConduitRelayHitMethod =
+        typeof(Conduit)
+            .GetMethods(
+                BindingFlags.Static |
+                BindingFlags.Public |
+                BindingFlags.NonPublic
+            )
+            .FirstOrDefault(
+                m => m.Name == "RelayHit" &&
+                     m.GetParameters().Length == 6 &&
+                     m.GetParameters()[3].ParameterType == typeof(DamageData[])
+            );
+
     private static readonly HashSet<Torch> TouchedTorches =
         new HashSet<Torch>();
 
@@ -281,12 +320,47 @@ public static class LeviathanStarfireRuntime
         public float capacitySeconds;
         public float lastUpdateTime;
         public float idleStartedTime = -1f;
+        public bool blastFiredThisActivation;
+        public bool wasEmitting;
+        public float visualEmissionStartedTime = -1f;
     }
 
     // Persistent lung state survives trigger release. It is initialized full,
     // drains while Starfire is actually breathing, and recovers only while idle.
     private static readonly Dictionary<Torch, BreathState> BreathStates =
         new Dictionary<Torch, BreathState>();
+
+    private sealed class BlastWaveState
+    {
+        public Torch sourceTorch;
+        public GameShip owner;
+        public Vector2 origin;
+        public Vector2 direction;
+        public float startedTime;
+        public float previousRadius;
+        public float maxRange;
+        public float speed;
+        public float radialThickness;
+        public float halfArcDegrees;
+        public float damageTickEquivalent;
+        public GameObject visualObject;
+        public LineRenderer lineRenderer;
+        public Material visualMaterial;
+        public readonly HashSet<GameShip> hitShips = new HashSet<GameShip>();
+    }
+
+    private static readonly Dictionary<Torch, BlastWaveState> BlastWaves =
+        new Dictionary<Torch, BlastWaveState>();
+
+    private static readonly HashSet<GameShip> RechargePullTargets =
+        new HashSet<GameShip>();
+
+    // Custom Starfire damage (Blast Wave) uses the same native Torch packet and
+    // RouteDamage hooks as normal Starfire, but supplies an integrated breath
+    // scale instead of the instantaneous reservoir scale.
+    private static float currentDamageScaleOverride = -1f;
+
+    private static bool sceneCleanupRegistered;
 
     private static bool warnedNoSpikeFields;
     private static bool warnedNoSpikeObject;
@@ -307,6 +381,12 @@ public static class LeviathanStarfireRuntime
         public float nativeHalfWidth;
         public int beamCount;
         public int lengthSegments;
+        public Vector3[] vertices;
+        public Color[] colors;
+        public Color lastSourceColor;
+        public float lastVisualOpacity = -1f;
+        public float lastEndFeatherFraction = -1f;
+        public bool colorsInitialized;
     }
 
     private sealed class FanState
@@ -323,6 +403,18 @@ public static class LeviathanStarfireRuntime
         public float maxX;
         public float centerY;
         public float baseHalfWidth;
+        public readonly Vector2[] colliderPoints = new Vector2[5];
+        public bool colliderShapeInitialized;
+        public float lastColliderNearHalfWidth;
+        public float lastColliderFarHalfWidth;
+        public float lastColliderTipX;
+        public bool visualGeometryInitialized;
+        public float lastVisualNearHalfWidth;
+        public float lastVisualFarHalfWidth;
+        public float lastVisualBreathScaleX;
+        public float lastVisualExtendScale;
+        public float maxVisualRangeMetric;
+        public float maxVisualWidthMetric;
         public readonly List<FanVisualLayer> visualLayers =
             new List<FanVisualLayer>();
     }
@@ -339,6 +431,49 @@ public static class LeviathanStarfireRuntime
 
     [ThreadStatic]
     private static int damageContextDepth;
+
+    public static void EnsureSceneCleanupHook()
+    {
+        if (sceneCleanupRegistered)
+            return;
+
+        sceneCleanupRegistered = true;
+        SceneManager.sceneUnloaded += OnSceneUnloaded;
+    }
+
+    private static void OnSceneUnloaded(Scene scene)
+    {
+        CleanupTransientState();
+    }
+
+    // Static Torch dictionaries otherwise survive scene changes. Explicitly
+    // release generated Mesh/Material objects so Unity can reclaim GPU/native
+    // resources before the next sector allocates its render targets.
+    public static void CleanupTransientState()
+    {
+        foreach (KeyValuePair<Torch, FanState> pair in FanStates)
+            CleanupFanState(pair.Value);
+        FanStates.Clear();
+
+        foreach (KeyValuePair<Torch, BlastWaveState> pair in BlastWaves)
+            CleanupBlastWaveVisual(pair.Value);
+        BlastWaves.Clear();
+
+        BreathStates.Clear();
+        StartupBeginTimes.Clear();
+        TouchedTorches.Clear();
+        FullySuppressedTorches.Clear();
+        RechargePullTargets.Clear();
+
+        currentDamageTorch = null;
+        damageContextDepth = 0;
+        currentDamageScaleOverride = -1f;
+
+        resolvedStatePilot = null;
+        resolvedStateRank = -1;
+        resolvedStateRevision = -1;
+        resolvedState = null;
+    }
 
     // =========================================================================
     // STARFIRE STATE / SOURCE SELECTION
@@ -376,7 +511,10 @@ public static class LeviathanStarfireRuntime
     {
         player = GetParentShip(torch);
 
-        if (!IsPrimaryTorch(torch, player))
+        // These Harmony hooks run for every Torch in the sector. Reject NPC
+        // Torches before scanning their slots or touching specialization state.
+        if (!IsCurrentPlayer(player) ||
+            !IsPrimaryTorch(torch, player))
         {
             rank = 0;
             return false;
@@ -476,6 +614,9 @@ public static class LeviathanStarfireRuntime
             RestoreStarfireFan(torch);
             BreathStates.Remove(torch);
             StartupBeginTimes.Remove(torch);
+            BlastWaveState activeWave;
+            if (BlastWaves.TryGetValue(torch, out activeWave))
+                DestroyBlastWave(torch, activeWave);
 
             if (TouchedTorches.Remove(torch))
             {
@@ -499,9 +640,27 @@ public static class LeviathanStarfireRuntime
             RestoreStarfireFan(torch);
             BreathStates.Remove(torch);
             StartupBeginTimes.Remove(torch);
+            BlastWaveState activeWave;
+            if (BlastWaves.TryGetValue(torch, out activeWave))
+                DestroyBlastWave(torch, activeWave);
             FullySuppressedTorches.Add(torch);
             SetSpikeSuppressed(mainSpike, true);
             SetSpikeSuppressed(mirrorSpike, true);
+            return;
+        }
+
+        ResolvedStarfireState resolved = GetResolvedStarfireState(rank);
+
+        // Blast Wave replaces the Torch completely for this activation. Keep the
+        // native Torch spike and Starfire plume hidden; only the travelling wave
+        // visual is allowed to render. The source spike remains available as an
+        // origin/reference object but contributes no renderer or collider.
+        if (resolved.BlastWaveEnabled)
+        {
+            FullySuppressedTorches.Add(torch);
+            SetSpikeSuppressed(mainSpike, true);
+            SetSpikeSuppressed(mirrorSpike, true);
+            SetStarfireFanActive(torch, false);
             return;
         }
 
@@ -516,13 +675,17 @@ public static class LeviathanStarfireRuntime
         // not remain visible during that discharge tail. Releasing only hides the
         // breath; persistent Breath Power is preserved and recovers in FixedUpdate.
         bool firing = torch.IsActive();
-        SetStarfireFanActive(torch, firing);
+        bool emitting = firing && !IsInsideStartupDelay(torch, rank);
+        SetStarfireFanActive(torch, emitting);
 
         if (!firing)
         {
             StartupBeginTimes.Remove(torch);
             return;
         }
+
+        if (!emitting)
+            return;
 
         if (applyScale)
             ApplyStarfireFan(torch, mainSpike, rank);
@@ -600,8 +763,10 @@ public static class LeviathanStarfireRuntime
 
         float scaledLength = localLength * breathScaleX;
         float nearHalfWidth = Mathf.Max(
-            state.baseHalfWidth * GetMuzzleHalfWidthMultiplier(),
-            state.baseHalfWidth * 0.01f
+            state.baseHalfWidth *
+                GetMuzzleHalfWidthMultiplier() *
+                remainingWidthFraction,
+            0.0001f
         );
         float farHalfWidth =
             nearHalfWidth + Mathf.Tan(fanHalfAngle) * scaledLength;
@@ -610,16 +775,15 @@ public static class LeviathanStarfireRuntime
         float cy = state.centerY;
 
         // Still exactly one PolygonCollider2D / one native OverlapCollider call.
-        // Its points are derived from the current cosmetic beam silhouette, so
-        // beam count, length staggering, fill/thickness and feather changes carry
-        // into the approximate damage envelope automatically.
-        state.fanCollider.points = BuildMechanicalFanPointsFromVisual(
+        // Use a cheap five-point envelope rather than rebaking a beam-by-beam
+        // silhouette every falloff tick.
+        UpdateMechanicalFanCollider(
+            state,
             x0,
             x1,
             cy,
             nearHalfWidth,
-            farHalfWidth,
-            state.baseHalfWidth
+            farHalfWidth
         );
 
         state.originalCollider.enabled = false;
@@ -636,6 +800,7 @@ public static class LeviathanStarfireRuntime
             );
         }
 
+        float visualExtendScale = GetVisualStartupExtendScale(torch, rank);
         UpdateFanVisuals(
             torch,
             state,
@@ -644,31 +809,50 @@ public static class LeviathanStarfireRuntime
             x0,
             x1,
             cy,
-            breathScaleX
+            breathScaleX,
+            visualExtendScale
         );
     }
 
-    private static Vector2[] BuildMechanicalFanPointsFromVisual(
+    private static float GetVisualStartupExtendScale(Torch torch, int rank)
+    {
+        ResolvedStarfireState resolved = GetResolvedStarfireState(rank);
+        float seconds = Mathf.Max(0f, resolved.VisualStartupExtendSeconds);
+        if (seconds <= 0.0001f || torch == null)
+            return 1f;
+
+        BreathState breath = GetOrCreateBreathState(torch, rank);
+        if (breath == null || breath.visualEmissionStartedTime < 0f)
+            return 1f;
+
+        float t = Mathf.Clamp01(
+            (Time.time - breath.visualEmissionStartedTime) / seconds
+        );
+        return Mathf.SmoothStep(0f, 1f, t);
+    }
+
+    private static void UpdateMechanicalFanCollider(
+        FanState state,
         float x0,
         float x1,
         float centerY,
         float nearHalfWidth,
-        float farHalfWidth,
-        float nativeHalfWidth)
+        float farHalfWidth)
     {
-        // Build the one mechanical polygon from the same beam-count, staggered
-        // endpoint, beam-fill/thickness and terminal-feather knobs used by the
-        // cosmetic plume. This keeps one cheap native overlap while making most
-        // visual-shape tuning automatically reshape the damage envelope too.
-        int beamCount = GetVisualBeamCount();
-        float centerLengthBonus = Mathf.Max(
-            0f,
-            GetVisualCenterLengthBonusFraction()
-        );
-        float endFeatherFraction = Mathf.Clamp(
-            GetVisualEndFeatherFraction(),
-            0f,
-            0.50f
+        if (state == null || state.fanCollider == null)
+            return;
+
+        // Keep the mechanical envelope cheap. The previous collider traced each
+        // cosmetic beam and forced PolygonCollider2D to rebake a large changing
+        // polygon every falloff tick. Five points preserve the cone and center tip.
+        float widthPadding = GetHitboxWidthPaddingMultiplier();
+        float lengthPadding = GetHitboxLengthPaddingMultiplier();
+        float centerBonus = Mathf.Max(0f, GetVisualCenterLengthBonusFraction());
+        int beamCount = Mathf.Max(1, GetVisualBeamCount());
+        float beamFill = Mathf.Max(0f, GetVisualBeamFillFraction());
+        float minimumHalfThickness = Mathf.Max(
+            0.0001f,
+            state.baseHalfWidth * GetVisualMinimumHalfWidthMultiplier()
         );
         float nearSpacing = beamCount > 1
             ? (nearHalfWidth * 2f) / (beamCount - 1)
@@ -676,96 +860,53 @@ public static class LeviathanStarfireRuntime
         float farSpacing = beamCount > 1
             ? (farHalfWidth * 2f) / (beamCount - 1)
             : farHalfWidth * 2f;
-        float safeNativeHalfWidth = Mathf.Max(
+        float nearThickness = Mathf.Max(
+            minimumHalfThickness,
+            nearSpacing * beamFill * 0.5f
+        );
+        float farThickness = Mathf.Max(
+            minimumHalfThickness,
+            farSpacing * beamFill * 0.5f
+        );
+        float visibleEndT = 1f - Mathf.Clamp(
+            GetVisualEndFeatherFraction(),
+            0f,
+            0.50f
+        ) * 0.5f;
+
+        float near = Mathf.Max(
             0.0001f,
-            nativeHalfWidth
+            (nearHalfWidth + nearThickness) * widthPadding
         );
-        float minimumWidthMultiplier =
-            GetVisualMinimumHalfWidthMultiplier();
-        float beamFillFraction = GetVisualBeamFillFraction();
-        float hitboxWidthPadding =
-            GetHitboxWidthPaddingMultiplier();
-        float hitboxLengthPadding =
-            GetHitboxLengthPaddingMultiplier();
-        float minimumHalfThickness =
-            safeNativeHalfWidth * minimumWidthMultiplier;
-        float nearHalfThickness = Mathf.Max(
-            minimumHalfThickness,
-            nearSpacing * beamFillFraction * 0.5f
+        float far = Mathf.Max(
+            near,
+            (farHalfWidth + farThickness) * widthPadding
         );
-        float farHalfThickness = Mathf.Max(
-            minimumHalfThickness,
-            farSpacing * beamFillFraction * 0.5f
-        );
+        float outerX = x0 +
+            (x1 - x0) * visibleEndT * lengthPadding;
+        float tipX = x0 +
+            (x1 - x0) * visibleEndT * (1f + centerBonus) * lengthPadding;
 
-        // Treat the midpoint of the alpha-feather as the practical visible edge.
-        // Geometry continues through a fully-transparent tail, but damage should
-        // follow what the player can meaningfully see rather than that invisible
-        // final sliver. SmoothStep is 50% alpha at the feather midpoint.
-        float visibleEndT = 1f - endFeatherFraction * 0.5f;
-        List<Vector2> points = new List<Vector2>(beamCount + 4);
-        float nearOuterExtent =
-            (nearHalfWidth + nearHalfThickness) *
-            hitboxWidthPadding;
+        bool changed = !state.colliderShapeInitialized ||
+            Mathf.Abs(state.lastColliderNearHalfWidth - near) > 0.0005f ||
+            Mathf.Abs(state.lastColliderFarHalfWidth - far) > 0.0005f ||
+            Mathf.Abs(state.lastColliderTipX - tipX) > 0.0005f;
 
-        points.Add(new Vector2(x0, centerY + nearOuterExtent));
+        if (!changed)
+            return;
 
-        // Trace the terminal visual silhouette from upper outer beam through the
-        // center and down to the lower outer beam. Endpoint depth, fan expansion
-        // and ribbon thickness use the same formulas as UpdateFanVisuals().
-        for (int beam = beamCount - 1; beam >= 0; beam--)
-        {
-            float beamT = beamCount == 1
-                ? 0f
-                : Mathf.Lerp(
-                    -1f,
-                    1f,
-                    beam / (beamCount - 1f)
-                );
-            float centerLengthWeight = GetCenterLengthWeight(
-                beam,
-                beamCount
-            );
-            float beamLengthScale =
-                1f + centerLengthBonus * centerLengthWeight;
-            float fanT = visibleEndT * beamLengthScale;
-            float terminalX = x0 +
-                (x1 - x0) * fanT * hitboxLengthPadding;
-            float terminalHalfWidth =
-                nearHalfWidth +
-                (farHalfWidth - nearHalfWidth) * fanT;
-            float terminalHalfThickness =
-                nearHalfThickness +
-                (farHalfThickness - nearHalfThickness) * fanT;
-            float beamCenterY =
-                centerY + terminalHalfWidth * beamT;
+        Vector2[] points = state.colliderPoints;
+        points[0] = new Vector2(x0, centerY + near);
+        points[1] = new Vector2(outerX, centerY + far);
+        points[2] = new Vector2(tipX, centerY);
+        points[3] = new Vector2(outerX, centerY - far);
+        points[4] = new Vector2(x0, centerY - near);
+        state.fanCollider.points = points;
 
-            if (Mathf.Abs(beamT) <= 0.0001f)
-            {
-                float paddedThickness =
-                    terminalHalfThickness * hitboxWidthPadding;
-                points.Add(new Vector2(
-                    terminalX,
-                    beamCenterY + paddedThickness
-                ));
-                points.Add(new Vector2(
-                    terminalX,
-                    beamCenterY - paddedThickness
-                ));
-            }
-            else
-            {
-                float outerY = beamCenterY +
-                    Mathf.Sign(beamT) * terminalHalfThickness;
-                outerY = centerY +
-                    (outerY - centerY) * hitboxWidthPadding;
-
-                points.Add(new Vector2(terminalX, outerY));
-            }
-        }
-
-        points.Add(new Vector2(x0, centerY - nearOuterExtent));
-        return points.ToArray();
+        state.lastColliderNearHalfWidth = near;
+        state.lastColliderFarHalfWidth = far;
+        state.lastColliderTipX = tipX;
+        state.colliderShapeInitialized = true;
     }
 
     private static float GetCenterLengthWeight(int beam, int beamCount)
@@ -1072,6 +1213,12 @@ public static class LeviathanStarfireRuntime
         layer.mesh.colors = colors;
         layer.mesh.RecalculateBounds();
 
+        layer.vertices = vertices;
+        layer.colors = colors;
+        layer.lastSourceColor = sourceColor;
+        layer.lastVisualOpacity = -1f;
+        layer.lastEndFeatherFraction = -1f;
+        layer.colorsInitialized = false;
         layer.beamCount = beamCount;
         layer.lengthSegments = lengthSegments;
     }
@@ -1084,7 +1231,8 @@ public static class LeviathanStarfireRuntime
         float x0,
         float x1,
         float centerY,
-        float breathScaleX)
+        float breathScaleX,
+        float visualExtendScale)
     {
         if (torch == null ||
             state == null ||
@@ -1118,6 +1266,19 @@ public static class LeviathanStarfireRuntime
             GetVisualMinimumHalfWidthMultiplier();
         float beamFillFraction = GetVisualBeamFillFraction();
         float visualOpacity = GetVisualOpacity();
+        visualExtendScale = Mathf.Clamp01(visualExtendScale);
+
+        bool geometryChanged = !state.visualGeometryInitialized ||
+            Mathf.Abs(state.lastVisualNearHalfWidth - nearHalfWidth) > 0.0005f ||
+            Mathf.Abs(state.lastVisualFarHalfWidth - farHalfWidth) > 0.0005f ||
+            Mathf.Abs(state.lastVisualBreathScaleX - breathScaleX) > 0.0005f ||
+            Mathf.Abs(state.lastVisualExtendScale - visualExtendScale) > 0.002f;
+
+        float rangeMetric = breathScaleX * visualExtendScale;
+        float widthMetric = farHalfWidth * visualExtendScale;
+        bool boundsMayExpand = !state.visualGeometryInitialized ||
+            rangeMetric > state.maxVisualRangeMetric + 0.0005f ||
+            widthMetric > state.maxVisualWidthMetric + 0.0005f;
 
         for (int layerIndex = 0;
              layerIndex < state.visualLayers.Count;
@@ -1127,6 +1288,7 @@ public static class LeviathanStarfireRuntime
             if (layer == null || layer.mesh == null)
                 continue;
 
+            bool layerGeometryChanged = geometryChanged;
             if (layer.beamCount != beamCount ||
                 layer.lengthSegments != lengthSegments)
             {
@@ -1135,6 +1297,7 @@ public static class LeviathanStarfireRuntime
                     beamCount,
                     lengthSegments
                 );
+                layerGeometryChanged = true;
             }
 
             if (layer.sourceRenderer != null)
@@ -1166,22 +1329,35 @@ public static class LeviathanStarfireRuntime
                     visualWidthScale
             );
 
-            Vector3[] vertices = layer.mesh.vertices;
-            Color[] colors = layer.mesh.colors;
+            Vector3[] vertices = layer.vertices;
+            Color[] colors = layer.colors;
             if (vertices == null ||
-                vertices.Length != beamCount * vertsPerBeam)
+                vertices.Length != beamCount * vertsPerBeam ||
+                colors == null ||
+                colors.Length != vertices.Length)
             {
                 continue;
             }
 
-            if (colors == null || colors.Length != vertices.Length)
-                colors = new Color[vertices.Length];
-
             Color sourceColor = layer.sourceRenderer == null
                 ? Color.white
                 : layer.sourceRenderer.color;
-            float baseAlpha =
-                sourceColor.a * visualOpacity;
+            float baseAlpha = sourceColor.a * visualOpacity;
+            bool colorsChanged = !layer.colorsInitialized ||
+                layer.lastSourceColor != sourceColor ||
+                Mathf.Abs(layer.lastVisualOpacity - visualOpacity) > 0.0005f ||
+                Mathf.Abs(layer.lastEndFeatherFraction - endFeatherFraction) > 0.0005f;
+
+            if (!layerGeometryChanged && !colorsChanged)
+                continue;
+
+            Matrix4x4 bodyToSpike = Matrix4x4.identity;
+            if (layerGeometryChanged)
+            {
+                bodyToSpike =
+                    state.spikeObject.transform.worldToLocalMatrix *
+                    state.body.localToWorldMatrix;
+            }
 
             for (int beam = 0; beam < beamCount; beam++)
             {
@@ -1212,8 +1388,9 @@ public static class LeviathanStarfireRuntime
                      section++)
                 {
                     float t = section / (float)lengthSegments;
-                    float fanT = t * beamLengthScale;
-                    float x = Mathf.Lerp(x0, beamEndX, t);
+                    float grownT = t * visualExtendScale;
+                    float fanT = grownT * beamLengthScale;
+                    float x = Mathf.Lerp(x0, beamEndX, grownT);
                     float halfWidth =
                         nearHalfWidth +
                         (farHalfWidth - nearHalfWidth) * fanT;
@@ -1237,37 +1414,70 @@ public static class LeviathanStarfireRuntime
                     float alpha = baseAlpha * endAlpha;
                     int v = vBase + section * 2;
 
-                    vertices[v + 0] =
-                        BodyPointToSpikeLocalWithXScale(
-                            state,
+                    if (layerGeometryChanged)
+                    {
+                        vertices[v + 0] = bodyToSpike.MultiplyPoint3x4(
                             new Vector3(
                                 x,
                                 center + halfThickness,
                                 0f
-                            ),
-                            breathScaleX
+                            )
                         );
-                    vertices[v + 1] =
-                        BodyPointToSpikeLocalWithXScale(
-                            state,
+                        vertices[v + 1] = bodyToSpike.MultiplyPoint3x4(
                             new Vector3(
                                 x,
                                 center - halfThickness,
                                 0f
-                            ),
-                            breathScaleX
+                            )
                         );
+                    }
 
-                    Color vertexColor = sourceColor;
-                    vertexColor.a = alpha;
-                    colors[v + 0] = vertexColor;
-                    colors[v + 1] = vertexColor;
+                    if (colorsChanged)
+                    {
+                        Color vertexColor = sourceColor;
+                        vertexColor.a = alpha;
+                        colors[v + 0] = vertexColor;
+                        colors[v + 1] = vertexColor;
+                    }
                 }
             }
 
-            layer.mesh.vertices = vertices;
-            layer.mesh.colors = colors;
-            layer.mesh.RecalculateBounds();
+            if (layerGeometryChanged)
+            {
+                layer.mesh.vertices = vertices;
+                // Once full-size bounds have been observed, retracting geometry
+                // remains inside them. Avoid scanning every vertex for bounds on
+                // every decay tick; only expand bounds when the plume grows beyond
+                // a previously observed extent.
+                if (boundsMayExpand)
+                    layer.mesh.RecalculateBounds();
+            }
+
+            if (colorsChanged)
+            {
+                layer.mesh.colors = colors;
+                layer.lastSourceColor = sourceColor;
+                layer.lastVisualOpacity = visualOpacity;
+                layer.lastEndFeatherFraction = endFeatherFraction;
+                layer.colorsInitialized = true;
+            }
+        }
+
+        if (geometryChanged)
+        {
+            state.lastVisualNearHalfWidth = nearHalfWidth;
+            state.lastVisualFarHalfWidth = farHalfWidth;
+            state.lastVisualBreathScaleX = breathScaleX;
+            state.lastVisualExtendScale = visualExtendScale;
+            state.maxVisualRangeMetric = Mathf.Max(
+                state.maxVisualRangeMetric,
+                rangeMetric
+            );
+            state.maxVisualWidthMetric = Mathf.Max(
+                state.maxVisualWidthMetric,
+                widthMetric
+            );
+            state.visualGeometryInitialized = true;
         }
     }
 
@@ -1778,6 +1988,9 @@ public static class LeviathanStarfireRuntime
             !IsSourceTorch(torch, player))
         {
             BreathStates.Remove(torch);
+            BlastWaveState activeWave;
+            if (BlastWaves.TryGetValue(torch, out activeWave))
+                DestroyBlastWave(torch, activeWave);
             return;
         }
 
@@ -1795,6 +2008,11 @@ public static class LeviathanStarfireRuntime
 
         float capacity = Mathf.Max(0f, state.capacitySeconds);
         bool firing = torch.IsActive();
+        ResolvedStarfireState resolved = GetResolvedStarfireState(rank);
+
+        // A previously launched wave keeps travelling independently of trigger
+        // state and breath recovery.
+        UpdateBlastWave(torch, resolved);
 
         if (firing)
         {
@@ -1802,57 +2020,83 @@ public static class LeviathanStarfireRuntime
 
             // Windup is preparation, not exhalation. Breath capacity begins
             // draining only after the Starfire startup delay has completed.
-            if (!IsInsideStartupDelay(torch, rank) && delta > 0f)
+            bool insideStartup = IsInsideStartupDelay(torch, rank);
+            bool emitting = !insideStartup && !resolved.BlastWaveEnabled;
+            if (emitting && !state.wasEmitting)
+                state.visualEmissionStartedTime = now;
+            state.wasEmitting = emitting;
+
+            if (!insideStartup)
             {
-                float drainRate = Mathf.Max(
-                    0f,
-                    GetBreathActiveDrainRate()
-                );
-                state.remainingSeconds = Mathf.Max(
-                    0f,
-                    state.remainingSeconds - delta * drainRate
-                );
+                if (resolved.BlastWaveEnabled)
+                {
+                    if (!state.blastFiredThisActivation &&
+                        state.remainingSeconds > 0.0001f)
+                    {
+                        FireBlastWave(
+                            torch,
+                            player,
+                            rank,
+                            resolved,
+                            state
+                        );
+                        state.remainingSeconds = 0f;
+                        state.blastFiredThisActivation = true;
+                    }
+                }
+                else if (delta > 0f)
+                {
+                    state.remainingSeconds = Mathf.Max(
+                        0f,
+                        state.remainingSeconds -
+                            delta * resolved.ActiveDrainRate
+                    );
+                }
             }
         }
         else
         {
             StartupBeginTimes.Remove(torch);
+            state.blastFiredThisActivation = false;
+            state.wasEmitting = false;
+            state.visualEmissionStartedTime = -1f;
 
             if (state.idleStartedTime < 0f)
                 state.idleStartedTime = now;
 
-            float recoveryDelay = Mathf.Max(
-                0f,
-                GetBreathRecoveryDelaySeconds()
-            );
-
-            if (capacity > 0f &&
+            float recoveryDelay = resolved.RecoveryDelaySeconds;
+            bool recoveryStarted =
+                capacity > 0f &&
                 state.remainingSeconds < capacity &&
-                now - state.idleStartedTime >= recoveryDelay &&
-                delta > 0f)
+                now - state.idleStartedTime >= recoveryDelay;
+
+            if (recoveryStarted && delta > 0f)
             {
                 float missingFraction = Mathf.Clamp01(
                     1f - state.remainingSeconds / capacity
                 );
-                float exponent = Mathf.Max(
-                    0.05f,
-                    GetBreathRecoveryCurveExponent()
-                );
                 float curveScale = Mathf.Pow(
                     Mathf.Max(0.01f, missingFraction),
-                    exponent - 1f
+                    resolved.RecoveryCurveExponent - 1f
                 );
                 curveScale = Mathf.Clamp(curveScale, 0.05f, 20f);
 
-                float recoveryRate = Mathf.Max(
-                    0f,
-                    GetBreathRecoverySecondsPerSecond()
-                );
                 state.remainingSeconds = Mathf.Min(
                     capacity,
                     state.remainingSeconds +
-                        delta * recoveryRate * curveScale
+                        delta *
+                        resolved.RecoverySecondsPerSecond *
+                        curveScale
                 );
+            }
+
+            // Big Succ is explicitly a recovery effect: it begins only when
+            // breath recovery itself begins, and stops the instant capacity is full.
+            if (recoveryStarted &&
+                state.remainingSeconds < capacity - 0.0001f &&
+                resolved.RechargePullEnabled)
+            {
+                ApplyRechargePull(player, resolved);
             }
         }
 
@@ -1965,6 +2209,551 @@ public static class LeviathanStarfireRuntime
             Mathf.Clamp01(minimumFraction),
             curved
         );
+    }
+
+    // Integral of the remaining normal Starfire damage profile, expressed as
+    // seconds of full-power Starfire damage. Blast Wave consumes this value rather
+    // than inventing a separate damage formula, so every resolved damage/capacity/
+    // falloff modifier automatically changes the wave payout.
+    public static float CalculateRemainingBreathDamageSeconds(
+        Torch torch,
+        int rank)
+    {
+        BreathState breath = GetOrCreateBreathState(torch, rank);
+        if (breath == null || breath.remainingSeconds <= 0.0001f)
+            return 0f;
+
+        ResolvedStarfireState state = GetResolvedStarfireState(rank);
+        float drainRate = Mathf.Max(0.0001f, state.ActiveDrainRate);
+        float remaining = Mathf.Max(0f, breath.remainingSeconds);
+        float retreat = Mathf.Max(0f, state.RetreatSeconds);
+
+        if (retreat <= 0.0001f)
+            return remaining / drainRate;
+
+        float fullReservoir = Mathf.Max(0f, remaining - retreat);
+        float falloffReservoir = Mathf.Min(remaining, retreat);
+        float exponent = Mathf.Max(0.01f, state.DamageFalloffCurveExponent);
+        float minimum = Mathf.Clamp01(state.MinimumDamageFraction);
+
+        float normalizedRemaining = Mathf.Clamp01(
+            falloffReservoir / retreat
+        );
+
+        // Integral of:
+        // 1 - (1-minimum) * (1-r/retreat)^exponent, r=[0, remaining].
+        float falloffIntegral = falloffReservoir -
+            (1f - minimum) *
+            retreat /
+            (exponent + 1f) *
+            (1f - Mathf.Pow(
+                1f - normalizedRemaining,
+                exponent + 1f
+            ));
+
+        return Mathf.Max(
+            0f,
+            (fullReservoir + falloffIntegral) / drainRate
+        );
+    }
+
+    private static void ApplyRechargePull(
+        GameShip player,
+        ResolvedStarfireState state)
+    {
+        if (player == null ||
+            state == null ||
+            state.RechargePullRadius <= 0.0001f ||
+            state.RechargePullStrength <= 0f ||
+            PhysicsController.instance == null)
+        {
+            return;
+        }
+
+        RechargePullTargets.Clear();
+        Collider2D[] colliders = PhysicsController.instance.OverlapCircle(
+            player.transform.position,
+            state.RechargePullRadius
+        );
+
+        if (colliders == null)
+            return;
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider2D collider = colliders[i];
+            if (!collider)
+                continue;
+
+            GameObject obj = collider.gameObject;
+            if (obj.CompareTag("Shield") && collider.transform.parent != null)
+                obj = collider.transform.parent.gameObject;
+
+            if (!obj || obj == player.gameObject)
+                continue;
+
+            GameShip target;
+            if (!GameShip.TryGetShip(obj, out target) ||
+                !target ||
+                target.IsDrone() ||
+                !Faction.IsHostile(player.faction, target.faction) ||
+                RechargePullTargets.Contains(target))
+            {
+                continue;
+            }
+
+            if (NetSession.InSession && target.IsNetRemote())
+                continue;
+
+            AIShip ai = AIController.instance == null
+                ? null
+                : AIController.instance.GetAIShip(target);
+            if (ai is AttachedAIShip || ai is OrbitAIShip)
+                continue;
+
+            Rigidbody2D body = target.GetRigidBody();
+            if (body == null)
+                continue;
+
+            RechargePullTargets.Add(target);
+
+            Vector2 toPlayer =
+                (Vector2)player.transform.position - body.position;
+            float distance = toPlayer.magnitude;
+            if (distance <= 0.0001f)
+                continue;
+
+            float normalizedDistance = Mathf.Clamp01(
+                distance / state.RechargePullRadius
+            );
+            // A zero falloff exponent intentionally matches native Gladiator
+            // Event Horizon: constant pull strength everywhere inside the radius.
+            // Positive values opt into distance falloff for future tuning.
+            float falloff = state.RechargePullFalloffExponent <= 0f
+                ? 1f
+                : Mathf.Pow(
+                    1f - normalizedDistance,
+                    state.RechargePullFalloffExponent
+                );
+            Vector2 direction = toPlayer / distance;
+
+            float bossScale = target.GetShipClass() == Ship.Class.Boss
+                ? 0.25f
+                : 1f;
+            float deltaSpeed =
+                state.RechargePullStrength *
+                Modifier.baseKnockback *
+                Time.fixedDeltaTime *
+                falloff *
+                bossScale;
+
+            if (state.RechargePullMaxSpeed > 0f)
+            {
+                float inwardSpeed = Vector2.Dot(body.velocity, direction);
+                deltaSpeed = Mathf.Min(
+                    deltaSpeed,
+                    Mathf.Max(
+                        0f,
+                        state.RechargePullMaxSpeed - inwardSpeed
+                    )
+                );
+            }
+
+            if (deltaSpeed > 0f)
+            {
+                body.AddForce(
+                    direction * deltaSpeed,
+                    ForceMode2D.Impulse
+                );
+            }
+        }
+    }
+
+    private static void FireBlastWave(
+        Torch torch,
+        GameShip player,
+        int rank,
+        ResolvedStarfireState state,
+        BreathState breath)
+    {
+        if (torch == null || player == null || state == null || breath == null)
+            return;
+
+        float damageSeconds = CalculateRemainingBreathDamageSeconds(
+            torch,
+            rank
+        );
+        if (damageSeconds <= 0.0001f)
+            return;
+
+        float tickRate = player.ApplyModifier(
+            Modifier.Type.BeamTickRate,
+            Item.Category.None,
+            0.2f,
+            true
+        );
+        tickRate = Mathf.Max(0.0001f, tickRate);
+
+        Vector2 origin = player.transform.position;
+        Vector2 direction = player.transform.right;
+        FanState fan;
+        if (FanStates.TryGetValue(torch, out fan) &&
+            fan != null &&
+            fan.body != null)
+        {
+            origin = fan.body.position;
+            direction = fan.body.right;
+        }
+
+        direction.Normalize();
+
+        float maxRange = Mathf.Max(
+            0.01f,
+            Mathf.Abs(torch.MaxRange) *
+                Mathf.Max(0.01f, state.BlastWaveRangeMultiplier)
+        );
+        float durationSpeed = state.BlastWaveDuration > 0.0001f
+            ? maxRange / state.BlastWaveDuration
+            : 0f;
+        float speed = durationSpeed > 0f
+            ? durationSpeed
+            : state.BlastWaveSpeed;
+
+        BlastWaveState wave = new BlastWaveState();
+        wave.sourceTorch = torch;
+        wave.owner = player;
+        wave.origin = origin;
+        wave.direction = direction;
+        wave.startedTime = Time.time;
+        wave.previousRadius = 0f;
+        wave.maxRange = maxRange;
+        wave.speed = speed;
+        wave.radialThickness = Mathf.Max(
+            0.05f,
+            state.BlastWaveFrontThickness
+        );
+        wave.halfArcDegrees = Mathf.Clamp(
+            state.BlastWaveArcDegrees * 0.5f,
+            0f,
+            180f
+        );
+        wave.damageTickEquivalent = Mathf.Max(
+            0f,
+            damageSeconds /
+                tickRate *
+                state.BlastWaveDamageMultiplier
+        );
+
+        BlastWaveState previousWave;
+        if (BlastWaves.TryGetValue(torch, out previousWave))
+            DestroyBlastWave(torch, previousWave);
+
+        BlastWaves[torch] = wave;
+        CreateBlastWaveVisual(wave, state);
+    }
+
+    private static void CreateBlastWaveVisual(
+        BlastWaveState wave,
+        ResolvedStarfireState state)
+    {
+        if (wave == null || state == null || state.BlastWaveVisualOpacity <= 0f)
+            return;
+
+        Shader shader = Shader.Find("Sprites/Default");
+        if (shader == null)
+            return;
+
+        GameObject obj = new GameObject("Leviathan Starfire Blast Wave");
+        LineRenderer line = obj.AddComponent<LineRenderer>();
+        line.useWorldSpace = true;
+        line.loop = false;
+        line.positionCount = 25;
+        line.widthMultiplier = wave.radialThickness;
+        line.numCapVertices = 2;
+        line.numCornerVertices = 2;
+        Material visualMaterial = new Material(shader);
+        line.sharedMaterial = visualMaterial;
+        wave.visualMaterial = visualMaterial;
+
+        Color color = Color.white;
+        FanState fan;
+        if (wave.sourceTorch != null &&
+            FanStates.TryGetValue(wave.sourceTorch, out fan) &&
+            fan != null &&
+            fan.visualLayers.Count > 0 &&
+            fan.visualLayers[0].sourceRenderer)
+        {
+            SpriteRenderer source = fan.visualLayers[0].sourceRenderer;
+            color = source.color;
+            line.sortingLayerID = source.sortingLayerID;
+            line.sortingOrder = source.sortingOrder;
+        }
+
+        color.a *= state.BlastWaveVisualOpacity;
+        line.startColor = color;
+        line.endColor = color;
+
+        wave.visualObject = obj;
+        wave.lineRenderer = line;
+        UpdateBlastWaveVisual(wave, 0f);
+    }
+
+    private static void UpdateBlastWaveVisual(
+        BlastWaveState wave,
+        float radius)
+    {
+        if (wave == null || wave.lineRenderer == null)
+            return;
+
+        int count = Mathf.Max(2, wave.lineRenderer.positionCount);
+        float baseAngle = Mathf.Atan2(wave.direction.y, wave.direction.x) *
+            Mathf.Rad2Deg;
+
+        for (int i = 0; i < count; i++)
+        {
+            float t = count <= 1 ? 0.5f : (float)i / (count - 1);
+            float angle = baseAngle + Mathf.Lerp(
+                -wave.halfArcDegrees,
+                wave.halfArcDegrees,
+                t
+            );
+            Vector3 radial3 = Quaternion.Euler(0f, 0f, angle) * Vector3.right;
+            Vector2 radial = new Vector2(radial3.x, radial3.y);
+            wave.lineRenderer.SetPosition(
+                i,
+                wave.origin + radial * radius
+            );
+        }
+    }
+
+    private static void CleanupBlastWaveVisual(BlastWaveState wave)
+    {
+        if (wave == null)
+            return;
+
+        if (wave.visualObject)
+            UnityEngine.Object.Destroy(wave.visualObject);
+
+        if (wave.visualMaterial)
+            UnityEngine.Object.Destroy(wave.visualMaterial);
+
+        wave.visualObject = null;
+        wave.lineRenderer = null;
+        wave.visualMaterial = null;
+    }
+
+    private static void DestroyBlastWave(
+        Torch torch,
+        BlastWaveState wave)
+    {
+        CleanupBlastWaveVisual(wave);
+
+        if (torch != null)
+            BlastWaves.Remove(torch);
+    }
+
+    private static void UpdateBlastWave(
+        Torch torch,
+        ResolvedStarfireState state)
+    {
+        BlastWaveState wave;
+        if (torch == null ||
+            !BlastWaves.TryGetValue(torch, out wave) ||
+            wave == null)
+        {
+            return;
+        }
+
+        if (!wave.owner || !wave.sourceTorch)
+        {
+            DestroyBlastWave(torch, wave);
+            return;
+        }
+
+        float elapsed = Mathf.Max(0f, Time.time - wave.startedTime);
+        float currentRadius = wave.speed <= 0.0001f
+            ? wave.maxRange
+            : Mathf.Min(wave.maxRange, elapsed * wave.speed);
+
+        UpdateBlastWaveVisual(wave, currentRadius);
+
+        float outer = Mathf.Min(
+            wave.maxRange,
+            currentRadius + wave.radialThickness * 0.5f
+        );
+        float inner = Mathf.Max(
+            0f,
+            wave.previousRadius - wave.radialThickness * 0.5f
+        );
+
+        Collider2D[] colliders = PhysicsController.instance == null
+            ? null
+            : PhysicsController.instance.OverlapCircle(wave.origin, outer);
+
+        if (colliders != null)
+        {
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider2D collider = colliders[i];
+                if (!collider)
+                    continue;
+
+                GameObject obj = collider.gameObject;
+                if (obj.CompareTag("Shield") && collider.transform.parent != null)
+                    obj = collider.transform.parent.gameObject;
+
+                if (!obj || obj == wave.owner.gameObject)
+                    continue;
+
+                GameShip target;
+                if (!GameShip.TryGetShip(obj, out target) ||
+                    !target ||
+                    wave.hitShips.Contains(target) ||
+                    !Faction.IsHostile(wave.owner.faction, target.faction) ||
+                    !target.CanBeDamagedBy(wave.owner, false))
+                {
+                    continue;
+                }
+
+                Vector2 hitPoint = collider.ClosestPoint(wave.origin);
+                Vector2 offset = hitPoint - wave.origin;
+                float distance = offset.magnitude;
+                if (distance < inner || distance > outer)
+                    continue;
+
+                if (distance > 0.0001f &&
+                    Vector2.Angle(wave.direction, offset) > wave.halfArcDegrees)
+                {
+                    continue;
+                }
+
+                // The travelling front only gets one opportunity per target.
+                wave.hitShips.Add(target);
+                if (!target.IsDodging())
+                {
+                    ApplyBlastWaveDamage(
+                        wave,
+                        target,
+                        hitPoint,
+                        state
+                    );
+                }
+            }
+        }
+
+        wave.previousRadius = currentRadius;
+
+        if (currentRadius >= wave.maxRange - 0.0001f)
+            DestroyBlastWave(torch, wave);
+    }
+
+    private static void ApplyBlastWaveDamage(
+        BlastWaveState wave,
+        GameShip target,
+        Vector2 hitPosition,
+        ResolvedStarfireState state)
+    {
+        if (wave == null ||
+            !wave.sourceTorch ||
+            !wave.owner ||
+            !target ||
+            wave.damageTickEquivalent <= 0f)
+        {
+            return;
+        }
+
+        Torch torch = wave.sourceTorch;
+        float originalCharge = ReadCharge(torch);
+        Torch previousTorch = currentDamageTorch;
+        int previousDepth = damageContextDepth;
+        float previousOverride = currentDamageScaleOverride;
+
+        try
+        {
+            currentDamageTorch = torch;
+            damageContextDepth = Math.Max(1, damageContextDepth + 1);
+            currentDamageScaleOverride = wave.damageTickEquivalent;
+
+            if (ChargeField != null)
+                ChargeField.SetValue(torch, 1f);
+
+            bool crit = Modifier.CritRoll(torch.GetCritChance(), target);
+            DamageData[] damage = torch.GetDamageData(crit);
+            bool bypassDamageLimit = torch.HasCustomizer(
+                Customizer.Type.BypassDamageLimit
+            );
+
+            target.SetLastDamageDirection(wave.direction);
+            target.lastDamagedByWeaponName = torch.GetName(false, false);
+            target.lastDamagedByShipName = wave.owner.GetName();
+            target.lastDamagedByFaction = wave.owner.faction;
+
+            if (RouteDamageMethod == null)
+            {
+                Debug.LogError(
+                    "[Leviathan] Starfire Blast Wave could not resolve " +
+                    "NetCombat.RouteDamage."
+                );
+                return;
+            }
+
+            RouteDamageMethod.Invoke(
+                null,
+                new object[]
+                {
+                    target,
+                    torch.damageType,
+                    damage,
+                    torch.GetStatusEffectChance(),
+                    crit,
+                    hitPosition,
+                    wave.owner,
+                    bypassDamageLimit,
+                    state.BlastWaveKnockback,
+                    torch,
+                    0f,
+                    0f,
+                    false,
+                    0f
+                }
+            );
+
+            if (ConduitRelayHitMethod != null)
+            {
+                ConduitRelayHitMethod.Invoke(
+                    null,
+                    new object[]
+                    {
+                        torch,
+                        wave.owner,
+                        target,
+                        damage,
+                        hitPosition,
+                        bypassDamageLimit
+                    }
+                );
+            }
+
+            if (state.BlastWaveKnockback > 0f)
+            {
+                Rigidbody2D body = target.GetRigidBody();
+                Modifier.Knockback(
+                    state.BlastWaveKnockback,
+                    body,
+                    wave.origin,
+                    wave.owner
+                );
+            }
+        }
+        finally
+        {
+            if (ChargeField != null)
+                ChargeField.SetValue(torch, originalCharge);
+
+            currentDamageScaleOverride = previousOverride;
+            damageContextDepth = previousDepth;
+            currentDamageTorch = previousTorch;
+        }
     }
 
     // =========================================================================
@@ -2194,6 +2983,14 @@ public static class LeviathanStarfireRuntime
             return false;
         }
 
+        // Blast Wave replaces Starfire's native continuous DoT entirely. Its
+        // custom travelling front routes one integrated native Torch packet.
+        if (GetResolvedStarfireState(rank).BlastWaveEnabled)
+        {
+            suppress = true;
+            return false;
+        }
+
         object mirrorSpike = GetMirrorSpike(torch);
 
         // Native Torch may call DoSpikeDamage once for each spike. If the method
@@ -2254,9 +3051,13 @@ public static class LeviathanStarfireRuntime
         if (source == null || source.Length == 0)
             return;
 
+        float breathDamageScale = currentDamageScaleOverride >= 0f
+            ? currentDamageScaleOverride
+            : GetCurrentBreathDamageScale(torch, rank);
+
         float packetMultiplier =
             GetDamageMultiplier(rank) *
-            GetCurrentBreathDamageScale(torch, rank);
+            breathDamageScale;
 
         // Native mirrored Torches split one weapon's damage across two spikes.
         // Starfire emits exactly one spike, so restore the source weapon's full
@@ -2357,10 +3158,10 @@ public static class LeviathanStarfireRuntime
     // =========================================================================
 
     private static float ApplySpecializationKnob(
+        Pilot pilot,
         LeviathanSpecializationKnob knob,
         float baseValue)
     {
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
         return pilot == null
             ? baseValue
             : LeviathanSpecializationRuntime.ApplyKnob(
@@ -2371,9 +3172,9 @@ public static class LeviathanStarfireRuntime
     }
 
     private static float GetSpecializationMultiplier(
+        Pilot pilot,
         LeviathanSpecializationKnob knob)
     {
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
         return pilot == null
             ? 1f
             : LeviathanSpecializationRuntime.GetKnobMultiplier(
@@ -2382,564 +3183,380 @@ public static class LeviathanStarfireRuntime
             );
     }
 
-    public static float GetHeatMultiplier(int rank)
+    // One authoritative post-modifier configuration for Starfire. Every ordinary
+    // breath subsystem consumes this resolved state instead of reinterpreting node
+    // effects independently. It is rebuilt at most once per rendered frame for the
+    // current Pilot/rank, so tree changes are reflected immediately without a manual
+    // invalidation path.
+    public sealed class ResolvedStarfireState
     {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.HeatGeneration,
-                GetRankValue(HeatMultiplierByRank, rank)
-            )
-        );
+        public int Rank;
+
+        public float HeatMultiplier;
+        public float LengthMultiplier;
+        public float WidthMultiplier;
+        public float DamageMultiplier;
+        public float CritChanceBonus;
+        public float CritDamageBonus;
+        public float StatusChanceBonus;
+
+        public float StartupDelaySeconds;
+        public float NativeChargeRampSpeedMultiplier;
+
+        public float FullSizeHoldSeconds;
+        public float RetreatSeconds;
+        public float CapacitySeconds;
+        public float ActiveDrainRate;
+        public float RecoverySecondsPerSecond;
+        public float RecoveryDelaySeconds;
+        public float RecoveryCurveExponent;
+        public float MinimumDamageFraction;
+        public float MinimumLengthFraction;
+        public float MinimumWidthFraction;
+        public float RetreatCurveExponent;
+        public float DamageFalloffCurveExponent;
+        public float LengthFalloffCurveExponent;
+        public float WidthFalloffCurveExponent;
+
+        public float BaseFanHalfAngleDegrees;
+        public float MuzzleHalfWidthMultiplier;
+        public float HitboxWidthPaddingMultiplier;
+        public float HitboxLengthPaddingMultiplier;
+        public float VisualCenterLengthBonusFraction;
+        public float VisualOpacity;
+        public float VisualBeamFillFraction;
+        public float VisualMinimumHalfWidthMultiplier;
+        public float VisualEndFeatherFraction;
+        public float VisualStartupExtendSeconds;
+        public int VisualBeamCount;
+        public int VisualLengthSegments;
+
+        public bool RechargePullEnabled;
+        public float RechargePullRadius;
+        public float RechargePullStrength;
+        public float RechargePullFalloffExponent;
+        public float RechargePullMaxSpeed;
+
+        public bool BlastWaveEnabled;
+        public float BlastWaveArcDegrees;
+        public float BlastWaveDamageMultiplier;
+        public float BlastWaveSpeed;
+        public float BlastWaveRangeMultiplier;
+        public float BlastWaveFrontThickness;
+        public float BlastWaveDuration;
+        public float BlastWaveFalloffExponent;
+        public float BlastWaveVisualOpacity;
+        public float BlastWaveKnockback;
     }
 
-    public static float GetLengthMultiplier(int rank)
+    private static Pilot resolvedStatePilot;
+    private static int resolvedStateRank = -1;
+    private static int resolvedStateRevision = -1;
+    private static ResolvedStarfireState resolvedState;
+
+    private static int ResolveCurrentStarfireRank()
     {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.Length,
-                GetRankValue(LengthMultiplierByRank, rank)
-            )
-        );
+        if (WorldController.instance != null)
+        {
+            GameShip player = WorldController.instance.GetCurrentPlayerShip();
+            int rank;
+            if (player != null && TryGetStarfireRank(player, out rank))
+                return Mathf.Max(1, rank);
+        }
+
+        return 1;
     }
 
-    public static float GetWidthMultiplier(int rank)
+    public static ResolvedStarfireState GetResolvedStarfireState(int rank)
     {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.Width,
-                GetRankValue(WidthMultiplierByRank, rank)
-            )
-        );
-    }
+        rank = Mathf.Max(1, rank);
+        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+        int revision = LeviathanSpecializationRuntime.ConfigurationRevision;
 
-    public static float GetDamageMultiplier(int rank)
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.Damage,
-                GetRankValue(DamageMultiplierByRank, rank)
-            )
-        );
-    }
+        if (resolvedState != null &&
+            resolvedStateRevision == revision &&
+            resolvedStateRank == rank &&
+            ReferenceEquals(resolvedStatePilot, pilot))
+        {
+            return resolvedState;
+        }
 
-    public static float GetCritChanceBonus(int rank)
-    {
-        return ApplySpecializationKnob(
+        ResolvedStarfireState state = new ResolvedStarfireState();
+        state.Rank = rank;
+
+        state.HeatMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.HeatGeneration,
+            GetRankValue(HeatMultiplierByRank, rank)));
+        state.LengthMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.Length,
+            GetRankValue(LengthMultiplierByRank, rank)));
+        state.WidthMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.Width,
+            GetRankValue(WidthMultiplierByRank, rank)));
+        state.DamageMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.Damage,
+            GetRankValue(DamageMultiplierByRank, rank)));
+        state.CritChanceBonus = ApplySpecializationKnob(
+            pilot,
             LeviathanStarfireKnobs.CritChance,
-            GetRankValue(CritChanceBonusByRank, rank)
-        );
-    }
-
-    public static float GetCritDamageBonus(int rank)
-    {
-        return ApplySpecializationKnob(
+            GetRankValue(CritChanceBonusByRank, rank));
+        state.CritDamageBonus = ApplySpecializationKnob(
+            pilot,
             LeviathanStarfireKnobs.CritDamage,
-            GetRankValue(CritDamageBonusByRank, rank)
-        );
-    }
-
-    public static float GetStatusChanceBonus(int rank)
-    {
-        return ApplySpecializationKnob(
+            GetRankValue(CritDamageBonusByRank, rank));
+        state.StatusChanceBonus = ApplySpecializationKnob(
+            pilot,
             LeviathanStarfireKnobs.StatusChance,
-            GetRankValue(StatusChanceBonusByRank, rank)
-        );
+            GetRankValue(StatusChanceBonusByRank, rank));
+
+        state.StartupDelaySeconds = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.StartupDelaySeconds,
+            GetRankValue(StartupDelaySecondsByRank, rank)));
+        state.NativeChargeRampSpeedMultiplier = Mathf.Max(0.0001f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.NativeChargeRampSpeed,
+            GetRankValue(ChargeRampSpeedMultiplierByRank, rank)));
+
+        float durationMultiplier = Mathf.Max(0f, GetSpecializationMultiplier(
+            pilot,
+            LeviathanStarfireKnobs.Duration));
+        state.FullSizeHoldSeconds = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.FullSizeHoldSeconds,
+            GetRankValue(FullSizeHoldSecondsByRank, rank)) * durationMultiplier);
+        state.RetreatSeconds = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RetreatSeconds,
+            GetRankValue(BreathRetreatSecondsByRank, rank)) * durationMultiplier);
+        state.CapacitySeconds = Mathf.Max(0f,
+            state.FullSizeHoldSeconds + state.RetreatSeconds);
+        state.ActiveDrainRate = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.ActiveDrainRate,
+            BaseBreathActiveDrainRate));
+
+        float recoveryRateMultiplier = Mathf.Max(0f, GetSpecializationMultiplier(
+            pilot,
+            LeviathanStarfireKnobs.RecoveryRate));
+        state.RecoverySecondsPerSecond = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RecoverySecondsPerSecond,
+            BaseBreathRecoverySecondsPerSecond) * recoveryRateMultiplier);
+        state.RecoveryDelaySeconds = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RecoveryDelaySeconds,
+            BaseBreathRecoveryDelaySeconds));
+        state.RecoveryCurveExponent = Mathf.Max(0.05f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RecoveryCurveExponent,
+            BaseBreathRecoveryCurveExponent));
+
+        state.MinimumDamageFraction = Mathf.Clamp01(ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.MinimumDamage,
+            BaseBreathMinimumDamageFraction));
+        state.MinimumLengthFraction = Mathf.Clamp01(ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.MinimumLength,
+            BaseBreathMinimumLengthFraction));
+        state.MinimumWidthFraction = Mathf.Clamp01(ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.MinimumWidth,
+            BaseBreathMinimumWidthFraction));
+        state.RetreatCurveExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RetreatCurveExponent,
+            GetRankValue(BreathRetreatCurveExponentByRank, rank)));
+        state.DamageFalloffCurveExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.DamageFalloffCurveExponent,
+            state.RetreatCurveExponent));
+        state.LengthFalloffCurveExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.LengthFalloffCurveExponent,
+            state.RetreatCurveExponent));
+        state.WidthFalloffCurveExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.WidthFalloffCurveExponent,
+            state.RetreatCurveExponent));
+
+        state.BaseFanHalfAngleDegrees = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BaseFanHalfAngleDegrees,
+            BaseFanHalfAngleDegrees));
+        state.MuzzleHalfWidthMultiplier = Mathf.Max(0.01f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.MuzzleWidth,
+            BaseMuzzleHalfWidthMultiplier));
+        state.HitboxWidthPaddingMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.HitboxWidthPadding,
+            BaseHitboxWidthPaddingMultiplier));
+        state.HitboxLengthPaddingMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.HitboxLengthPadding,
+            BaseHitboxLengthPaddingMultiplier));
+        state.VisualCenterLengthBonusFraction = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.CenterLengthBonus,
+            BaseVisualCenterLengthBonusFraction));
+        state.VisualOpacity = Mathf.Clamp01(ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.VisualOpacity,
+            BaseVisualOpacity));
+        state.VisualBeamFillFraction = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.VisualBeamFill,
+            BaseVisualBeamFillFraction));
+        state.VisualMinimumHalfWidthMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.VisualMinimumBeamWidth,
+            BaseVisualMinimumHalfWidthMultiplier));
+        state.VisualEndFeatherFraction = Mathf.Clamp(ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.VisualEndFeather,
+            BaseVisualEndFeatherFraction), 0f, 0.50f);
+        state.VisualStartupExtendSeconds = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.VisualStartupExtendSeconds,
+            BaseVisualStartupExtendSeconds));
+        state.VisualBeamCount = Mathf.Max(1, Mathf.RoundToInt(ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.VisualBeamCount,
+            BaseVisualBeamCount)));
+        state.VisualLengthSegments = Mathf.Max(2, Mathf.RoundToInt(ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.VisualLengthSegments,
+            BaseVisualLengthSegments)));
+
+        state.RechargePullEnabled = LeviathanSpecializationRuntime.HasFlag(
+            LeviathanStarfireFlags.RechargePull);
+        state.RechargePullRadius = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RechargePullRadius, 0f)) * WorldUnitsPerMeter;
+        state.RechargePullStrength = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RechargePullStrength, 0f));
+        state.RechargePullFalloffExponent = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RechargePullFalloffExponent, 0f));
+        state.RechargePullMaxSpeed = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.RechargePullMaxSpeed, 0f)) * WorldUnitsPerMeter;
+
+        state.BlastWaveEnabled = LeviathanSpecializationRuntime.HasFlag(
+            LeviathanStarfireFlags.BlastWave);
+        state.BlastWaveArcDegrees = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveArcDegrees, 0f));
+        state.BlastWaveDamageMultiplier = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveDamageMultiplier, 1f));
+        state.BlastWaveSpeed = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveSpeed, 0f)) * WorldUnitsPerMeter;
+        state.BlastWaveRangeMultiplier = Mathf.Max(0f, GetSpecializationMultiplier(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveRange));
+        state.BlastWaveFrontThickness = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveWidth, 0f)) * WorldUnitsPerMeter;
+        state.BlastWaveDuration = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveDuration, 0f));
+        state.BlastWaveFalloffExponent = Mathf.Max(0.01f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveFalloffExponent, 1f));
+        state.BlastWaveVisualOpacity = Mathf.Clamp01(ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveVisualOpacity, 0f));
+        state.BlastWaveKnockback = Mathf.Max(0f, ApplySpecializationKnob(
+            pilot,
+            LeviathanStarfireKnobs.BlastWaveKnockback, 0f));
+
+        resolvedStatePilot = pilot;
+        resolvedStateRank = rank;
+        // Synchronizing an auto-granted root during resolution can itself bump
+        // the revision, so capture the final value after all knob aggregation.
+        resolvedStateRevision =
+            LeviathanSpecializationRuntime.ConfigurationRevision;
+        resolvedState = state;
+        return state;
     }
 
-    public static float GetStartupDelaySeconds(int rank)
+    public static ResolvedStarfireState GetResolvedStarfireState()
     {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.StartupDelaySeconds,
-                GetRankValue(StartupDelaySecondsByRank, rank)
-            )
-        );
+        return GetResolvedStarfireState(ResolveCurrentStarfireRank());
     }
 
-    public static float GetChargeRampSpeedMultiplier(int rank)
+    public static float GetHeatMultiplier(int rank) { return GetResolvedStarfireState(rank).HeatMultiplier; }
+    public static float GetLengthMultiplier(int rank) { return GetResolvedStarfireState(rank).LengthMultiplier; }
+    public static float GetWidthMultiplier(int rank) { return GetResolvedStarfireState(rank).WidthMultiplier; }
+    public static float GetDamageMultiplier(int rank) { return GetResolvedStarfireState(rank).DamageMultiplier; }
+    public static float GetCritChanceBonus(int rank) { return GetResolvedStarfireState(rank).CritChanceBonus; }
+    public static float GetCritDamageBonus(int rank) { return GetResolvedStarfireState(rank).CritDamageBonus; }
+    public static float GetStatusChanceBonus(int rank) { return GetResolvedStarfireState(rank).StatusChanceBonus; }
+    public static float GetStartupDelaySeconds(int rank) { return GetResolvedStarfireState(rank).StartupDelaySeconds; }
+    public static float GetChargeRampSpeedMultiplier(int rank) { return GetResolvedStarfireState(rank).NativeChargeRampSpeedMultiplier; }
+    public static float GetFullSizeHoldSeconds(int rank) { return GetResolvedStarfireState(rank).FullSizeHoldSeconds; }
+    public static float GetBreathRetreatSeconds(int rank) { return GetResolvedStarfireState(rank).RetreatSeconds; }
+    public static float GetBreathCapacitySeconds(int rank) { return GetResolvedStarfireState(rank).CapacitySeconds; }
+    public static float GetBreathActiveDrainRate() { return GetResolvedStarfireState().ActiveDrainRate; }
+    public static float GetBreathRecoverySecondsPerSecond() { return GetResolvedStarfireState().RecoverySecondsPerSecond; }
+    public static float GetBreathRecoveryDelaySeconds() { return GetResolvedStarfireState().RecoveryDelaySeconds; }
+    public static float GetBreathRecoveryCurveExponent() { return GetResolvedStarfireState().RecoveryCurveExponent; }
+    public static float GetBreathMinimumDamageFraction() { return GetResolvedStarfireState().MinimumDamageFraction; }
+    public static float GetBreathMinimumLengthFraction() { return GetResolvedStarfireState().MinimumLengthFraction; }
+    public static float GetBreathMinimumWidthFraction() { return GetResolvedStarfireState().MinimumWidthFraction; }
+    public static float GetBreathRetreatCurveExponent(int rank) { return GetResolvedStarfireState(rank).RetreatCurveExponent; }
+    public static float GetBreathDamageFalloffCurveExponent(int rank) { return GetResolvedStarfireState(rank).DamageFalloffCurveExponent; }
+    public static float GetBreathLengthFalloffCurveExponent(int rank) { return GetResolvedStarfireState(rank).LengthFalloffCurveExponent; }
+    public static float GetBreathWidthFalloffCurveExponent(int rank) { return GetResolvedStarfireState(rank).WidthFalloffCurveExponent; }
+
+    public static float GetCurrentBreathDamageScale(Torch torch, int rank)
     {
-        return Mathf.Max(
-            0.0001f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.NativeChargeRampSpeed,
-                GetRankValue(ChargeRampSpeedMultiplierByRank, rank)
-            )
-        );
-    }
-
-    public static float GetFullSizeHoldSeconds(int rank)
-    {
-        float value = Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.FullSizeHoldSeconds,
-                GetRankValue(FullSizeHoldSecondsByRank, rank)
-            )
-        );
-
-        return Mathf.Max(
-            0f,
-            value * GetSpecializationMultiplier(
-                LeviathanStarfireKnobs.Duration
-            )
-        );
-    }
-
-    public static float GetBreathRetreatSeconds(int rank)
-    {
-        float value = Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RetreatSeconds,
-                GetRankValue(BreathRetreatSecondsByRank, rank)
-            )
-        );
-
-        return Mathf.Max(
-            0f,
-            value * GetSpecializationMultiplier(
-                LeviathanStarfireKnobs.Duration
-            )
-        );
-    }
-
-    public static float GetBreathCapacitySeconds(int rank)
-    {
-        return Mathf.Max(
-            0f,
-            GetFullSizeHoldSeconds(rank) + GetBreathRetreatSeconds(rank)
-        );
-    }
-
-    public static float GetBreathActiveDrainRate()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.ActiveDrainRate,
-                BaseBreathActiveDrainRate
-            )
-        );
-    }
-
-    public static float GetBreathRecoverySecondsPerSecond()
-    {
-        float value = Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RecoverySecondsPerSecond,
-                BaseBreathRecoverySecondsPerSecond
-            )
-        );
-
-        return Mathf.Max(
-            0f,
-            value * GetSpecializationMultiplier(
-                LeviathanStarfireKnobs.RecoveryRate
-            )
-        );
-    }
-
-    public static float GetBreathRecoveryDelaySeconds()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RecoveryDelaySeconds,
-                BaseBreathRecoveryDelaySeconds
-            )
-        );
-    }
-
-    public static float GetBreathRecoveryCurveExponent()
-    {
-        return Mathf.Max(
-            0.05f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RecoveryCurveExponent,
-                BaseBreathRecoveryCurveExponent
-            )
-        );
-    }
-
-    public static float GetBreathMinimumDamageFraction()
-    {
-        return Mathf.Clamp01(
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.MinimumDamage,
-                BaseBreathMinimumDamageFraction
-            )
-        );
-    }
-
-    public static float GetBreathMinimumLengthFraction()
-    {
-        return Mathf.Clamp01(
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.MinimumLength,
-                BaseBreathMinimumLengthFraction
-            )
-        );
-    }
-
-    public static float GetBreathMinimumWidthFraction()
-    {
-        return Mathf.Clamp01(
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.MinimumWidth,
-                BaseBreathMinimumWidthFraction
-            )
-        );
-    }
-
-    public static float GetBreathRetreatCurveExponent(int rank)
-    {
-        return Mathf.Max(
-            0.01f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RetreatCurveExponent,
-                GetRankValue(BreathRetreatCurveExponentByRank, rank)
-            )
-        );
-    }
-
-    public static float GetBreathDamageFalloffCurveExponent(int rank)
-    {
-        return Mathf.Max(
-            0.01f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.DamageFalloffCurveExponent,
-                GetBreathRetreatCurveExponent(rank)
-            )
-        );
-    }
-
-    public static float GetBreathLengthFalloffCurveExponent(int rank)
-    {
-        return Mathf.Max(
-            0.01f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.LengthFalloffCurveExponent,
-                GetBreathRetreatCurveExponent(rank)
-            )
-        );
-    }
-
-    public static float GetBreathWidthFalloffCurveExponent(int rank)
-    {
-        return Mathf.Max(
-            0.01f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.WidthFalloffCurveExponent,
-                GetBreathRetreatCurveExponent(rank)
-            )
-        );
-    }
-
-    public static float GetCurrentBreathDamageScale(
-        Torch torch,
-        int rank)
-    {
+        ResolvedStarfireState state = GetResolvedStarfireState(rank);
         return EvaluateBreathComponent(
             GetBreathFalloffProgress(torch, rank),
-            GetBreathMinimumDamageFraction(),
-            GetBreathDamageFalloffCurveExponent(rank)
+            state.MinimumDamageFraction,
+            state.DamageFalloffCurveExponent
         );
     }
 
-    public static float GetBaseFanHalfAngleDegrees()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BaseFanHalfAngleDegrees,
-                BaseFanHalfAngleDegrees
-            )
-        );
-    }
+    public static float GetBaseFanHalfAngleDegrees() { return GetResolvedStarfireState().BaseFanHalfAngleDegrees; }
+    public static float GetMuzzleHalfWidthMultiplier() { return GetResolvedStarfireState().MuzzleHalfWidthMultiplier; }
+    public static float GetHitboxWidthPaddingMultiplier() { return GetResolvedStarfireState().HitboxWidthPaddingMultiplier; }
+    public static float GetHitboxLengthPaddingMultiplier() { return GetResolvedStarfireState().HitboxLengthPaddingMultiplier; }
+    public static float GetVisualCenterLengthBonusFraction() { return GetResolvedStarfireState().VisualCenterLengthBonusFraction; }
+    public static float GetVisualOpacity() { return GetResolvedStarfireState().VisualOpacity; }
+    public static float GetVisualBeamFillFraction() { return GetResolvedStarfireState().VisualBeamFillFraction; }
+    public static float GetVisualMinimumHalfWidthMultiplier() { return GetResolvedStarfireState().VisualMinimumHalfWidthMultiplier; }
+    public static float GetVisualEndFeatherFraction() { return GetResolvedStarfireState().VisualEndFeatherFraction; }
+    public static float GetVisualStartupExtendSeconds() { return GetResolvedStarfireState().VisualStartupExtendSeconds; }
+    public static int GetVisualBeamCount() { return GetResolvedStarfireState().VisualBeamCount; }
+    public static int GetVisualLengthSegments() { return GetResolvedStarfireState().VisualLengthSegments; }
 
-    public static float GetMuzzleHalfWidthMultiplier()
-    {
-        return Mathf.Max(
-            0.01f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.MuzzleWidth,
-                BaseMuzzleHalfWidthMultiplier
-            )
-        );
-    }
+    public static bool IsRechargePullEnabled() { return GetResolvedStarfireState().RechargePullEnabled; }
+    public static float GetRechargePullRadius() { return GetResolvedStarfireState().RechargePullRadius; }
+    public static float GetRechargePullStrength() { return GetResolvedStarfireState().RechargePullStrength; }
+    public static float GetRechargePullFalloffExponent() { return GetResolvedStarfireState().RechargePullFalloffExponent; }
+    public static float GetRechargePullMaxSpeed() { return GetResolvedStarfireState().RechargePullMaxSpeed; }
 
-    public static float GetHitboxWidthPaddingMultiplier()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.HitboxWidthPadding,
-                BaseHitboxWidthPaddingMultiplier
-            )
-        );
-    }
-
-    public static float GetHitboxLengthPaddingMultiplier()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.HitboxLengthPadding,
-                BaseHitboxLengthPaddingMultiplier
-            )
-        );
-    }
-
-    public static float GetVisualCenterLengthBonusFraction()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.CenterLengthBonus,
-                BaseVisualCenterLengthBonusFraction
-            )
-        );
-    }
-
-    public static float GetVisualOpacity()
-    {
-        return Mathf.Clamp01(
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.VisualOpacity,
-                BaseVisualOpacity
-            )
-        );
-    }
-
-    public static float GetVisualBeamFillFraction()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.VisualBeamFill,
-                BaseVisualBeamFillFraction
-            )
-        );
-    }
-
-    public static float GetVisualMinimumHalfWidthMultiplier()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.VisualMinimumBeamWidth,
-                BaseVisualMinimumHalfWidthMultiplier
-            )
-        );
-    }
-
-    public static float GetVisualEndFeatherFraction()
-    {
-        return Mathf.Clamp(
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.VisualEndFeather,
-                BaseVisualEndFeatherFraction
-            ),
-            0f,
-            0.50f
-        );
-    }
-
-    public static int GetVisualBeamCount()
-    {
-        float value = ApplySpecializationKnob(
-            LeviathanStarfireKnobs.VisualBeamCount,
-            BaseVisualBeamCount
-        );
-
-        return Mathf.Max(1, Mathf.RoundToInt(value));
-    }
-
-    public static int GetVisualLengthSegments()
-    {
-        float value = ApplySpecializationKnob(
-            LeviathanStarfireKnobs.VisualLengthSegments,
-            BaseVisualLengthSegments
-        );
-
-        return Mathf.Max(2, Mathf.RoundToInt(value));
-    }
-
-    // -------------------------------------------------------------------------
-    // Reserved feature surfaces. These are intentionally neutral until a tree
-    // node enables the corresponding typed flag and supplies authored values.
-    // -------------------------------------------------------------------------
-
-    public static bool IsRechargePullEnabled()
-    {
-        return LeviathanSpecializationRuntime.HasFlag(
-            LeviathanStarfireFlags.RechargePull
-        );
-    }
-
-    public static float GetRechargePullRadius()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RechargePullRadius,
-                0f
-            )
-        );
-    }
-
-    public static float GetRechargePullStrength()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RechargePullStrength,
-                0f
-            )
-        );
-    }
-
-    public static float GetRechargePullFalloffExponent()
-    {
-        return Mathf.Max(
-            0.01f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RechargePullFalloffExponent,
-                1f
-            )
-        );
-    }
-
-    public static float GetRechargePullMaxSpeed()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.RechargePullMaxSpeed,
-                0f
-            )
-        );
-    }
-
-    public static bool IsBlastWaveEnabled()
-    {
-        return LeviathanSpecializationRuntime.HasFlag(
-            LeviathanStarfireFlags.BlastWave
-        );
-    }
-
-    public static float GetBlastWaveArcDegrees()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BlastWaveArcDegrees,
-                0f
-            )
-        );
-    }
-
-    public static float GetBlastWaveDamageSeconds()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BlastWaveDamageSeconds,
-                0f
-            )
-        );
-    }
-
-    public static float GetBlastWaveDamageMultiplier()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BlastWaveDamageMultiplier,
-                1f
-            )
-        );
-    }
-
-    public static float GetBlastWaveSpeed()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BlastWaveSpeed,
-                0f
-            )
-        );
-    }
-
-    public static float GetBlastWaveRangeMultiplier()
-    {
-        return Mathf.Max(
-            0f,
-            GetSpecializationMultiplier(
-                LeviathanStarfireKnobs.BlastWaveRange
-            )
-        );
-    }
-
-    public static float GetBlastWaveWidthMultiplier()
-    {
-        return Mathf.Max(
-            0f,
-            GetSpecializationMultiplier(
-                LeviathanStarfireKnobs.BlastWaveWidth
-            )
-        );
-    }
-
-    public static float GetBlastWaveDuration()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BlastWaveDuration,
-                0f
-            )
-        );
-    }
-
-    public static float GetBlastWaveFalloffExponent()
-    {
-        return Mathf.Max(
-            0.01f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BlastWaveFalloffExponent,
-                1f
-            )
-        );
-    }
-
-    public static float GetBlastWaveVisualOpacity()
-    {
-        return Mathf.Clamp01(
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BlastWaveVisualOpacity,
-                0f
-            )
-        );
-    }
-
-    public static float GetBlastWaveKnockback()
-    {
-        return Mathf.Max(
-            0f,
-            ApplySpecializationKnob(
-                LeviathanStarfireKnobs.BlastWaveKnockback,
-                0f
-            )
-        );
-    }
+    public static bool IsBlastWaveEnabled() { return GetResolvedStarfireState().BlastWaveEnabled; }
+    public static float GetBlastWaveArcDegrees() { return GetResolvedStarfireState().BlastWaveArcDegrees; }
+    public static float GetBlastWaveDamageMultiplier() { return GetResolvedStarfireState().BlastWaveDamageMultiplier; }
+    public static float GetBlastWaveSpeed() { return GetResolvedStarfireState().BlastWaveSpeed; }
+    public static float GetBlastWaveRangeMultiplier() { return GetResolvedStarfireState().BlastWaveRangeMultiplier; }
+    public static float GetBlastWaveFrontThickness() { return GetResolvedStarfireState().BlastWaveFrontThickness; }
+    public static float GetBlastWaveDuration() { return GetResolvedStarfireState().BlastWaveDuration; }
+    public static float GetBlastWaveFalloffExponent() { return GetResolvedStarfireState().BlastWaveFalloffExponent; }
+    public static float GetBlastWaveVisualOpacity() { return GetResolvedStarfireState().BlastWaveVisualOpacity; }
+    public static float GetBlastWaveKnockback() { return GetResolvedStarfireState().BlastWaveKnockback; }
 
     private static float GetRankValue(float[] values, int rank)
     {
@@ -2980,6 +3597,15 @@ public static class LeviathanStarfireMaxRangePatch
             __3,
             ref __result
         );
+    }
+}
+
+[HarmonyPatch(typeof(WorldController), "PostInit")]
+public static class LeviathanStarfireSceneCleanupBootstrapPatch
+{
+    public static void Postfix()
+    {
+        LeviathanStarfireRuntime.EnsureSceneCleanupHook();
     }
 }
 

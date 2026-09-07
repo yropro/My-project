@@ -265,6 +265,13 @@ public static class LeviathanStarfireKnobs
             "Visual End Feather"
         );
 
+    public static readonly LeviathanSpecializationKnob VisualStartupExtendSeconds =
+        LeviathanSpecializationKnob.Flat(
+            "starfire.visual_startup_extend_seconds",
+            "Visual Startup Extend Time",
+            "s"
+        );
+
     public static readonly LeviathanSpecializationKnob VisualBeamCount =
         LeviathanSpecializationKnob.Flat(
             "starfire.visual_beam_count",
@@ -318,6 +325,9 @@ public static class LeviathanStarfireKnobs
             "°"
         );
 
+    // Reserved compatibility knob. The current Blast Wave implementation does
+    // not use an authored damage-duration value; it integrates the actual
+    // remaining resolved Breath Power damage profile instead.
     public static readonly LeviathanSpecializationKnob BlastWaveDamageSeconds =
         LeviathanSpecializationKnob.Flat(
             "starfire.blast_wave_damage_seconds",
@@ -345,9 +355,10 @@ public static class LeviathanStarfireKnobs
         );
 
     public static readonly LeviathanSpecializationKnob BlastWaveWidth =
-        LeviathanSpecializationKnob.Percent(
+        LeviathanSpecializationKnob.Flat(
             "starfire.blast_wave_width",
-            "Blast Wave Width"
+            "Blast Wave Front Thickness",
+            "m"
         );
 
     public static readonly LeviathanSpecializationKnob BlastWaveDuration =

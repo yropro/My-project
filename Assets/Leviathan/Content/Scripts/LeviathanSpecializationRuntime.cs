@@ -293,6 +293,23 @@ public static class LeviathanSpecializationRuntime
         new LeviathanGrowthPointBank();
 
     private static bool registeredDefaults;
+    private static int configurationRevision;
+
+    // Changes only when specialization state actually changes. Runtime consumers
+    // can cache fully-resolved configurations against this revision instead of
+    // rebuilding every rendered frame.
+    public static int ConfigurationRevision
+    {
+        get { return configurationRevision; }
+    }
+
+    public static void InvalidateConfiguration()
+    {
+        unchecked
+        {
+            configurationRevision++;
+        }
+    }
 
     public static void RegisterDefaults()
     {
@@ -330,7 +347,10 @@ public static class LeviathanSpecializationRuntime
             // serialized. Rebuild them immediately after loading so persisted
             // child nodes can satisfy their normal root prerequisites.
             if (playerData.PersistenceReady)
+            {
                 SynchronizeAllAutoGrantedNodes(pilot);
+                InvalidateConfiguration();
+            }
         }
         else if (!playerData.PersistenceReady)
         {
@@ -345,7 +365,10 @@ public static class LeviathanSpecializationRuntime
             playerData.PersistenceReason = retryReason;
 
             if (ready)
+            {
                 SynchronizeAllAutoGrantedNodes(pilot);
+                InvalidateConfiguration();
+            }
         }
 
         return playerData;
@@ -411,7 +434,12 @@ public static class LeviathanSpecializationRuntime
             if (!nodes[i].AutoGranted)
                 continue;
 
-            state.SetRank(nodes[i].Id, unlocked ? nodes[i].MaxRank : 0);
+            int desiredRank = unlocked ? nodes[i].MaxRank : 0;
+            if (state.GetRank(nodes[i].Id) != desiredRank)
+            {
+                state.SetRank(nodes[i].Id, desiredRank);
+                InvalidateConfiguration();
+            }
         }
     }
 
@@ -610,6 +638,7 @@ public static class LeviathanSpecializationRuntime
             return false;
         }
 
+        InvalidateConfiguration();
         return true;
     }
 
@@ -690,6 +719,7 @@ public static class LeviathanSpecializationRuntime
             PointBank.TryRefund(pilot, node.PointCostPerRank, out ignored);
         }
 
+        InvalidateConfiguration();
         return true;
     }
 
@@ -798,11 +828,16 @@ public static class LeviathanSpecializationRuntime
 
         SynchronizeAllAutoGrantedNodes(pilot);
 
-        return LeviathanSpecializationPersistence.Save(
+        bool saved = LeviathanSpecializationPersistence.Save(
             pilot,
             playerData.Trees,
             out reason
         );
+
+        if (saved)
+            InvalidateConfiguration();
+
+        return saved;
     }
 
     public static int GetNodeRank(

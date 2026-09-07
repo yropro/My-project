@@ -76,8 +76,8 @@ public static class LeviathanConstrictor
         3.10f, // Rank 1
         3.40f, // Rank 2
         3.60f, // Rank 3
-        3.8f, // Rank 4
-        4.00f  // Rank 5
+        3.76f, // Rank 4
+        3.85f  // Rank 5
     };
 
     // ADDITIVE crit chance granted by Constrictor, on top of the equipped
@@ -91,7 +91,7 @@ public static class LeviathanConstrictor
         0.0725f, // Rank 2
         0.10f, // Rank 3
         0.15f, // Rank 4
-        0.20f  // Rank 5
+        0.17f  // Rank 5
     };
 
     // ADDITIVE crit damage modifier granted by Constrictor, on top of the

@@ -284,8 +284,17 @@ Named multiplier knobs:
 
     LeviathanFx.Multiply(DamageFactor, 1.25f)
 
-means x1.25 per purchased rank. MultiplyRanks() is also available for explicit
-per-rank factors. Generic Ranks() also works with Multiplier knobs.
+means x1.25 per purchased rank. Multiply() and MultiplyRanks() may target ANY
+named knob, not only knobs whose default kind is Multiplier. This allows a normal
+Damage percent knob to receive ordinary +damage nodes and true multiplicative
+modifiers such as Focused Breath without special-case runtime code.
+
+MultiplyTotals() accepts the total resolved multiplier at each purchased rank:
+
+    LeviathanFx.MultiplyTotals(Damage, 1.45f, 1.90f, 2.35f)
+
+Rank 1/2/3 therefore resolve to exactly x1.45 / x1.90 / x2.35 rather than
+compounding to 1.45^rank. Generic Ranks() still works with Multiplier knobs.
 
 Typed feature flags:
 
@@ -310,6 +319,10 @@ STARFIRE PERSISTENT BREATH MODEL
 Starfire now owns a persistent breath reservoir instead of resetting its falloff
 clock on every trigger release.
 
+Starfire builds one ResolvedStarfireState from its rank-1 baseline plus every
+active named knob/flag. Heat, geometry, native damage, breath depletion/recovery,
+Big Succ and Blast Wave all consume that same resolved state.
+
 Baseline specialization Starfire:
     Full-power capacity:        1.50 seconds
     Falloff capacity:           2.00 seconds
@@ -318,6 +331,9 @@ Baseline specialization Starfire:
     Idle recovery:              0.50 breath-second / second
     Empty-to-full recovery:     about 7 seconds
     Recovery delay:             0 seconds
+    Damage at empty:            0%
+    Length at empty:            0%
+    Width at empty:             0%
 
 Windup does not consume breath. Releasing preserves the remaining reservoir and
 starts recovery. Damage, length and angular width all read the same reservoir,

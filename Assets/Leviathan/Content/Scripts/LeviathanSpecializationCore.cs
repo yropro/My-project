@@ -413,6 +413,7 @@ public sealed class LeviathanSpecializationEffect
     private readonly bool hasConstantIncrement;
     private readonly float constantIncrement;
     private readonly float[] perRankIncrements;
+    private bool multiplierRanksAreTotals;
 
     private LeviathanSpecializationEffect(
         LeviathanSpecializationEffectType type,
@@ -479,6 +480,65 @@ public sealed class LeviathanSpecializationEffect
             0f,
             converted
         );
+    }
+
+    // Explicit multiplier contribution against any named knob. The knob's Kind
+    // controls the default Increment/Ranks authoring semantics, not the complete
+    // set of operations that can target it. This lets one node add +damage while
+    // another multiplies the already-resolved damage through the same knob.
+    public static LeviathanSpecializationEffect KnobMultiplier(
+        LeviathanSpecializationKnob knob,
+        float factorPerRank)
+    {
+        if (knob == null)
+            throw new ArgumentNullException("knob");
+
+        return new LeviathanSpecializationEffect(
+            LeviathanSpecializationEffectType.Multiplier,
+            knob.Id,
+            knob,
+            true,
+            factorPerRank,
+            null
+        );
+    }
+
+    public static LeviathanSpecializationEffect KnobMultiplierRanks(
+        LeviathanSpecializationKnob knob,
+        params float[] factorsByRank)
+    {
+        if (knob == null)
+            throw new ArgumentNullException("knob");
+        if (factorsByRank == null || factorsByRank.Length == 0)
+            throw new ArgumentException("At least one per-rank factor is required.", "factorsByRank");
+
+        float[] factors = new float[factorsByRank.Length];
+        Array.Copy(factorsByRank, factors, factorsByRank.Length);
+
+        return new LeviathanSpecializationEffect(
+            LeviathanSpecializationEffectType.Multiplier,
+            knob.Id,
+            knob,
+            false,
+            0f,
+            factors
+        );
+    }
+
+    // Per-rank TOTAL multipliers rather than incremental factors. Example:
+    // 1.45, 1.90, 2.35 means purchased rank 1/2/3 resolves to exactly those
+    // multipliers. This is useful for effects described as +45% per rank without
+    // accidentally compounding to 1.45^rank.
+    public static LeviathanSpecializationEffect KnobMultiplierTotals(
+        LeviathanSpecializationKnob knob,
+        params float[] totalFactorsByRank)
+    {
+        LeviathanSpecializationEffect effect = KnobMultiplierRanks(
+            knob,
+            totalFactorsByRank
+        );
+        effect.multiplierRanksAreTotals = true;
+        return effect;
     }
 
     // Compatibility helpers for one-off raw effects. Prefer LeviathanFx with a
@@ -587,8 +647,14 @@ public sealed class LeviathanSpecializationEffect
             if (hasConstantIncrement)
                 return (float)Math.Pow(constantIncrement, rank);
 
-            float factor = 1f;
             int count = Math.Min(rank, perRankIncrements == null ? 0 : perRankIncrements.Length);
+            if (count <= 0)
+                return 1f;
+
+            if (multiplierRanksAreTotals)
+                return perRankIncrements[count - 1];
+
+            float factor = 1f;
             for (int i = 0; i < count; i++)
                 factor *= perRankIncrements[i];
             return factor;
@@ -627,6 +693,14 @@ public sealed class LeviathanSpecializationEffect
 
         if (Knob != null)
         {
+            if (Type == LeviathanSpecializationEffectType.Multiplier)
+            {
+                float knobFactor = hasConstantIncrement
+                    ? constantIncrement
+                    : perRankIncrements[Math.Min(rankIndex - 1, perRankIncrements.Length - 1)];
+                return "x" + knobFactor.ToString("0.###") + " " + Knob.Name;
+            }
+
             float rawDefinitionValue;
             if (hasConstantIncrement)
             {
@@ -692,21 +766,14 @@ public static class LeviathanFx
         return LeviathanSpecializationEffect.KnobRanks(knob, valuesByRank);
     }
 
-    // Explicit multiplier helper for multiplier knobs. Example:
-    // Multiply(knob, 1.25f) => x1.25 for each purchased rank.
+    // Explicit multiplier helper against any named knob. Example:
+    // Multiply(StarfireKnobs.Damage, 1.45f) multiplies the damage value after
+    // additive/percent contributions on that same knob have been resolved.
     public static LeviathanSpecializationEffect Multiply(
         LeviathanSpecializationKnob knob,
         float factorPerRank)
     {
-        if (knob == null)
-            throw new ArgumentNullException("knob");
-        if (knob.Kind != LeviathanKnobKind.Multiplier)
-            throw new ArgumentException(
-                "Multiply requires a Multiplier knob.",
-                "knob"
-            );
-
-        return LeviathanSpecializationEffect.KnobIncrement(
+        return LeviathanSpecializationEffect.KnobMultiplier(
             knob,
             factorPerRank
         );
@@ -716,17 +783,19 @@ public static class LeviathanFx
         LeviathanSpecializationKnob knob,
         params float[] factorsByRank)
     {
-        if (knob == null)
-            throw new ArgumentNullException("knob");
-        if (knob.Kind != LeviathanKnobKind.Multiplier)
-            throw new ArgumentException(
-                "MultiplyRanks requires a Multiplier knob.",
-                "knob"
-            );
-
-        return LeviathanSpecializationEffect.KnobRanks(
+        return LeviathanSpecializationEffect.KnobMultiplierRanks(
             knob,
             factorsByRank
+        );
+    }
+
+    public static LeviathanSpecializationEffect MultiplyTotals(
+        LeviathanSpecializationKnob knob,
+        params float[] totalFactorsByRank)
+    {
+        return LeviathanSpecializationEffect.KnobMultiplierTotals(
+            knob,
+            totalFactorsByRank
         );
     }
 
@@ -856,6 +925,27 @@ public static class LeviathanNode
         );
     }
 
+    public static LeviathanSpecializationNode PassiveExclusive(
+        string id,
+        string name,
+        int maxRank,
+        LeviathanRequirement requirement,
+        string exclusiveGroup,
+        string description,
+        params LeviathanSpecializationEffect[] effects)
+    {
+        return new LeviathanSpecializationNode(
+            id,
+            name,
+            maxRank,
+            LeviathanSpecializationNodeType.Passive,
+            requirement,
+            exclusiveGroup,
+            description,
+            effects
+        );
+    }
+
     public static LeviathanSpecializationNode Major(
         string id,
         string name,
@@ -871,6 +961,27 @@ public static class LeviathanNode
             LeviathanSpecializationNodeType.Major,
             requirement,
             null,
+            description,
+            effects
+        );
+    }
+
+    public static LeviathanSpecializationNode MajorExclusive(
+        string id,
+        string name,
+        int maxRank,
+        LeviathanRequirement requirement,
+        string exclusiveGroup,
+        string description,
+        params LeviathanSpecializationEffect[] effects)
+    {
+        return new LeviathanSpecializationNode(
+            id,
+            name,
+            maxRank,
+            LeviathanSpecializationNodeType.Major,
+            requirement,
+            exclusiveGroup,
             description,
             effects
         );
@@ -1574,7 +1685,7 @@ public static class LeviathanSpecializationAutoLayout
                 previousOrder[pair.Value[i]] = i;
         }
 
-        current.Sort(delegate(string a, string b)
+        current.Sort(delegate (string a, string b)
         {
             float ba = GetBarycenter(a, edges, previousOrder, useParents);
             float bb = GetBarycenter(b, edges, previousOrder, useParents);
