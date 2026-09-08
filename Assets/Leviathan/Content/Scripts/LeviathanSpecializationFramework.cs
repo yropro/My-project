@@ -1033,6 +1033,8 @@ public sealed class LeviathanSpecializationTree
     private readonly List<LeviathanSpecializationNode> nodes =
         new List<LeviathanSpecializationNode>();
 
+    private readonly IList<LeviathanSpecializationNode> readOnlyNodes;
+
     private readonly Dictionary<string, LeviathanSpecializationNode> byId =
         new Dictionary<string, LeviathanSpecializationNode>(StringComparer.Ordinal);
 
@@ -1053,11 +1055,12 @@ public sealed class LeviathanSpecializationTree
         DisplayOrder = displayOrder;
         UnlockKind = unlockKind;
         NativeUnlockUpgradeKey = nativeUnlockUpgradeKey;
+        readOnlyNodes = nodes.AsReadOnly();
     }
 
     public IList<LeviathanSpecializationNode> Nodes
     {
-        get { return nodes.AsReadOnly(); }
+        get { return readOnlyNodes; }
     }
 
     public LeviathanSpecializationTree Add(LeviathanSpecializationNode node)
@@ -1187,6 +1190,13 @@ public sealed class LeviathanSpecializationState : ILeviathanSpecializationRankS
     private readonly Dictionary<string, int> ranks =
         new Dictionary<string, int>(StringComparer.Ordinal);
 
+    private int revision;
+
+    public int Revision
+    {
+        get { return revision; }
+    }
+
     public int GetRank(string nodeId)
     {
         int rank;
@@ -1200,10 +1210,20 @@ public sealed class LeviathanSpecializationState : ILeviathanSpecializationRankS
         if (string.IsNullOrEmpty(nodeId))
             return;
 
-        if (rank <= 0)
+        int desired = Math.Max(0, rank);
+        int current = GetRank(nodeId);
+        if (current == desired)
+            return;
+
+        if (desired <= 0)
             ranks.Remove(nodeId);
         else
-            ranks[nodeId] = rank;
+            ranks[nodeId] = desired;
+
+        unchecked
+        {
+            revision++;
+        }
     }
 
     public IDictionary<string, int> Snapshot()
@@ -1831,6 +1851,17 @@ public static class LeviathanSpecializationRegistry
     private static readonly Dictionary<string, LeviathanSpecializationTree> trees =
         new Dictionary<string, LeviathanSpecializationTree>(StringComparer.Ordinal);
 
+    private static IList<LeviathanSpecializationTree> cachedAll =
+        new List<LeviathanSpecializationTree>().AsReadOnly();
+
+    private static bool cachedAllDirty = true;
+    private static int revision;
+
+    public static int Revision
+    {
+        get { return revision; }
+    }
+
     public static void Register(LeviathanSpecializationTree tree)
     {
         if (tree == null)
@@ -1838,6 +1869,7 @@ public static class LeviathanSpecializationRegistry
 
         tree.Validate();
         trees[tree.Id] = tree;
+        MarkStructureChanged();
     }
 
     public static LeviathanSpecializationTree Get(string treeId)
@@ -1848,18 +1880,44 @@ public static class LeviathanSpecializationRegistry
             : null;
     }
 
+    // Tree definitions change only during registration/rebuild. Cache the sorted
+    // read-only view so combat/runtime lookups never OrderBy/ToList the registry.
     public static IList<LeviathanSpecializationTree> All()
     {
-        return trees.Values
-            .OrderBy(t => t.DisplayOrder)
-            .ThenBy(t => t.Id)
-            .ToList()
-            .AsReadOnly();
+        if (!cachedAllDirty)
+            return cachedAll;
+
+        List<LeviathanSpecializationTree> sorted =
+            new List<LeviathanSpecializationTree>(trees.Values);
+
+        sorted.Sort(delegate (
+            LeviathanSpecializationTree a,
+            LeviathanSpecializationTree b)
+        {
+            int order = a.DisplayOrder.CompareTo(b.DisplayOrder);
+            return order != 0
+                ? order
+                : string.CompareOrdinal(a.Id, b.Id);
+        });
+
+        cachedAll = sorted.AsReadOnly();
+        cachedAllDirty = false;
+        return cachedAll;
     }
 
     public static void Clear()
     {
         trees.Clear();
+        MarkStructureChanged();
+    }
+
+    private static void MarkStructureChanged()
+    {
+        cachedAllDirty = true;
+        unchecked
+        {
+            revision++;
+        }
     }
 
     public static string ResolveEffectName(string key)
@@ -2139,6 +2197,23 @@ public static class LeviathanSpecializationPersistence
     }
 }
 
+internal struct LeviathanSpecializationAggregateCacheValue
+{
+    public float Flat;
+    public float Percent;
+    public float Multiplier;
+
+    public LeviathanSpecializationAggregateCacheValue(
+        float flat,
+        float percent,
+        float multiplier)
+    {
+        Flat = flat;
+        Percent = percent;
+        Multiplier = multiplier;
+    }
+}
+
 public sealed class LeviathanPilotSpecializationData
 {
     public readonly Dictionary<string, LeviathanSpecializationState> Trees =
@@ -2146,11 +2221,41 @@ public sealed class LeviathanPilotSpecializationData
 
     public bool PersistenceReady;
     public string PersistenceReason;
+
+    // Runtime resolution caches. Validity is keyed to all inputs that can alter
+    // specialization results, including direct SetRank changes used by refund
+    // simulation and native-upgrade tree unlocks.
+    internal int CacheConfigurationRevision = int.MinValue;
+    internal int CacheRegistryRevision = int.MinValue;
+    internal int CacheNativeUnlockStamp = int.MinValue;
+    internal int CacheStateRevisionStamp = int.MinValue;
+
+    internal readonly Dictionary<string, bool> TreeUnlockCache =
+        new Dictionary<string, bool>(StringComparer.Ordinal);
+
+    internal readonly Dictionary<string, LeviathanSpecializationAggregateCacheValue>
+        KnobAggregateCache =
+            new Dictionary<string, LeviathanSpecializationAggregateCacheValue>(
+                StringComparer.Ordinal);
+
+    internal readonly Dictionary<string, bool> FlagCache =
+        new Dictionary<string, bool>(StringComparer.Ordinal);
+
+    internal readonly HashSet<string> UnlockPathScratch =
+        new HashSet<string>(StringComparer.Ordinal);
+
+    internal void ClearResolutionCaches()
+    {
+        TreeUnlockCache.Clear();
+        KnobAggregateCache.Clear();
+        FlagCache.Clear();
+        UnlockPathScratch.Clear();
+    }
 }
 
 public static class LeviathanSpecializationRuntime
 {
-    public const string DiagnosticBuildMarker = "SPEC-DIAG-20260907-A";
+    public const string DiagnosticBuildMarker = "SPEC-DIAG-20260907-B";
     private static readonly Dictionary<Pilot, LeviathanPilotSpecializationData> data =
         new Dictionary<Pilot, LeviathanPilotSpecializationData>();
 
@@ -2273,6 +2378,101 @@ public static class LeviathanSpecializationRuntime
         return state;
     }
 
+    private static LeviathanSpecializationState GetRawState(
+        LeviathanPilotSpecializationData playerData,
+        string treeId)
+    {
+        if (playerData == null || string.IsNullOrEmpty(treeId))
+            return null;
+
+        LeviathanSpecializationState state;
+        if (!playerData.Trees.TryGetValue(treeId, out state))
+        {
+            state = new LeviathanSpecializationState();
+            playerData.Trees.Add(treeId, state);
+        }
+
+        return state;
+    }
+
+    private static int ComputeNativeUnlockStamp(Pilot pilot)
+    {
+        unchecked
+        {
+            int hash = 17;
+            IList<LeviathanSpecializationTree> trees =
+                LeviathanSpecializationRegistry.All();
+
+            for (int i = 0; i < trees.Count; i++)
+            {
+                LeviathanSpecializationTree tree = trees[i];
+                if (tree.UnlockKind != LeviathanTreeUnlockKind.NativeUpgrade)
+                    continue;
+
+                int rank = pilot == null
+                    ? 0
+                    : pilot.GetUpgradeLevel(
+                        (Upgrade.Key)tree.NativeUnlockUpgradeKey);
+
+                hash = hash * 31 + tree.NativeUnlockUpgradeKey;
+                hash = hash * 31 + rank;
+            }
+
+            return hash;
+        }
+    }
+
+    private static int ComputeStateRevisionStamp(
+        LeviathanPilotSpecializationData playerData)
+    {
+        unchecked
+        {
+            int hash = 17;
+            IList<LeviathanSpecializationTree> trees =
+                LeviathanSpecializationRegistry.All();
+
+            for (int i = 0; i < trees.Count; i++)
+            {
+                LeviathanSpecializationState state;
+                int revision = playerData != null &&
+                    playerData.Trees.TryGetValue(trees[i].Id, out state) &&
+                    state != null
+                        ? state.Revision
+                        : 0;
+
+                hash = hash * 31 + revision;
+            }
+
+            return hash;
+        }
+    }
+
+    private static void EnsureResolutionCacheValid(
+        Pilot pilot,
+        LeviathanPilotSpecializationData playerData)
+    {
+        if (playerData == null)
+            return;
+
+        int registryRevision = LeviathanSpecializationRegistry.Revision;
+        int nativeUnlockStamp = ComputeNativeUnlockStamp(pilot);
+        int stateRevisionStamp = ComputeStateRevisionStamp(playerData);
+
+        if (playerData.CacheConfigurationRevision == configurationRevision &&
+            playerData.CacheRegistryRevision == registryRevision &&
+            playerData.CacheNativeUnlockStamp == nativeUnlockStamp &&
+            playerData.CacheStateRevisionStamp == stateRevisionStamp)
+        {
+            return;
+        }
+
+        playerData.CacheConfigurationRevision = configurationRevision;
+        playerData.CacheRegistryRevision = registryRevision;
+        playerData.CacheNativeUnlockStamp = nativeUnlockStamp;
+        playerData.CacheStateRevisionStamp = stateRevisionStamp;
+        playerData.ClearResolutionCaches();
+    }
+
     public static LeviathanSpecializationState GetState(
         Pilot pilot,
         string treeId)
@@ -2346,65 +2546,101 @@ public static class LeviathanSpecializationRuntime
         Pilot pilot,
         LeviathanSpecializationTree tree)
     {
-        return IsTreeUnlockedRaw(
-            pilot,
-            tree,
-            new HashSet<string>(StringComparer.Ordinal)
-        );
-    }
-
-    private static bool IsTreeUnlockedRaw(
-        Pilot pilot,
-        LeviathanSpecializationTree tree,
-        HashSet<string> path)
-    {
         if (pilot == null || tree == null)
             return false;
+
+        LeviathanPilotSpecializationData playerData = GetPilotData(pilot);
+        if (playerData == null)
+            return false;
+
+        EnsureResolutionCacheValid(pilot, playerData);
+        return IsTreeUnlockedCached(pilot, tree, playerData);
+    }
+
+    private static bool IsTreeUnlockedCached(
+        Pilot pilot,
+        LeviathanSpecializationTree tree,
+        LeviathanPilotSpecializationData playerData)
+    {
+        if (pilot == null || tree == null || playerData == null)
+            return false;
+
+        bool cached;
+        if (playerData.TreeUnlockCache.TryGetValue(tree.Id, out cached))
+            return cached;
+
+        playerData.UnlockPathScratch.Clear();
+        return EvaluateTreeUnlocked(
+            pilot,
+            tree,
+            playerData,
+            playerData.UnlockPathScratch);
+    }
+
+    private static bool EvaluateTreeUnlocked(
+        Pilot pilot,
+        LeviathanSpecializationTree tree,
+        LeviathanPilotSpecializationData playerData,
+        HashSet<string> path)
+    {
+        bool cached;
+        if (playerData.TreeUnlockCache.TryGetValue(tree.Id, out cached))
+            return cached;
 
         if (!path.Add(tree.Id))
             return false;
 
+        bool result = false;
+
         try
         {
             if (tree.UnlockKind == LeviathanTreeUnlockKind.Always)
-                return true;
-
-            if (tree.UnlockKind == LeviathanTreeUnlockKind.NativeUpgrade)
             {
-                return pilot.GetUpgradeLevel(
+                result = true;
+            }
+            else if (tree.UnlockKind == LeviathanTreeUnlockKind.NativeUpgrade)
+            {
+                result = pilot.GetUpgradeLevel(
                     (Upgrade.Key)tree.NativeUnlockUpgradeKey
                 ) >= 1;
             }
-
-            IList<LeviathanSpecializationTree> all =
-                LeviathanSpecializationRegistry.All();
-
-            for (int i = 0; i < all.Count; i++)
+            else
             {
-                LeviathanSpecializationTree sourceTree = all[i];
+                IList<LeviathanSpecializationTree> all =
+                    LeviathanSpecializationRegistry.All();
 
-                if (sourceTree.Id == tree.Id ||
-                    !IsTreeUnlockedRaw(pilot, sourceTree, path))
+                for (int i = 0; i < all.Count; i++)
                 {
-                    continue;
-                }
+                    LeviathanSpecializationTree sourceTree = all[i];
+                    if (sourceTree.Id == tree.Id ||
+                        !EvaluateTreeUnlocked(
+                            pilot,
+                            sourceTree,
+                            playerData,
+                            path))
+                    {
+                        continue;
+                    }
 
-                LeviathanSpecializationState state =
-                    GetRawState(pilot, sourceTree.Id);
+                    LeviathanSpecializationState state =
+                        GetRawState(playerData, sourceTree.Id);
 
-                if (state != null &&
-                    state.HasUnlockTreeEffect(sourceTree, tree.Id))
-                {
-                    return true;
+                    if (state != null &&
+                        state.HasUnlockTreeEffect(sourceTree, tree.Id))
+                    {
+                        result = true;
+                        break;
+                    }
                 }
             }
-
-            return false;
         }
         finally
         {
             path.Remove(tree.Id);
         }
+
+        playerData.TreeUnlockCache[tree.Id] = result;
+        return result;
     }
 
     public static bool CanSafelySpend(Pilot pilot, out string reason)
@@ -2819,26 +3055,48 @@ public static class LeviathanSpecializationRuntime
         multiplier = 1f;
 
         RegisterDefaults();
+        LeviathanPilotSpecializationData playerData = GetPilotData(pilot);
+        if (playerData == null)
+            return;
+
+        EnsureResolutionCacheValid(pilot, playerData);
+
+        LeviathanSpecializationAggregateCacheValue cached;
+        if (playerData.KnobAggregateCache.TryGetValue(knob.Id, out cached))
+        {
+            flat = cached.Flat;
+            percent = cached.Percent;
+            multiplier = cached.Multiplier;
+            return;
+        }
+
         IList<LeviathanSpecializationTree> trees =
             LeviathanSpecializationRegistry.All();
 
         for (int i = 0; i < trees.Count; i++)
         {
-            if (!IsTreeUnlockedRaw(pilot, trees[i]))
+            if (!IsTreeUnlockedCached(pilot, trees[i], playerData))
                 continue;
 
-            LeviathanSpecializationState state = GetState(pilot, trees[i].Id);
-            if (state != null)
-            {
-                state.Aggregate(
-                    trees[i],
-                    knob.Id,
-                    ref flat,
-                    ref percent,
-                    ref multiplier
-                );
-            }
+            LeviathanSpecializationState state =
+                GetRawState(playerData, trees[i].Id);
+            if (state == null)
+                continue;
+
+            state.Aggregate(
+                trees[i],
+                knob.Id,
+                ref flat,
+                ref percent,
+                ref multiplier
+            );
         }
+
+        playerData.KnobAggregateCache[knob.Id] =
+            new LeviathanSpecializationAggregateCacheValue(
+                flat,
+                percent,
+                multiplier);
     }
 
     public static bool HasFlag(
@@ -2866,21 +3124,37 @@ public static class LeviathanSpecializationRuntime
             return false;
 
         RegisterDefaults();
+        LeviathanPilotSpecializationData playerData = GetPilotData(pilot);
+        if (playerData == null)
+            return false;
+
+        EnsureResolutionCacheValid(pilot, playerData);
+
+        bool cached;
+        if (playerData.FlagCache.TryGetValue(flag.Id, out cached))
+            return cached;
+
+        bool enabled = false;
         IList<LeviathanSpecializationTree> trees =
             LeviathanSpecializationRegistry.All();
 
         for (int i = 0; i < trees.Count; i++)
         {
             LeviathanSpecializationTree tree = trees[i];
-            if (!IsTreeUnlockedRaw(pilot, tree))
+            if (!IsTreeUnlockedCached(pilot, tree, playerData))
                 continue;
 
-            LeviathanSpecializationState state = GetState(pilot, tree.Id);
+            LeviathanSpecializationState state =
+                GetRawState(playerData, tree.Id);
             if (state != null && state.HasFlag(tree, flag.Id))
-                return true;
+            {
+                enabled = true;
+                break;
+            }
         }
 
-        return false;
+        playerData.FlagCache[flag.Id] = enabled;
+        return enabled;
     }
 
     public static bool HasFlag(LeviathanSpecializationFlag flag)

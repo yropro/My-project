@@ -6,7 +6,7 @@ using Starfire = LeviathanStarfireRuntime;
 ///
 /// This file intentionally contains no Starfire mechanics. To add or rebalance
 /// an ordinary node, point it at a knob exposed by LeviathanStarfireRuntime and
-/// edit the numbers here. Unique behavior is implemented in LeviathanStarfire_v2.cs
+/// edit the numbers here. Unique behavior is implemented in LeviathanStarfire.cs
 /// and exposed here as a flag.
 /// </summary>
 public static class LeviathanStarfireTree
@@ -15,6 +15,54 @@ public static class LeviathanStarfireTree
     public const string RootNodeId = "starfire";
 
     private const string BreathShape = "starfire_breath_shape";
+
+    // Conditional effects still target the same ordinary Starfire knobs. The
+    // source family only decides which contribution from the purchased node is
+    // active; swapping weapons therefore reinterprets the same tree investment.
+    internal static readonly Starfire.FamilyKnobEffect[] FamilyEffects =
+    {
+        Family(
+            "Intensified Flame",
+            Starfire.StarfireSourceFamily.Torch,
+            Increment(Starfire.Knobs.Damage, 12f)
+        ),
+        Family(
+            "Intensified Flame",
+            Starfire.StarfireSourceFamily.Thrower,
+            Increment(Starfire.Knobs.StatusChance, 3f)
+        ),
+        Family(
+            "Overpressure",
+            Starfire.StarfireSourceFamily.Torch,
+            Increment(Starfire.Knobs.Damage, 15f)
+        ),
+        Family(
+            "Overpressure",
+            Starfire.StarfireSourceFamily.Thrower,
+            Increment(Starfire.Knobs.ProjectileSize, 10f)
+        )
+    };
+
+    private static Starfire.FamilyKnobEffect Family(
+        string nodeName,
+        Starfire.StarfireSourceFamily family,
+        LeviathanTreeDsl.Effect effect)
+    {
+        return new Starfire.FamilyKnobEffect(
+            Id(nodeName),
+            family,
+            effect
+        );
+    }
+
+    private static void ValidateFamilyEffects(LeviathanSpecializationTree tree)
+    {
+        for (int i = 0; i < FamilyEffects.Length; i++)
+        {
+            Starfire.FamilyKnobEffect effect = FamilyEffects[i];
+            effect.ValidateForNode(tree.GetNode(effect.NodeId));
+        }
+    }
 
     public static LeviathanSpecializationTree Create()
     {
@@ -27,7 +75,7 @@ public static class LeviathanStarfireTree
 
         tree.Add(Root(
             "Starfire",
-            "Transforms the first equipped Primary Torch into a broad breath weapon with persistent Breath Power."
+            "Transforms the first equipped Primary Torch or spray Thrower into a native thrower-style projectile breath with persistent Breath Power."
         ));
 
         // =====================================================================
@@ -76,9 +124,11 @@ public static class LeviathanStarfireTree
                 Requires("Overpressure")
             ),
             Increment(Starfire.Knobs.StartupDelaySeconds, 0.60f),
+            // Width scales most conservatively because angular spread compounds
+            // with the independently increased breath length.
             MultiplyTotals(Starfire.Knobs.Damage, 1.45f, 1.90f, 2.35f),
-            MultiplyTotals(Starfire.Knobs.Length, 1.45f, 1.90f, 2.35f),
-            MultiplyTotals(Starfire.Knobs.Width, 1.45f, 1.90f, 2.35f)
+            MultiplyTotals(Starfire.Knobs.Length, 1.25f, 1.50f, 1.75f),
+            MultiplyTotals(Starfire.Knobs.Width, 1.15f, 1.30f, 1.45f)
         ));
 
         tree.Add(Major(
@@ -109,7 +159,7 @@ public static class LeviathanStarfireTree
             Requires("Extended Flame"),
             BreathShape,
             Increment(Starfire.Knobs.Width, 30f),
-            Increment(Starfire.Knobs.BaseFanHalfAngleDegrees, 4f),
+            Increment(Starfire.Knobs.FiringHalfAngleDegrees, 4f),
             Increment(Starfire.Knobs.Damage, -10f)
         ));
 
@@ -127,7 +177,7 @@ public static class LeviathanStarfireTree
                 Requires("Overpressure")
             ),
             BreathShape,
-            Increment(Starfire.Knobs.BaseFanHalfAngleDegrees, -7.50f),
+            Increment(Starfire.Knobs.FiringHalfAngleDegrees, -7.50f),
             Multiply(Starfire.Knobs.Damage, 1.35f)
         ));
 
@@ -137,15 +187,17 @@ public static class LeviathanStarfireTree
 
         tree.Add(Node(
             "Intensified Flame",
+            1,
             Requires("Starfire"),
-            Increment(Starfire.Knobs.Damage, 12f),
+            "Torch: +12% Damage. Thrower: +3 percentage points Status Chance.",
             Increment(Starfire.Knobs.HeatGeneration, 8f)
         ));
 
         tree.Add(Node(
             "Overpressure",
+            1,
             Requires("Intensified Flame"),
-            Increment(Starfire.Knobs.Damage, 15f),
+            "Torch: +15% Damage. Thrower: +10% Projectile Size.",
             Increment(Starfire.Knobs.Length, 10f),
             Increment(Starfire.Knobs.HeatGeneration, 10f)
         ));
@@ -163,7 +215,7 @@ public static class LeviathanStarfireTree
                 Requires("Powerful Exhalation"),
                 Requires("Deep Breath")
             ),
-            "Replaces Starfire's continuous attack with a travelling 120-degree blast that consumes all remaining Breath Power.",
+            "Replaces Starfire's projectile breath with a travelling 120-degree blast that consumes all remaining Breath Power.",
             Enable(Starfire.Flags.BlastWave),
             Increment(Starfire.Knobs.BlastWaveArcDegrees, 120f),
             Multiply(Starfire.Knobs.BlastWaveDamageMultiplier, 1.10f),
@@ -175,6 +227,7 @@ public static class LeviathanStarfireTree
             Increment(Starfire.Knobs.BlastWaveEndRadius, 120f)
         ));
 
+        ValidateFamilyEffects(tree);
         tree.Validate();
         return tree;
     }

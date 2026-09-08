@@ -331,6 +331,7 @@ public static class LeviathanTemporalDiveRuntime
     {
         public bool Changed;
         public float OriginalSpeedScale;
+        public float AppliedFactor;
     }
 
     private static readonly Dictionary<int, DiveState> ActiveDives =
@@ -741,7 +742,14 @@ public static class LeviathanTemporalDiveRuntime
         {
             state.Changed = true;
             state.OriginalSpeedScale = ship.speedScale;
+            state.AppliedFactor = factor;
+
+            // GameShip caches speedScaleSquared and uses it for max-speed caps.
+            // Changing speedScale without rebuilding that cache lets an affected
+            // ship accelerate back toward its normal max speed while inside the
+            // field, making the Dive feel much weaker than its configured factor.
             ship.speedScale *= factor;
+            ship.GenerateSquaredValues();
         }
 
         return state;
@@ -749,8 +757,11 @@ public static class LeviathanTemporalDiveRuntime
 
     public static void EndShipFrame(GameShip ship, ShipTimeState state)
     {
-        if (ship && state.Changed)
-            ship.speedScale = state.OriginalSpeedScale;
+        if (!ship || !state.Changed)
+            return;
+
+        ship.speedScale = state.OriginalSpeedScale;
+        ship.GenerateSquaredValues();
     }
 
     public static void ApplyProjectileFrame(Projectile projectile)

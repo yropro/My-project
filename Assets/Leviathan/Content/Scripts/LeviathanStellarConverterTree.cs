@@ -28,6 +28,10 @@ public static class LeviathanStellarConverterTree
             "Baseline charged Converter profile."
         ));
 
+        // Damage/range percentages modify the finished Converter baseline.
+        // Example: +10% range means Baseline Converter Range * 1.10.
+        // Multiple tree percentage bonuses add against that same baseline.
+
         // =====================================================================
         // RAPID / CONTINUOUS
         // =====================================================================
@@ -37,7 +41,7 @@ public static class LeviathanStellarConverterTree
             Requires("Stellar Converter"),
             PrimaryPath,
             Ranks(Converter.Knobs.ChargeTime, -0.30f, -0.30f),
-            Ranks(Converter.Knobs.DamageMultiplier, -0.96f, -0.96f),
+            Ranks(Converter.Knobs.FinalDamagePercent, -30f, -30f),
             Ranks(Converter.Knobs.WidthMultiplier, -3.00f, -3.00f),
             Ranks(Converter.Knobs.StatusChance, 7.50f, 7.50f)
         ));
@@ -58,7 +62,7 @@ public static class LeviathanStellarConverterTree
             Requires("Stellar Converter"),
             PrimaryPath,
             "Trades piercing and some damage for native chain behavior.",
-            Multiply(Converter.Knobs.DamageMultiplier, 0.70f),
+            Increment(Converter.Knobs.FinalDamagePercent, -30f),
             Ranks(Converter.Knobs.ChainTargets, 2f),
             Enable(Converter.Flags.ArcCascade)
         ));
@@ -66,7 +70,7 @@ public static class LeviathanStellarConverterTree
         tree.Add(Major(
             "Fractal Cascade",
             Requires("Arc Cascade"),
-            Multiply(Converter.Knobs.DamageMultiplier, 0.60f / 0.70f),
+            Increment(Converter.Knobs.FinalDamagePercent, -10f),
             Ranks(Converter.Knobs.ChainTargets, 1f),
             Enable(Converter.Flags.FractalCascade)
         ));
@@ -81,9 +85,9 @@ public static class LeviathanStellarConverterTree
             PrimaryPath,
             Ranks(Converter.Knobs.ChargeTime, 0.25f, 0.25f),
             Ranks(Converter.Knobs.PulseDuration, 0.10f, 0.10f),
-            Ranks(Converter.Knobs.DamageMultiplier, 0.62f, 0.63f),
+            Ranks(Converter.Knobs.FinalDamagePercent, 20f, 20f),
             Ranks(Converter.Knobs.WidthMultiplier, 5.00f, 5.00f),
-            Ranks(Converter.Knobs.RangeMultiplier, 0.125f, 0.125f),
+            Ranks(Converter.Knobs.FinalRangePercent, 12.5f, 12.5f),
             Ranks(Converter.Knobs.Piercing, 0f, 1f)
         ));
 
@@ -93,12 +97,12 @@ public static class LeviathanStellarConverterTree
             Ranks(Converter.Knobs.ChargeTime, 0.25f, 0.25f),
             Ranks(Converter.Knobs.PulseDuration, 0.10f, 0.10f),
             Ranks(
-                Converter.Knobs.DamageMultiplier,
-                0.650f,
-                LeviathanStellarConverterTuning.DeepCapacitorsDamageMultiplier - 5.10f
+                Converter.Knobs.FinalDamagePercent,
+                20f,
+                25f
             ),
             Ranks(Converter.Knobs.WidthMultiplier, 5.00f, 10.00f),
-            Ranks(Converter.Knobs.RangeMultiplier, 0.075f, 0.075f)
+            Ranks(Converter.Knobs.FinalRangePercent, 7.5f, 7.5f)
         ));
 
         tree.Add(Keystone(
@@ -113,7 +117,7 @@ public static class LeviathanStellarConverterTree
             "Dying Star",
             Requires("Deep Capacitors", 2),
             ManifestationPath,
-            "Replaces the beam with a slow gravity seed that gathers enemies, then detonates after its fuse expires.",
+            "Replaces the beam with a slow gravity seed that gathers enemies. Hold after launch to mature it; release to detonate early with reduced damage and radius.",
             Enable(Converter.Flags.DyingStar)
         ));
 
@@ -122,7 +126,9 @@ public static class LeviathanStellarConverterTree
             Requires("Deep Capacitors", 2),
             ManifestationPath,
             "Keeps the Converter beam. An invisible gravity corridor grows down the beam and drags enemies toward its independently-moving tip.",
-            Enable(Converter.Flags.EventHorizon)
+            Enable(Converter.Flags.EventHorizon),
+            Increment(Converter.Knobs.PulseDuration, 0.5f),
+            Increment(Converter.Knobs.WidthMultiplier, 10.00f)
         ));
 
         // =====================================================================
@@ -137,6 +143,13 @@ public static class LeviathanStellarConverterTree
         ));
 
         tree.Add(Node(
+            "Resonant Feedback",
+            Requires("Resonant Optics", 1),
+            Increment(Converter.Knobs.FinalDamagePercent, 5f),
+            Increment(Converter.Knobs.CritChance, 2.5f)
+        ));
+
+        tree.Add(Node(
             "Ionized Focusing",
             2,
             Requires("Stellar Converter"),
@@ -144,10 +157,32 @@ public static class LeviathanStellarConverterTree
         ));
 
         tree.Add(Node(
+            "Ionized Reach",
+            Requires("Ionized Focusing", 1),
+            Increment(Converter.Knobs.FinalRangePercent, 5f),
+            Increment(Converter.Knobs.StatusChance, 2.5f)
+        ));
+
+        tree.Add(Node(
             "Long-Focus Lens",
             2,
             Requires("Stellar Converter"),
             Increment(Converter.Knobs.FinalRangePercent, 10f)
+        ));
+
+        tree.Add(Node(
+            "Focal Compression",
+            Requires("Long-Focus Lens", 1),
+            Increment(Converter.Knobs.FinalRangePercent, -10f),
+            Increment(Converter.Knobs.FinalDamagePercent, 15f)
+        ));
+
+        tree.Add(Node(
+            "Thermal Overdrive",
+            Requires("Long-Focus Lens", 2),
+            Increment(Converter.Knobs.HeatGenerationPercent, 25f),
+            Increment(Converter.Knobs.FinalRangePercent, 10f),
+            Increment(Converter.Knobs.FinalDamagePercent, 10f)
         ));
 
         tree.Validate();
