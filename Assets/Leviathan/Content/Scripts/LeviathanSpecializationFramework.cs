@@ -1936,7 +1936,7 @@ public interface ILeviathanSpecializationPointBank
     bool TryRefund(Pilot pilot, int amount, out string reason);
 }
 
-public sealed class LeviathanGrowthPointBank : ILeviathanSpecializationPointBank
+public sealed class LeviathanEvolutionPointBank : ILeviathanSpecializationPointBank
 {
     public bool IsAvailable(Pilot pilot, out string reason)
     {
@@ -1955,7 +1955,7 @@ public sealed class LeviathanGrowthPointBank : ILeviathanSpecializationPointBank
         }
         catch (Exception ex)
         {
-            reason = "Growth Point source skill is unavailable: " + ex.Message;
+            reason = "Evolution Point source skill is unavailable: " + ex.Message;
             return false;
         }
     }
@@ -1994,7 +1994,7 @@ public sealed class LeviathanGrowthPointBank : ILeviathanSpecializationPointBank
 
         if (GetAvailablePoints(pilot) < amount)
         {
-            reason = "Not enough Growth Points.";
+            reason = "Not enough Evolution Points.";
             return false;
         }
 
@@ -2222,6 +2222,16 @@ public sealed class LeviathanPilotSpecializationData
     public bool PersistenceReady;
     public string PersistenceReason;
 
+    // Network replicas use transient specialization state supplied by
+    // LeviathanNetwork. It must never load from or write to local persistence.
+    internal bool IsRemoteTransient;
+    internal bool RemoteUpdateInProgress;
+
+    internal readonly Dictionary<string, LeviathanSpecializationState>
+        RemotePendingTrees =
+            new Dictionary<string, LeviathanSpecializationState>(
+                StringComparer.Ordinal);
+
     // Runtime resolution caches. Validity is keyed to all inputs that can alter
     // specialization results, including direct SetRank changes used by refund
     // simulation and native-upgrade tree unlocks.
@@ -2260,7 +2270,7 @@ public static class LeviathanSpecializationRuntime
         new Dictionary<Pilot, LeviathanPilotSpecializationData>();
 
     public static ILeviathanSpecializationPointBank PointBank =
-        new LeviathanGrowthPointBank();
+        new LeviathanEvolutionPointBank();
 
     private static bool registeredDefaults;
     private static int configurationRevision;
@@ -2290,6 +2300,159 @@ public static class LeviathanSpecializationRuntime
 
         registeredDefaults = true;
         LeviathanSpecializationCatalog.RegisterAll();
+    }
+
+    /// <summary>
+    /// Begins an atomic replacement of specialization state for a network
+    /// replica Pilot. Remote state is transient: it never participates in local
+    /// persistence and is replaced wholesale by each received spec block.
+    /// </summary>
+    public static void BeginRemoteSpecialization(Pilot pilot)
+    {
+        RegisterDefaults();
+
+        if (pilot == null)
+            throw new ArgumentNullException("pilot");
+
+        Pilot localPilot = GetCurrentPilot();
+        if (localPilot != null && ReferenceEquals(localPilot, pilot))
+        {
+            throw new InvalidOperationException(
+                "Refusing to install remote specialization on the local Pilot."
+            );
+        }
+
+        LeviathanPilotSpecializationData playerData;
+        if (!data.TryGetValue(pilot, out playerData))
+        {
+            playerData = new LeviathanPilotSpecializationData();
+            data.Add(pilot, playerData);
+        }
+
+        playerData.IsRemoteTransient = true;
+        playerData.PersistenceReady = true;
+        playerData.PersistenceReason = string.Empty;
+        playerData.RemoteUpdateInProgress = true;
+        playerData.RemotePendingTrees.Clear();
+    }
+
+    /// <summary>
+    /// Stages one player-chosen rank from the network specialization schema.
+    /// Auto-granted roots are intentionally not accepted here; they are derived
+    /// in EndRemoteSpecialization after all transmitted choices are installed.
+    /// </summary>
+    public static void SetRemoteRank(
+        Pilot pilot,
+        string treeId,
+        string nodeId,
+        int rank)
+    {
+        if (pilot == null)
+            throw new ArgumentNullException("pilot");
+
+        LeviathanPilotSpecializationData playerData;
+        if (!data.TryGetValue(pilot, out playerData) ||
+            !playerData.IsRemoteTransient ||
+            !playerData.RemoteUpdateInProgress)
+        {
+            throw new InvalidOperationException(
+                "BeginRemoteSpecialization must be called before SetRemoteRank."
+            );
+        }
+
+        LeviathanSpecializationTree tree =
+            LeviathanSpecializationRegistry.Get(treeId);
+        if (tree == null)
+        {
+            throw new InvalidOperationException(
+                "Remote specialization referenced unknown tree '" +
+                (treeId ?? string.Empty) + "'."
+            );
+        }
+
+        LeviathanSpecializationNode node = tree.GetNode(nodeId);
+        if (node == null)
+        {
+            throw new InvalidOperationException(
+                "Remote specialization referenced unknown node '" +
+                (nodeId ?? string.Empty) + "' in tree '" + tree.Id + "'."
+            );
+        }
+
+        if (node.AutoGranted)
+            return;
+
+        LeviathanSpecializationState state;
+        if (!playerData.RemotePendingTrees.TryGetValue(tree.Id, out state))
+        {
+            state = new LeviathanSpecializationState();
+            playerData.RemotePendingTrees.Add(tree.Id, state);
+        }
+
+        state.SetRank(
+            node.Id,
+            Math.Max(0, Math.Min(rank, node.MaxRank))
+        );
+    }
+
+    /// <summary>
+    /// Atomically publishes the staged remote rank set, then rebuilds derived
+    /// auto-granted roots from the replica Pilot's native unlock state.
+    /// </summary>
+    public static void EndRemoteSpecialization(Pilot pilot)
+    {
+        if (pilot == null)
+            throw new ArgumentNullException("pilot");
+
+        LeviathanPilotSpecializationData playerData;
+        if (!data.TryGetValue(pilot, out playerData) ||
+            !playerData.IsRemoteTransient ||
+            !playerData.RemoteUpdateInProgress)
+        {
+            throw new InvalidOperationException(
+                "BeginRemoteSpecialization must be called before EndRemoteSpecialization."
+            );
+        }
+
+        playerData.Trees.Clear();
+
+        foreach (KeyValuePair<string, LeviathanSpecializationState> pair
+            in playerData.RemotePendingTrees)
+        {
+            playerData.Trees.Add(pair.Key, pair.Value);
+        }
+
+        playerData.RemotePendingTrees.Clear();
+        playerData.RemoteUpdateInProgress = false;
+
+        playerData.CacheConfigurationRevision = int.MinValue;
+        playerData.CacheRegistryRevision = int.MinValue;
+        playerData.CacheNativeUnlockStamp = int.MinValue;
+        playerData.CacheStateRevisionStamp = int.MinValue;
+        playerData.ClearResolutionCaches();
+
+        SynchronizeAllAutoGrantedNodes(pilot);
+        InvalidateConfiguration();
+    }
+
+    /// <summary>
+    /// Releases all transient specialization state owned by a destroyed or
+    /// replaced network replica. Local Pilot state is never removed here.
+    /// </summary>
+    public static void ClearRemoteSpecialization(Pilot pilot)
+    {
+        if (pilot == null)
+            return;
+
+        LeviathanPilotSpecializationData playerData;
+        if (!data.TryGetValue(pilot, out playerData) ||
+            !playerData.IsRemoteTransient)
+        {
+            return;
+        }
+
+        data.Remove(pilot);
+        InvalidateConfiguration();
     }
 
     // Rebuilds tree definitions from the currently compiled *Tree.cs files.
@@ -2337,6 +2500,12 @@ public static class LeviathanSpecializationRuntime
                 SynchronizeAllAutoGrantedNodes(pilot);
                 InvalidateConfiguration();
             }
+        }
+        else if (playerData.IsRemoteTransient)
+        {
+            // Remote replica state is supplied by LeviathanNetwork and is
+            // deliberately disconnected from local save persistence.
+            return playerData;
         }
         else if (!playerData.PersistenceReady)
         {
@@ -2661,6 +2830,12 @@ public static class LeviathanSpecializationRuntime
             return false;
         }
 
+        if (playerData.IsRemoteTransient)
+        {
+            reason = "Remote specialization is transient and cannot spend points.";
+            return false;
+        }
+
         if (!playerData.PersistenceReady)
         {
             reason = playerData.PersistenceReason;
@@ -2704,7 +2879,7 @@ public static class LeviathanSpecializationRuntime
 
         if (GetAvailablePoints(pilot) < cost)
         {
-            reason = "Not enough Growth Points.";
+            reason = "Not enough Evolution Points.";
             return false;
         }
 
@@ -3663,6 +3838,7 @@ public static class LeviathanSpecializationCatalog
     private static void RegisterCurrentDefinitions()
     {
         LeviathanSpecializationRegistry.Register(LeviathanEvolutionTree.Create());
+        LeviathanSpecializationRegistry.Register(LeviathanGrowthTree.Create());
         LeviathanSpecializationRegistry.Register(LeviathanStarfireTree.Create());
         LeviathanSpecializationRegistry.Register(LeviathanConstrictorTree.Create());
         LeviathanSpecializationRegistry.Register(LeviathanPredatorTree.Create());

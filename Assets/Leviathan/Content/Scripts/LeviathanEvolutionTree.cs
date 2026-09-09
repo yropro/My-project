@@ -1,7 +1,8 @@
 using static LeviathanTreeDsl;
 
-// Evolution is the root specialization tree. Native Evolution ranks grant Growth
-// Points; nodes here spend those points to unlock the individual Leviathan trees.
+// Evolution is the root specialization tree. Native Evolution ranks grant Evolution
+// Points. Rank 1 automatically activates the Leviathan chassis and Growth tree;
+// nodes here spend Evolution Points to unlock the other Leviathan trees.
 public static class LeviathanEvolutionTree
 {
     public const string TreeId = "evolution";
@@ -20,8 +21,9 @@ public static class LeviathanEvolutionTree
         tree.Add(Root(
             RootNodeId,
             "Evolution",
-            "Evolution ranks grant Growth Points. Spend them here to unlock Leviathan skill trees."
+            "Evolution ranks grant Evolution Points. Evolution rank 1 automatically awakens the Leviathan chassis and Growth tree; spend Evolution Points here to unlock the other Leviathan skill trees."
         ));
+
 
         tree.Add(NodeId(
             "unlock_starfire",

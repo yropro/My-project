@@ -26,6 +26,17 @@ public static class LeviathanStellarConverterTuning
     public const float BaselineWidthMultiplier = 10.00f;
     public const float BaselineRangeMultiplier = 1.10f;
 
+    // Baseline charge presentation.
+    public const float ChargeOrbStartingSizeFraction = 0.05f;
+    public const float ChargeOrbOpacityMultiplier = 1.00f;
+
+    // Structure-powered branch. These percentages add against the finished
+    // Stellar Converter baseline rather than multiplying one another.
+    public const float ConductionDamagePerBodySegment = 0.01f;
+    public const float ConvergenceDamagePerTail = 0.10f;
+    public const float ConvergenceFeederWidthFraction = 0.50f;
+    public const float ConvergenceFeederOpacityMultiplier = 1.00f;
+
     // Existing Converter presentation/crit behavior retained by the new baseline.
     public const float BaselineCritChanceMultiplier = 1.10f;
     public const float BaselineCritDamageMultiplier = 1.00f;
@@ -292,6 +303,14 @@ public static class LeviathanStellarConverter
         public static readonly LeviathanSpecializationFlag EventHorizon =
             LeviathanSpecializationFlag.Create(
                 "stellar_converter.mode.event_horizon", "Event Horizon");
+
+        public static readonly LeviathanSpecializationFlag Conduction =
+            LeviathanSpecializationFlag.Create(
+                "stellar_converter.structure.conduction", "Conduction");
+
+        public static readonly LeviathanSpecializationFlag Convergence =
+            LeviathanSpecializationFlag.Create(
+                "stellar_converter.structure.convergence", "Convergence");
     }
 
     // =========================================================================
@@ -487,31 +506,49 @@ public static class LeviathanStellarConverter
 
     private static int manifestationShotSequence;
 
-    // ShipStateSample.statusMask spare bits. Native Star Vortex currently uses
-    // 0-9 for status effects and 15 for thrusting; 10-14 are ignored natively.
-    private const ushort NetManifestationModeMask = 3 << 10;
-    private const ushort NetManifestationShotParityBit = 1 << 12;
-    private const ushort NetManifestationProjectileActiveBit = 1 << 13;
-    private const ushort NetConverterOutputStateBit = 1 << 14;
+    // STELLAR CONVERTER DYNAMIC SLOT
+    // byte 0  phase
+    // byte 1  normalized phase progress
+    //         Charging = charge progress; Firing = pulse progress
+    // byte 2  projectile launch sequence
+    // byte 3  flags: bit0 projectile active, bit1 Dying Star detonating
+    // byte 4  normalized progress toward the projectile's natural end boundary
+    // byte 5  Dying Star detonation scale (1.0 for non-Dying-Star states)
+    // byte 6  Dying Star explosion expansion progress
+    //
+    // Width, range, manifestation selection, Convergence and all other static
+    // presentation values come from the replicated specialization on the remote
+    // Pilot. Gameplay remains owner-authoritative.
 
-    private const int NetManifestationNone = 0;
-    private const int NetManifestationSingularity = 1;
-    private const int NetManifestationDyingStar = 2;
-    private const int NetManifestationEventHorizon = 3;
+    private sealed class ConverterPresentationState
+    {
+        public GameObject chargeOrbVisual;
+        public LineRenderer chargeOrbRenderer;
+        public readonly List<GameObject> feederVisuals =
+            new List<GameObject>();
+        public readonly List<LineRenderer> feederRenderers =
+            new List<LineRenderer>();
+        public readonly List<GameShip> tailScratch =
+            new List<GameShip>();
+
+        public GameObject eventHorizonTipVisual;
+        public Vector3 eventHorizonTipVisualBaseScale = Vector3.one;
+    }
 
     private sealed class RemoteState
     {
         public Phase phase;
-        public float phaseTimer;
-        public bool inputHeld;
-        public bool forceCompleteCurrentShot;
-
-        public bool networkStateReceived;
-        public int networkManifestationMode;
-        public int networkShotParity;
-        public bool networkProjectileActive;
-        public bool networkOutputState;
+        public float phaseProgress;
+        public bool hasNetworkState;
+        public int shotSequence = -1;
+        public bool projectileActive;
+        public bool detonating;
+        public float projectileProgress;
+        public float detonationScale = 1f;
+        public float explosionProgress;
         public GravityProjectileShot remoteVisualShot;
+        public readonly ConverterPresentationState presentation =
+            new ConverterPresentationState();
     }
 
     private static readonly Dictionary<Laser, RemoteState> RemoteStates =
@@ -601,6 +638,8 @@ public static class LeviathanStellarConverter
         public bool Singularity;
         public bool DyingStar;
         public bool EventHorizon;
+        public bool Conduction;
+        public bool Convergence;
         public float RandomBasicStatusChance;
         public float ManifestationCooldownSeconds;
         public float GravityVelocityScaling;
@@ -644,6 +683,7 @@ public static class LeviathanStellarConverter
         public Laser source;
         public GameShip owner;
         public Vector2 position;
+        public Vector2 launchOrigin;
         public Vector2 direction;
         public float traveled;
         public float maxTravel;
@@ -666,6 +706,7 @@ public static class LeviathanStellarConverter
         public float explosionExpansionSpeed;
         public float minimumDetonationScale = 1f;
         public float detonationCurveExponent = 1f;
+        public float detonationScale = 1f;
         public bool exploding;
         public bool explosionSoundPlayed;
 
@@ -684,8 +725,9 @@ public static class LeviathanStellarConverter
 
     private static GravityProjectileShot gravityProjectileShot;
     private static float eventHorizonPullTipDistance;
-    private static GameObject eventHorizonTipVisual;
-    private static Vector3 eventHorizonTipVisualBaseScale = Vector3.one;
+
+    private static readonly ConverterPresentationState LocalPresentation =
+        new ConverterPresentationState();
 
     private static readonly FieldInfo BeamWeaponBeamScriptField =
         AccessTools.Field(typeof(BeamWeapon), "beamScript");
@@ -728,10 +770,22 @@ public static class LeviathanStellarConverter
     private static bool searchedExplosiveAreaPrefab;
     private static Material cachedGravityFallbackMaterial;
 
-    private static Pilot resolvedPilot;
-    private static int resolvedRank = -1;
-    private static int resolvedFrame = -1;
-    private static ResolvedState resolvedLocalState;
+    private sealed class ResolvedCacheEntry
+    {
+        public int configurationRevision;
+        public int registryRevision;
+        public int rank;
+        public int bodySegments;
+        public int tails;
+        public ResolvedState state;
+    }
+
+    private static readonly Dictionary<Pilot, ResolvedCacheEntry>
+        ResolvedStateCache =
+            new Dictionary<Pilot, ResolvedCacheEntry>();
+
+    private static readonly ResolvedState[] LegacyStateCache =
+        new ResolvedState[MaxRank + 1];
 
     private static readonly HashSet<GameShip> GravityTargetScratch =
         new HashSet<GameShip>();
@@ -764,11 +818,17 @@ public static class LeviathanStellarConverter
             return false;
         }
 
-        // Specialization persistence is intentionally current-player data. Use it
-        // for the local owner only; remote replicas retain the legacy native-rank
-        // fallback until specialization choices are explicitly network-synced.
-        if (WorldController.instance != null &&
-            WorldController.instance.GetCurrentPlayerShip() == player &&
+        bool localOwner =
+            WorldController.instance != null &&
+            ReferenceEquals(
+                WorldController.instance.GetCurrentPlayerShip(),
+                player);
+
+        bool synchronizedRemote =
+            player.IsRemotePlayer() &&
+            LeviathanNetwork.HasSynchronizedSpecialization(player);
+
+        if ((localOwner || synchronizedRemote) &&
             LeviathanSpecializationRuntime.IsTreeActive(
                 pilot,
                 LeviathanStellarConverterTree.TreeId))
@@ -777,14 +837,16 @@ public static class LeviathanStellarConverter
             return true;
         }
 
+        // Until the exact remote replica has received its transient tree, retain
+        // the legacy/native-rank presentation fallback.
         rank = Mathf.Clamp(
             pilot.GetUpgradeLevel(LeviathanMod.StellarConverterUpgrade),
             0,
-            MaxRank
-        );
+            MaxRank);
 
         return rank >= 1;
     }
+
 
     public static bool TryGetRank(GameShip player, out int rank)
     {
@@ -947,18 +1009,29 @@ public static class LeviathanStellarConverter
 
     private static bool IsSpecializationProfile(GameShip player)
     {
-        if (player == null || WorldController.instance == null ||
-            WorldController.instance.GetCurrentPlayerShip() != player)
-        {
+        if (player == null)
             return false;
-        }
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
-        return pilot != null &&
+        if (pilot == null)
+            return false;
+
+        bool localOwner =
+            WorldController.instance != null &&
+            ReferenceEquals(
+                WorldController.instance.GetCurrentPlayerShip(),
+                player);
+
+        bool synchronizedRemote =
+            player.IsRemotePlayer() &&
+            LeviathanNetwork.HasSynchronizedSpecialization(player);
+
+        return (localOwner || synchronizedRemote) &&
             LeviathanSpecializationRuntime.IsTreeActive(
                 pilot,
                 LeviathanStellarConverterTree.TreeId);
     }
+
 
     private static float ApplyKnob(
         Pilot pilot,
@@ -973,19 +1046,76 @@ public static class LeviathanStellarConverter
                 baseValue);
     }
 
+    private static void GetStructureCounts(
+        GameShip player,
+        out int bodySegments,
+        out int tails)
+    {
+        bodySegments = 0;
+        tails = 0;
+
+        if (player == null)
+            return;
+
+        // The local controller is authoritative for the owner's live chain.
+        if (LeviathanMod.Controller != null &&
+            WorldController.instance != null &&
+            ReferenceEquals(
+                WorldController.instance.GetCurrentPlayerShip(),
+                player))
+        {
+            int sections =
+                LeviathanMod.Controller.GetActiveSectionCount(player);
+            bodySegments = Mathf.Max(
+                0,
+                LeviathanMod.Controller.GetActiveBodySegmentCount(player));
+            tails = Mathf.Max(0, sections - 1 - bodySegments);
+            return;
+        }
+
+        // Remote Leviathan replicas carry their actual built Squadron. The
+        // current authored format is [head, body..., tail], so no local
+        // LeviathanController state is required to reconstruct structure counts.
+        if (player.squadron == null || player.squadron.ships == null)
+            return;
+
+        int count = player.squadron.ships.Count;
+        if (count < 2)
+            return;
+
+        bodySegments = Mathf.Max(0, count - 2);
+        tails = 1;
+    }
+
     private static ResolvedState GetResolvedState(GameShip player, int rank)
     {
         if (!IsSpecializationProfile(player))
             return BuildLegacyState(rank);
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
-        int frame = Time.frameCount;
-        if (resolvedLocalState != null &&
-            resolvedFrame == frame &&
-            resolvedRank == rank &&
-            ReferenceEquals(resolvedPilot, pilot))
+        if (pilot == null)
+            return BuildLegacyState(rank);
+
+        int bodySegments;
+        int tails;
+        GetStructureCounts(player, out bodySegments, out tails);
+
+        int configurationRevision =
+            LeviathanSpecializationRuntime.ConfigurationRevision;
+        int registryRevision =
+            LeviathanSpecializationRegistry.Revision;
+
+        ResolvedCacheEntry cached;
+        if (ResolvedStateCache.TryGetValue(pilot, out cached) &&
+            cached != null &&
+            cached.state != null &&
+            cached.configurationRevision == configurationRevision &&
+            cached.registryRevision == registryRevision &&
+            cached.rank == rank &&
+            cached.bodySegments == bodySegments &&
+            cached.tails == tails)
         {
-            return resolvedLocalState;
+            return cached.state;
         }
 
         ResolvedState state = new ResolvedState();
@@ -1021,7 +1151,7 @@ public static class LeviathanStellarConverter
             state.FinalRangeMultiplier;
 
         state.AdditionalHeatFraction = Mathf.Max(
-            0f,
+            -1f,
             LeviathanSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.HeatGenerationPercent));
@@ -1064,6 +1194,37 @@ public static class LeviathanStellarConverter
         state.EventHorizon = LeviathanSpecializationRuntime.HasFlag(
             pilot,
             Flags.EventHorizon);
+        state.Conduction = LeviathanSpecializationRuntime.HasFlag(
+            pilot,
+            Flags.Conduction);
+        state.Convergence = LeviathanSpecializationRuntime.HasFlag(
+            pilot,
+            Flags.Convergence);
+
+        float structureDamageBonus = 0f;
+
+        if (state.Conduction)
+        {
+            structureDamageBonus +=
+                bodySegments *
+                LeviathanStellarConverterTuning.ConductionDamagePerBodySegment;
+        }
+
+        if (state.Convergence)
+        {
+            structureDamageBonus +=
+                tails *
+                LeviathanStellarConverterTuning.ConvergenceDamagePerTail;
+        }
+
+        if (structureDamageBonus > 0f)
+        {
+            // Join the ordinary additive final-damage bucket.
+            state.FinalDamageMultiplier += structureDamageBonus;
+            state.DamageMultiplier =
+                LeviathanStellarConverterTuning.BaselineDamageMultiplier *
+                state.FinalDamageMultiplier;
+        }
 
         state.ManifestationCooldownSeconds = Mathf.Max(0f, ApplyKnob(
             pilot,
@@ -1161,8 +1322,13 @@ public static class LeviathanStellarConverter
         if (state.Continuous)
         {
             state.ChargeSeconds = 0f;
+
+            // Continuous has its own damage baseline and still inherits the
+            // structure branch. Ordinary FinalDamagePercent nodes remain
+            // intentionally overridden by Continuous's special profile.
             state.DamageMultiplier =
-                LeviathanStellarConverterTuning.ContinuousDamageMultiplier;
+                LeviathanStellarConverterTuning.ContinuousDamageMultiplier *
+                (1f + structureDamageBonus);
             state.FinalDamageMultiplier =
                 state.DamageMultiplier /
                 Mathf.Max(
@@ -1177,15 +1343,28 @@ public static class LeviathanStellarConverter
                 LeviathanStellarConverterTuning.ContinuousRandomStatusChance;
         }
 
-        resolvedPilot = pilot;
-        resolvedRank = rank;
-        resolvedFrame = frame;
-        resolvedLocalState = state;
+        if (cached == null)
+        {
+            cached = new ResolvedCacheEntry();
+            ResolvedStateCache[pilot] = cached;
+        }
+
+        cached.configurationRevision = configurationRevision;
+        cached.registryRevision = registryRevision;
+        cached.rank = rank;
+        cached.bodySegments = bodySegments;
+        cached.tails = tails;
+        cached.state = state;
         return state;
     }
 
     private static ResolvedState BuildLegacyState(int rank)
     {
+        int cacheRank = Mathf.Clamp(rank, 0, MaxRank);
+        ResolvedState cached = LegacyStateCache[cacheRank];
+        if (cached != null)
+            return cached;
+
         ResolvedState state = new ResolvedState();
         state.ChargeSeconds = GetRankValue(ChargeDurationByRank, rank);
         state.PulseSeconds = GetRankValue(OutputDurationByRank, rank);
@@ -1216,6 +1395,7 @@ public static class LeviathanStellarConverter
             LeviathanStellarConverterTuning.DyingStarMinimumDetonationScale;
         state.DyingStarDetonationCurveExponent =
             LeviathanStellarConverterTuning.DyingStarDetonationCurveExponent;
+        LegacyStateCache[cacheRank] = state;
         return state;
     }
 
@@ -1409,7 +1589,11 @@ public static class LeviathanStellarConverter
             else
             {
                 RemoteState existing = GetRemoteState(laser);
-                SetNativeActive(laser, existing.phase == Phase.Firing);
+                SetNativeActive(
+                    laser,
+                    existing.hasNetworkState &&
+                    existing.phase == Phase.Firing &&
+                    IsRemoteBeamOutput(GetResolvedState(player, rank)));
             }
 
             return true;
@@ -1446,15 +1630,11 @@ public static class LeviathanStellarConverter
         }
 
         RemoteState state = GetRemoteState(laser);
-        state.inputHeld = true;
-
-        if (state.phase == Phase.Idle)
-        {
-            state.phase = Phase.Charging;
-            state.phaseTimer = 0f;
-        }
-
-        SetNativeActive(laser, false);
+        SetNativeActive(
+            laser,
+            state.hasNetworkState &&
+            state.phase == Phase.Firing &&
+            IsRemoteBeamOutput(GetResolvedState(player, rank)));
         return true;
     }
 
@@ -1488,7 +1668,11 @@ public static class LeviathanStellarConverter
             else
             {
                 RemoteState existing = GetRemoteState(laser);
-                SetNativeActive(laser, existing.phase == Phase.Firing);
+                SetNativeActive(
+                    laser,
+                    existing.hasNetworkState &&
+                    existing.phase == Phase.Firing &&
+                    IsRemoteBeamOutput(GetResolvedState(player, rank)));
             }
 
             return true;
@@ -1547,26 +1731,247 @@ public static class LeviathanStellarConverter
         }
 
         RemoteState state = GetRemoteState(laser);
-
-        if (IsControlInterrupted(player) && state.phase != Phase.Idle)
-        {
-            state.inputHeld = false;
-            state.forceCompleteCurrentShot = true;
-            SetNativeActive(laser, state.phase == Phase.Firing);
-            return true;
-        }
-
-        state.inputHeld = false;
-
-        if (state.phase == Phase.Charging &&
-            !state.forceCompleteCurrentShot)
-        {
-            state.phase = Phase.Idle;
-            state.phaseTimer = 0f;
-            SetNativeActive(laser, false);
-        }
-
+        SetNativeActive(
+            laser,
+            state.hasNetworkState &&
+            state.phase == Phase.Firing &&
+            IsRemoteBeamOutput(GetResolvedState(player, rank)));
         return true;
+    }
+
+    private static bool IsRemoteBeamOutput(ResolvedState resolved)
+    {
+        return resolved != null &&
+            !resolved.Singularity &&
+            !resolved.DyingStar;
+    }
+
+    private static float GetPhaseProgress(ResolvedState resolved)
+    {
+        if (resolved == null)
+            return 0f;
+
+        if (phase == Phase.Charging && resolved.ChargeSeconds > 0.0001f)
+        {
+            return Mathf.Clamp01(
+                phaseTimer / resolved.ChargeSeconds);
+        }
+
+        if (phase == Phase.Firing && resolved.PulseSeconds > 0.0001f)
+        {
+            return Mathf.Clamp01(
+                phaseTimer / resolved.PulseSeconds);
+        }
+
+        return 0f;
+    }
+
+    private static float GetProjectileNaturalProgress(
+        GravityProjectileShot shot)
+    {
+        if (shot == null)
+            return 0f;
+
+        float timeProgress = shot.lifetime <= 0.0001f
+            ? 1f
+            : shot.age / shot.lifetime;
+        float rangeProgress = shot.maxTravel <= 0.0001f
+            ? 1f
+            : shot.traveled / shot.maxTravel;
+
+        return Mathf.Clamp01(Mathf.Max(timeProgress, rangeProgress));
+    }
+
+    private static float GetDyingStarExplosionProgress(
+        GravityProjectileShot shot)
+    {
+        if (shot == null ||
+            shot.mode != GravityProjectileMode.DyingStar ||
+            !shot.exploding ||
+            shot.explosionRadius <= 0.0001f)
+        {
+            return 0f;
+        }
+
+        return Mathf.Clamp01(
+            shot.currentExplosionRadius / shot.explosionRadius);
+    }
+
+    private static void PublishNetworkState(ResolvedState resolved)
+    {
+        if (resolved == null)
+            return;
+
+        bool projectileActive = gravityProjectileShot != null;
+        if (phase == Phase.Idle && !projectileActive)
+            return;
+
+        LeviathanNetwork.SlotWriter writer =
+            LeviathanNetwork.BeginSlot(
+                LeviathanNetwork.SlotStellarConverter);
+
+        writer.Byte((byte)phase);
+        writer.Percent(GetPhaseProgress(resolved));
+        writer.Sequence(manifestationShotSequence);
+        writer.Flags(
+            projectileActive,
+            projectileActive && gravityProjectileShot.exploding);
+        writer.Percent(
+            GetProjectileNaturalProgress(gravityProjectileShot));
+        writer.Percent(
+            projectileActive &&
+            gravityProjectileShot.mode == GravityProjectileMode.DyingStar
+                ? gravityProjectileShot.detonationScale
+                : 1f);
+        writer.Percent(
+            GetDyingStarExplosionProgress(gravityProjectileShot));
+
+        LeviathanNetwork.EndSlot(writer);
+    }
+
+    private static bool ReadRemoteNetworkState(
+        Laser laser,
+        GameShip player,
+        ResolvedState resolved,
+        RemoteState state)
+    {
+        if (laser == null || player == null || resolved == null || state == null)
+            return false;
+
+        LeviathanNetwork.SlotReader reader;
+        if (!LeviathanNetwork.TryReadSlot(
+                player,
+                LeviathanNetwork.SlotStellarConverter,
+                out reader))
+        {
+            state.hasNetworkState = false;
+            state.phase = Phase.Idle;
+            state.phaseProgress = 0f;
+            state.projectileActive = false;
+            state.detonating = false;
+            state.projectileProgress = 0f;
+            state.detonationScale = 1f;
+            state.explosionProgress = 0f;
+            DestroyRemoteGravityVisual(state);
+            HideConverterPresentation(state.presentation);
+            SetNativeActive(laser, false);
+            return false;
+        }
+
+        int rawPhase = reader.Byte();
+        Phase incomingPhase =
+            rawPhase >= (int)Phase.Idle && rawPhase <= (int)Phase.Recovery
+                ? (Phase)rawPhase
+                : Phase.Idle;
+
+        float incomingPhaseProgress = reader.Percent();
+        int incomingSequence = reader.Sequence();
+        byte flags = reader.FlagsByte();
+        bool incomingProjectileActive = (flags & (1 << 0)) != 0;
+        bool incomingDetonating = (flags & (1 << 1)) != 0;
+        float incomingProjectileProgress = reader.Percent();
+        float incomingDetonationScale = reader.Percent();
+        float incomingExplosionProgress = reader.Percent();
+
+        bool phaseChanged =
+            !state.hasNetworkState ||
+            state.phase != incomingPhase;
+        bool sequenceChanged =
+            state.hasNetworkState &&
+            state.shotSequence != incomingSequence;
+
+        state.hasNetworkState = true;
+        state.phase = incomingPhase;
+        state.phaseProgress = phaseChanged
+            ? incomingPhaseProgress
+            : Mathf.Max(state.phaseProgress, incomingPhaseProgress);
+        state.shotSequence = incomingSequence;
+        state.projectileActive = incomingProjectileActive;
+        state.detonating = incomingDetonating;
+        state.projectileProgress = incomingProjectileProgress;
+        state.detonationScale = incomingDetonationScale;
+        state.explosionProgress = incomingExplosionProgress;
+
+        bool projectileMode = resolved.Singularity || resolved.DyingStar;
+
+        if (incomingProjectileActive && projectileMode)
+        {
+            bool wrongMode =
+                state.remoteVisualShot != null &&
+                ((resolved.Singularity &&
+                  state.remoteVisualShot.mode != GravityProjectileMode.Singularity) ||
+                 (resolved.DyingStar &&
+                  state.remoteVisualShot.mode != GravityProjectileMode.DyingStar));
+
+            if (sequenceChanged || wrongMode || state.remoteVisualShot == null)
+            {
+                SpawnRemoteGravityVisual(
+                    laser,
+                    state,
+                    resolved);
+            }
+
+            ReconcileRemoteGravityProgress(
+                state.remoteVisualShot,
+                incomingProjectileProgress);
+
+            if (resolved.DyingStar &&
+                incomingDetonating &&
+                state.remoteVisualShot != null &&
+                !state.remoteVisualShot.exploding)
+            {
+                BeginRemoteDyingStarExplosion(
+                    state.remoteVisualShot,
+                    incomingDetonationScale);
+            }
+
+            if (resolved.DyingStar &&
+                incomingDetonating &&
+                state.remoteVisualShot != null &&
+                state.remoteVisualShot.exploding)
+            {
+                state.remoteVisualShot.currentExplosionRadius =
+                    Mathf.Max(
+                        state.remoteVisualShot.currentExplosionRadius,
+                        Mathf.Clamp01(incomingExplosionProgress) *
+                            state.remoteVisualShot.explosionRadius);
+            }
+        }
+        else
+        {
+            DestroyRemoteGravityVisual(state);
+        }
+
+        bool beamOutput =
+            incomingPhase == Phase.Firing &&
+            IsRemoteBeamOutput(resolved);
+
+        SetNativeActive(laser, beamOutput);
+        return true;
+    }
+
+    private static void AdvanceRemotePresentationProgress(
+        RemoteState state,
+        ResolvedState resolved)
+    {
+        if (state == null || !state.hasNetworkState || resolved == null)
+            return;
+
+        float duration = 0f;
+
+        if (state.phase == Phase.Charging)
+            duration = resolved.ChargeSeconds;
+        else if (state.phase == Phase.Firing)
+            duration = resolved.PulseSeconds;
+
+        if (duration <= 0.0001f)
+            return;
+
+        // The 20 Hz slot remains authoritative for phase transitions. Progress
+        // simply advances between snapshots so charge/tip VFX stay smooth; a new
+        // snapshot may move it forward, but repeated reads never rewind it.
+        state.phaseProgress = Mathf.Clamp01(
+            state.phaseProgress + Time.fixedDeltaTime / duration);
     }
 
     public static void PrepareFixedUpdate(Laser laser)
@@ -1623,42 +2028,24 @@ public static class LeviathanStellarConverter
                 return;
             }
 
+            ResolvedState resolved = GetResolvedState(player, rank);
+            ReadRemoteNetworkState(
+                laser,
+                player,
+                resolved,
+                state);
+            AdvanceRemotePresentationProgress(state, resolved);
             UpdateRemoteGravityVisual(state);
-
-            if (state.networkStateReceived)
-            {
-                bool beamOutput =
-                    state.networkManifestationMode != NetManifestationDyingStar &&
-                    state.networkOutputState;
-
-                state.phase = beamOutput
-                    ? Phase.Firing
-                    : (state.inputHeld ? Phase.Charging : Phase.Idle);
-                state.phaseTimer = 0f;
-                SetNativeActive(laser, beamOutput);
-                return;
-            }
-
-            if (state.phase == Phase.Charging &&
-                !state.inputHeld &&
-                !state.forceCompleteCurrentShot)
-            {
-                state.phase = Phase.Idle;
-                state.phaseTimer = 0f;
-            }
-
-            SetNativeActive(laser, state.phase == Phase.Firing);
             return;
         }
 
         if (ReferenceEquals(sourceLaser, laser))
             ResetLocalSource();
 
-        RemoteState staleRemote;
-        if (RemoteStates.TryGetValue(laser, out staleRemote))
-            DestroyRemoteGravityVisual(staleRemote);
-        RemoteStates.Remove(laser);
+        if (RemoteStates.ContainsKey(laser))
+            ResetRemoteSource(laser);
     }
+
 
     public static void CompleteFixedUpdate(Laser laser)
     {
@@ -1669,20 +2056,35 @@ public static class LeviathanStellarConverter
             TryGetContext(laser, out player, out rank))
         {
             AdvanceLocalState(laser, rank);
+            ResolvedState resolved = GetResolvedState(player, rank);
+            PublishNetworkState(resolved);
+            UpdateConverterPresentation(
+                LocalPresentation,
+                laser,
+                player,
+                resolved,
+                phase,
+                GetPhaseProgress(resolved));
             return;
         }
 
         if (TryGetRemoteSourceContext(laser, out player, out rank))
         {
             RemoteState state;
+            if (!RemoteStates.TryGetValue(laser, out state))
+                return;
 
-            if (RemoteStates.TryGetValue(laser, out state) &&
-                !state.networkStateReceived)
-            {
-                AdvanceRemoteState(laser, state, rank);
-            }
+            ResolvedState resolved = GetResolvedState(player, rank);
+            UpdateConverterPresentation(
+                state.presentation,
+                laser,
+                player,
+                resolved,
+                state.phase,
+                state.phaseProgress);
         }
     }
+
 
     private static void AdvanceLocalState(Laser laser, int rank)
     {
@@ -1778,7 +2180,7 @@ public static class LeviathanStellarConverter
             phaseTimer = 0f;
             forceCompleteCurrentShot = false;
             eventHorizonPullTipDistance = 0f;
-            DestroyEventHorizonTipVisual();
+            DestroyEventHorizonTipVisual(LocalPresentation);
             return;
         }
 
@@ -1802,69 +2204,11 @@ public static class LeviathanStellarConverter
             phaseTimer = 0f;
             forceCompleteCurrentShot = false;
             eventHorizonPullTipDistance = 0f;
-            DestroyEventHorizonTipVisual();
+            DestroyEventHorizonTipVisual(LocalPresentation);
             SetNativeActive(laser, false);
         }
     }
 
-    private static void AdvanceRemoteState(
-        Laser laser,
-        RemoteState state,
-        int rank)
-    {
-        if (state.phase == Phase.Charging)
-        {
-            if (!state.inputHeld && !state.forceCompleteCurrentShot)
-            {
-                state.phase = Phase.Idle;
-                state.phaseTimer = 0f;
-                return;
-            }
-
-            if (!laser.CanActivate())
-            {
-                state.phaseTimer = 0f;
-                return;
-            }
-
-            state.phaseTimer += Time.fixedDeltaTime;
-
-            if (state.phaseTimer >=
-                GetRankValue(ChargeDurationByRank, rank))
-            {
-                state.phase = Phase.Firing;
-                state.phaseTimer = 0f;
-            }
-
-            return;
-        }
-
-        if (state.phase != Phase.Firing)
-            return;
-
-        if (!laser.CanActivate())
-        {
-            SetNativeActive(laser, false);
-            state.phase = state.inputHeld ? Phase.Charging : Phase.Idle;
-            state.phaseTimer = 0f;
-            state.forceCompleteCurrentShot = false;
-            return;
-        }
-
-        state.phaseTimer += Time.fixedDeltaTime;
-
-        if (state.phaseTimer >=
-            GetRankValue(OutputDurationByRank, rank))
-        {
-            bool queueNext =
-                state.inputHeld &&
-                !state.forceCompleteCurrentShot;
-
-            state.phase = queueNext ? Phase.Charging : Phase.Idle;
-            state.phaseTimer = 0f;
-            state.forceCompleteCurrentShot = false;
-        }
-    }
 
     private static void SelectSource(Laser laser)
     {
@@ -1872,7 +2216,8 @@ public static class LeviathanStellarConverter
             return;
 
         DestroyGravityProjectileShot();
-        DestroyEventHorizonTipVisual();
+        DestroyEventHorizonTipVisual(LocalPresentation);
+        DestroyConverterPresentation(LocalPresentation);
 
         if (sourceLaser != null)
             SetNativeActive(sourceLaser, false);
@@ -1902,7 +2247,8 @@ public static class LeviathanStellarConverter
     private static void ResetLocalSource()
     {
         DestroyGravityProjectileShot();
-        DestroyEventHorizonTipVisual();
+        DestroyEventHorizonTipVisual(LocalPresentation);
+        DestroyConverterPresentation(LocalPresentation);
 
         if (sourceLaser != null)
             SetNativeActive(sourceLaser, false);
@@ -1923,10 +2269,51 @@ public static class LeviathanStellarConverter
 
         RemoteState state;
         if (RemoteStates.TryGetValue(laser, out state))
+        {
             DestroyRemoteGravityVisual(state);
+            DestroyConverterPresentation(state.presentation);
+        }
+
+        GameShip remoteShip = laser.parentShip;
+        Pilot remotePilot = remoteShip == null
+            ? null
+            : GameShip.GetPlayerSourcePilot(remoteShip);
+        if (remotePilot != null)
+            ResolvedStateCache.Remove(remotePilot);
 
         SetNativeActive(laser, false);
         RemoteStates.Remove(laser);
+    }
+
+
+    public static void ForgetRemoteShip(GameShip remoteShip)
+    {
+        if (remoteShip == null)
+            return;
+
+        while (true)
+        {
+            Laser sourceToRemove = null;
+
+            foreach (KeyValuePair<Laser, RemoteState> pair in RemoteStates)
+            {
+                if (pair.Key != null &&
+                    ReferenceEquals(pair.Key.parentShip, remoteShip))
+                {
+                    sourceToRemove = pair.Key;
+                    break;
+                }
+            }
+
+            if (sourceToRemove == null)
+                break;
+
+            ResetRemoteSource(sourceToRemove);
+        }
+
+        Pilot pilot = GameShip.GetPlayerSourcePilot(remoteShip);
+        if (pilot != null)
+            ResolvedStateCache.Remove(pilot);
     }
 
     public static void ResetSource(Laser laser)
@@ -1944,12 +2331,15 @@ public static class LeviathanStellarConverter
         foreach (KeyValuePair<Laser, RemoteState> pair in RemoteStates)
         {
             DestroyRemoteGravityVisual(pair.Value);
+            DestroyConverterPresentation(pair.Value.presentation);
 
             if (pair.Key != null)
                 SetNativeActive(pair.Key, false);
         }
 
         RemoteStates.Clear();
+        ResolvedStateCache.Clear();
+        Array.Clear(LegacyStateCache, 0, LegacyStateCache.Length);
         manifestationShotSequence = 0;
         OriginalBeamColors.Clear();
 
@@ -1964,173 +2354,8 @@ public static class LeviathanStellarConverter
     // phases, so publish its actual input-held state on the network bit belonging
     // to the selected source. Primary uses shared bit 0; Special uses its native
     // activatable-index bit. Remote clients can then reconstruct the same cycle.
-    public static void ScaleNetworkSourceInput(
-        GameShip ship,
-        ref uint activeSlots)
-    {
-        Laser laser = FindSourceLaser(ship);
-        GameShip player;
-        int rank;
 
-        if (laser == null ||
-            !ReferenceEquals(sourceLaser, laser) ||
-            !TryGetContext(laser, out player, out rank))
-        {
-            return;
-        }
 
-        Item.Type slotType;
-        if (!TryGetSourceSlotType(laser, out slotType))
-            return;
-
-        uint bit;
-
-        if (slotType == Item.Type.PrimaryWeapon)
-        {
-            bit = 1U;
-        }
-        else if (slotType == Item.Type.Special)
-        {
-            int activatableIndex = FindActivatableIndex(ship, laser);
-            if (activatableIndex < 0 || activatableIndex >= 31)
-                return;
-
-            bit = 1U << (activatableIndex + 1);
-        }
-        else
-        {
-            return;
-        }
-
-        if (inputHeld)
-            activeSlots |= bit;
-        else
-            activeSlots &= ~bit;
-    }
-
-    public static void ScaleNetworkVisualState(
-        GameShip ship,
-        ref ushort statusMask)
-    {
-        if (ship == null ||
-            !ReferenceEquals(
-                WorldController.instance == null
-                    ? null
-                    : WorldController.instance.GetCurrentPlayerShip(),
-                ship))
-        {
-            return;
-        }
-
-        Laser laser = FindSourceLaser(ship);
-        GameShip player;
-        int rank;
-
-        if (laser == null ||
-            !ReferenceEquals(sourceLaser, laser) ||
-            !TryGetContext(laser, out player, out rank))
-        {
-            return;
-        }
-
-        ResolvedState resolved = GetResolvedState(player, rank);
-
-        int mode = NetManifestationNone;
-        if (resolved.Singularity)
-            mode = NetManifestationSingularity;
-        else if (resolved.DyingStar)
-            mode = NetManifestationDyingStar;
-        else if (resolved.EventHorizon)
-            mode = NetManifestationEventHorizon;
-
-        statusMask = (ushort)(
-            statusMask &
-            ~(NetManifestationModeMask |
-              NetManifestationShotParityBit |
-              NetManifestationProjectileActiveBit |
-              NetConverterOutputStateBit));
-
-        statusMask |= (ushort)(mode << 10);
-
-        if ((manifestationShotSequence & 1) != 0)
-            statusMask |= NetManifestationShotParityBit;
-
-        if (gravityProjectileShot != null)
-            statusMask |= NetManifestationProjectileActiveBit;
-
-        // Mode-specific owner-authoritative output state:
-        // normal/Event Horizon = exact beam output;
-        // Dying Star = detonation has begun.
-        bool outputState =
-            phase == Phase.Firing ||
-            (resolved.DyingStar &&
-             gravityProjectileShot != null &&
-             gravityProjectileShot.mode == GravityProjectileMode.DyingStar &&
-             gravityProjectileShot.exploding);
-
-        if (outputState)
-            statusMask |= NetConverterOutputStateBit;
-    }
-
-    public static void ReceiveNetworkVisualState(
-        GameShip remoteShip,
-        ushort statusMask)
-    {
-        if (remoteShip == null || !remoteShip.IsRemotePlayer())
-            return;
-
-        Laser laser = FindSourceLaser(remoteShip);
-        if (laser == null)
-            return;
-
-        RemoteState state = GetRemoteState(laser);
-
-        int mode = (statusMask & NetManifestationModeMask) >> 10;
-        int shotParity =
-            (statusMask & NetManifestationShotParityBit) != 0 ? 1 : 0;
-        bool projectileActive =
-            (statusMask & NetManifestationProjectileActiveBit) != 0;
-        bool outputActive =
-            (statusMask & NetConverterOutputStateBit) != 0;
-
-        bool first = !state.networkStateReceived;
-        bool modeChanged =
-            state.networkStateReceived &&
-            state.networkManifestationMode != mode;
-        bool newProjectile =
-            projectileActive &&
-            (first ||
-             !state.networkProjectileActive ||
-             state.networkShotParity != shotParity);
-
-        if (modeChanged)
-            DestroyRemoteGravityVisual(state);
-
-        state.networkStateReceived = true;
-        state.networkManifestationMode = mode;
-        state.networkShotParity = shotParity;
-        state.networkProjectileActive = projectileActive;
-        state.networkOutputState = outputActive;
-
-        if (newProjectile &&
-            (mode == NetManifestationSingularity ||
-             mode == NetManifestationDyingStar))
-        {
-            SpawnRemoteGravityVisual(laser, state, mode);
-        }
-
-        if (mode == NetManifestationDyingStar &&
-            outputActive &&
-            state.remoteVisualShot != null &&
-            !state.remoteVisualShot.exploding)
-        {
-            BeginRemoteDyingStarExplosion(state.remoteVisualShot);
-        }
-        else if (!projectileActive && state.remoteVisualShot != null)
-        {
-            DestroyRemoteGravityVisual(state);
-        }
-    }
 
     private static void SetNativeActive(Laser laser, bool active)
     {
@@ -2174,20 +2399,16 @@ public static class LeviathanStellarConverter
                 !IsTerminalStopped(player);
         }
 
-        // Remote replicas run the same Converter phase machine locally. This
-        // avoids the vanilla Primary active-slot bit latching Stellar on whenever
-        // any other Primary weapon remains held.
         if (TryGetRemoteSourceContext(laser, out player, out rank))
         {
-            RemoteState state;
-
-            return RemoteStates.TryGetValue(laser, out state) &&
-                state.phase == Phase.Firing &&
-                !IsTerminalStopped(player);
+            // Remote Converter beams are reconstructed presentation only. The
+            // owner already performs authoritative damage and hit registration.
+            return false;
         }
 
         return true;
     }
+
 
     // =========================================================================
     // HEAT
@@ -2199,8 +2420,8 @@ public static class LeviathanStellarConverter
         public float originalHeatPerSecond;
     }
 
-    // Tree heat is an additive penalty relative to the source Laser's native
-    // heat contribution. Baseline Converter heat behavior is left untouched.
+    // Tree heat is an additive percentage relative to the source Laser's
+    // baseline Converter heat contribution. Positive and negative values combine.
     public static HeatRateState PrepareShipHeatRate(GameShip player)
     {
         HeatRateState state = new HeatRateState();
@@ -2217,7 +2438,7 @@ public static class LeviathanStellarConverter
             return state;
 
         ResolvedState resolved = GetResolvedState(player, rank);
-        if (resolved.AdditionalHeatFraction <= 0f)
+        if (Mathf.Approximately(resolved.AdditionalHeatFraction, 0f))
             return state;
 
         object raw = GameShipHeatPerSecondField.GetValue(player);
@@ -2254,7 +2475,7 @@ public static class LeviathanStellarConverter
             state.originalHeatPerSecond);
     }
 
-    private static void ApplyManifestationExtraHeat(
+    private static void ApplyManifestationHeat(
         GameShip player,
         Laser laser,
         ResolvedState resolved)
@@ -2262,25 +2483,30 @@ public static class LeviathanStellarConverter
         if (player == null ||
             laser == null ||
             resolved == null ||
-            resolved.AdditionalHeatFraction <= 0f ||
             laser.heatPerSecond <= 0f)
         {
             return;
         }
 
-        // Singularity/Dying Star never leave the native Laser active during
-        // their projectile output. Charge only the tree-granted EXTRA heat here,
-        // using one normal Converter pulse as the reference quantity.
-        float extraHeat =
+        // Projectile manifestations replace the native beam, so pay one full
+        // resolved Converter pulse's baseline heat at launch. Tree heat is an
+        // additive percentage against that same baseline:
+        // -10% => 0.90x, +25% and -10% together => 1.15x.
+        float heatMultiplier =
+            Mathf.Max(0f, 1f + resolved.AdditionalHeatFraction);
+
+        float manifestationHeat =
             laser.heatPerSecond *
             Mathf.Max(0f, resolved.PulseSeconds) *
-            resolved.AdditionalHeatFraction;
+            heatMultiplier;
 
-        if (extraHeat <= 0f)
+        if (manifestationHeat <= 0f)
             return;
 
         float capacity = Mathf.Max(0f, player.HeatCapacity);
-        player.heat = Mathf.Min(capacity, player.heat + extraHeat);
+        player.heat = Mathf.Min(
+            capacity,
+            player.heat + manifestationHeat);
 
         if (capacity > 0f &&
             player.heat >= capacity &&
@@ -2728,6 +2954,381 @@ public static class LeviathanStellarConverter
     }
 
 
+
+    private static void UpdateConverterPresentation(
+        ConverterPresentationState presentation,
+        Laser laser,
+        GameShip player,
+        ResolvedState resolved,
+        Phase presentationPhase,
+        float phaseProgress)
+    {
+        if (presentation == null ||
+            laser == null ||
+            player == null ||
+            resolved == null)
+        {
+            HideConverterPresentation(presentation);
+            return;
+        }
+
+        Beam beam = BeamWeaponBeamScriptField == null
+            ? null
+            : BeamWeaponBeamScriptField.GetValue(laser) as Beam;
+
+        LineRenderer sourceLine =
+            beam == null || BeamLineRendererField == null
+                ? null
+                : BeamLineRendererField.GetValue(beam) as LineRenderer;
+
+        Vector2 origin;
+        Vector2 direction;
+
+        if (sourceLine == null ||
+            !TryGetLaserPose(laser, out origin, out direction))
+        {
+            HideConverterPresentation(presentation);
+            return;
+        }
+
+        float mainWidth = GetResolvedPresentationBeamWidth(
+            beam,
+            sourceLine,
+            resolved,
+            presentationPhase);
+
+        bool charging =
+            presentationPhase == Phase.Charging &&
+            resolved.ChargeSeconds > 0.0001f;
+
+        if (charging)
+        {
+            float growth = Mathf.SmoothStep(
+                0f,
+                1f,
+                Mathf.Clamp01(phaseProgress));
+            float sizeFraction = Mathf.Lerp(
+                Mathf.Clamp01(
+                    LeviathanStellarConverterTuning.ChargeOrbStartingSizeFraction),
+                1f,
+                growth);
+
+            EnsureChargeOrbRenderer(presentation, sourceLine);
+
+            if (presentation.chargeOrbRenderer != null)
+            {
+                CopyBeamLineAppearance(
+                    sourceLine,
+                    presentation.chargeOrbRenderer,
+                    LeviathanStellarConverterTuning.ChargeOrbOpacityMultiplier);
+
+                presentation.chargeOrbVisual.SetActive(true);
+
+                Vector2 perpendicular =
+                    new Vector2(-direction.y, direction.x);
+
+                // A tiny round-capped line segment renders as a compact disc.
+                float halfStub = Mathf.Max(
+                    0.00025f,
+                    mainWidth * 0.0025f);
+
+                presentation.chargeOrbRenderer.SetPosition(
+                    0,
+                    origin - perpendicular * halfStub);
+                presentation.chargeOrbRenderer.SetPosition(
+                    1,
+                    origin + perpendicular * halfStub);
+                presentation.chargeOrbRenderer.widthMultiplier =
+                    Mathf.Max(0.0001f, mainWidth * sizeFraction);
+            }
+        }
+        else if (presentation.chargeOrbVisual != null)
+        {
+            presentation.chargeOrbVisual.SetActive(false);
+        }
+
+        bool showFeeders =
+            resolved.Convergence &&
+            (presentationPhase == Phase.Charging ||
+             presentationPhase == Phase.Firing);
+
+        if (showFeeders)
+        {
+            GetActiveTailShips(player, presentation.tailScratch);
+
+            EnsureConvergenceFeederCount(
+                presentation,
+                presentation.tailScratch.Count,
+                sourceLine);
+
+            float feederWidth =
+                Mathf.Max(
+                    0.0001f,
+                    mainWidth *
+                    Mathf.Max(
+                        0f,
+                        LeviathanStellarConverterTuning.ConvergenceFeederWidthFraction));
+
+            for (int i = 0; i < presentation.feederRenderers.Count; i++)
+            {
+                bool active = i < presentation.tailScratch.Count;
+                GameObject feederObject = presentation.feederVisuals[i];
+
+                if (!active)
+                {
+                    if (feederObject != null)
+                        feederObject.SetActive(false);
+
+                    continue;
+                }
+
+                GameShip tail = presentation.tailScratch[i];
+
+                if (tail == null)
+                {
+                    if (feederObject != null)
+                        feederObject.SetActive(false);
+
+                    continue;
+                }
+
+                LineRenderer feeder = presentation.feederRenderers[i];
+
+                CopyBeamLineAppearance(
+                    sourceLine,
+                    feeder,
+                    LeviathanStellarConverterTuning.ConvergenceFeederOpacityMultiplier);
+
+                feederObject.SetActive(true);
+                feeder.widthMultiplier = feederWidth;
+                feeder.SetPosition(0, tail.transform.position);
+                feeder.SetPosition(1, origin);
+            }
+        }
+        else
+        {
+            HideConvergenceFeeders(presentation);
+        }
+
+        if (resolved.EventHorizon && presentationPhase == Phase.Firing)
+        {
+            float elapsed =
+                Mathf.Clamp01(phaseProgress) * resolved.PulseSeconds;
+            float tipSpeed =
+                resolved.EventHorizonTipSpeed *
+                LeviathanStellarConverterTuning.WorldUnitsPerMeter;
+            float tipDistance = Mathf.Min(
+                Mathf.Max(0f, Mathf.Abs(laser.MaxRange)),
+                Mathf.Max(0f, tipSpeed) * elapsed);
+
+            if (tipDistance > 0.0001f)
+            {
+                UpdateEventHorizonTipVisual(
+                    presentation,
+                    origin + direction * tipDistance,
+                    resolved.EventHorizonVisualRadius *
+                        LeviathanStellarConverterTuning.WorldUnitsPerMeter);
+            }
+            else
+            {
+                DestroyEventHorizonTipVisual(presentation);
+            }
+        }
+        else
+        {
+            DestroyEventHorizonTipVisual(presentation);
+        }
+    }
+
+    private static float GetResolvedPresentationBeamWidth(
+        Beam beam,
+        LineRenderer sourceLine,
+        ResolvedState resolved,
+        Phase presentationPhase)
+    {
+        if (beam == null || resolved == null)
+            return 0.01f;
+
+        if (presentationPhase == Phase.Firing &&
+            sourceLine != null &&
+            sourceLine.widthMultiplier > 0.0001f)
+        {
+            return sourceLine.widthMultiplier;
+        }
+
+        float baseWidth = GetFloat(BeamMaxWidthField, beam);
+
+        if (beam.additionalBeam != null)
+        {
+            baseWidth = Mathf.Max(
+                baseWidth,
+                GetFloat(BeamAdditionalMaxWidthField, beam));
+        }
+
+        return Mathf.Max(
+            0.0001f,
+            baseWidth * Mathf.Max(0f, resolved.WidthMultiplier));
+    }
+
+    private static void EnsureChargeOrbRenderer(
+        ConverterPresentationState presentation,
+        LineRenderer sourceLine)
+    {
+        if (presentation == null || presentation.chargeOrbRenderer != null)
+            return;
+
+        presentation.chargeOrbVisual = new GameObject(
+            "Leviathan Converter Charge Orb");
+
+        presentation.chargeOrbRenderer =
+            presentation.chargeOrbVisual.AddComponent<LineRenderer>();
+
+        presentation.chargeOrbRenderer.useWorldSpace = true;
+        presentation.chargeOrbRenderer.positionCount = 2;
+        presentation.chargeOrbRenderer.numCapVertices = 20;
+        presentation.chargeOrbRenderer.numCornerVertices = 20;
+
+        CopyBeamLineAppearance(
+            sourceLine,
+            presentation.chargeOrbRenderer,
+            1f);
+    }
+
+    private static void EnsureConvergenceFeederCount(
+        ConverterPresentationState presentation,
+        int count,
+        LineRenderer sourceLine)
+    {
+        if (presentation == null)
+            return;
+
+        while (presentation.feederRenderers.Count < count)
+        {
+            GameObject obj =
+                new GameObject(
+                    "Leviathan Converter Convergence Feeder");
+
+            LineRenderer line =
+                obj.AddComponent<LineRenderer>();
+
+            line.useWorldSpace = true;
+            line.positionCount = 2;
+            line.numCapVertices = 4;
+            line.numCornerVertices = 4;
+
+            CopyBeamLineAppearance(sourceLine, line, 1f);
+
+            presentation.feederVisuals.Add(obj);
+            presentation.feederRenderers.Add(line);
+        }
+    }
+
+    private static void CopyBeamLineAppearance(
+        LineRenderer source,
+        LineRenderer destination,
+        float opacityMultiplier)
+    {
+        if (source == null || destination == null)
+            return;
+
+        destination.sharedMaterial = source.sharedMaterial;
+        destination.textureMode = source.textureMode;
+        destination.alignment = source.alignment;
+        destination.sortingLayerID = source.sortingLayerID;
+        destination.sortingOrder = source.sortingOrder;
+
+        float opacity = Mathf.Max(0f, opacityMultiplier);
+
+        Color start = source.startColor;
+        Color end = source.endColor;
+
+        start.a *= opacity;
+        end.a *= opacity;
+
+        destination.startColor = start;
+        destination.endColor = end;
+    }
+
+    private static void GetActiveTailShips(
+        GameShip player,
+        List<GameShip> output)
+    {
+        if (output == null)
+            return;
+
+        output.Clear();
+
+        if (player == null ||
+            player.squadron == null ||
+            player.squadron.ships == null)
+        {
+            return;
+        }
+
+        List<Squadron.SquadronShip> ships = player.squadron.ships;
+        if (ships.Count < 2)
+            return;
+
+        // Current Leviathan squadron format is [head, body..., tail]. Reading
+        // the replica itself makes this work for both the owner and co-op peers.
+        Squadron.SquadronShip tailSlot = ships[ships.Count - 1];
+        if (tailSlot != null && tailSlot.ship != null)
+            output.Add(tailSlot.ship);
+    }
+
+    private static void HideConvergenceFeeders(
+        ConverterPresentationState presentation)
+    {
+        if (presentation == null)
+            return;
+
+        for (int i = 0; i < presentation.feederVisuals.Count; i++)
+        {
+            if (presentation.feederVisuals[i] != null)
+                presentation.feederVisuals[i].SetActive(false);
+        }
+
+        presentation.tailScratch.Clear();
+    }
+
+    private static void HideConverterPresentation(
+        ConverterPresentationState presentation)
+    {
+        if (presentation == null)
+            return;
+
+        if (presentation.chargeOrbVisual != null)
+            presentation.chargeOrbVisual.SetActive(false);
+
+        HideConvergenceFeeders(presentation);
+        DestroyEventHorizonTipVisual(presentation);
+    }
+
+    private static void DestroyConverterPresentation(
+        ConverterPresentationState presentation)
+    {
+        if (presentation == null)
+            return;
+
+        if (presentation.chargeOrbVisual != null)
+            UnityEngine.Object.Destroy(presentation.chargeOrbVisual);
+
+        presentation.chargeOrbVisual = null;
+        presentation.chargeOrbRenderer = null;
+
+        for (int i = 0; i < presentation.feederVisuals.Count; i++)
+        {
+            if (presentation.feederVisuals[i] != null)
+                UnityEngine.Object.Destroy(presentation.feederVisuals[i]);
+        }
+
+        presentation.feederVisuals.Clear();
+        presentation.feederRenderers.Clear();
+        presentation.tailScratch.Clear();
+        DestroyEventHorizonTipVisual(presentation);
+    }
+
+
     private static bool TryGetLaserPose(
         Laser laser,
         out Vector2 origin,
@@ -2797,6 +3398,7 @@ public static class LeviathanStellarConverter
         shot.source = laser;
         shot.owner = player;
         shot.position = origin;
+        shot.launchOrigin = origin;
         shot.direction = direction;
         shot.maxTravel = Mathf.Max(0.01f, Mathf.Abs(laser.MaxRange));
         shot.pullFalloffExponent =
@@ -2865,7 +3467,7 @@ public static class LeviathanStellarConverter
         manifestationShotSequence++;
         BuildGravityProjectileVisual(shot);
         UpdateGravityProjectileVisual(shot);
-        ApplyManifestationExtraHeat(player, laser, resolved);
+        ApplyManifestationHeat(player, laser, resolved);
 
         // Full-duration exposure should total exactly the configured integrated
         // fraction, so Singularity gets one of its evenly-divided ticks immediately.
@@ -2876,10 +3478,15 @@ public static class LeviathanStellarConverter
     private static void SpawnRemoteGravityVisual(
         Laser laser,
         RemoteState state,
-        int networkMode)
+        ResolvedState resolved)
     {
-        if (laser == null || state == null || laser.parentShip == null)
+        if (laser == null ||
+            state == null ||
+            resolved == null ||
+            laser.parentShip == null)
+        {
             return;
+        }
 
         DestroyRemoteGravityVisual(state);
 
@@ -2896,50 +3503,51 @@ public static class LeviathanStellarConverter
         shot.source = laser;
         shot.owner = laser.parentShip;
         shot.position = origin;
+        shot.launchOrigin = origin;
         shot.direction = direction;
         shot.maxTravel = Mathf.Max(0.01f, Mathf.Abs(laser.MaxRange));
         shot.pullFalloffExponent =
             LeviathanStellarConverterTuning.GravityPullFalloffExponent;
+        shot.velocityScaling = resolved.GravityVelocityScaling;
 
-        if (networkMode == NetManifestationSingularity)
+        if (resolved.Singularity)
         {
             shot.mode = GravityProjectileMode.Singularity;
             shot.travelSpeed =
-                LeviathanStellarConverterTuning.SingularityTravelSpeedMetersPerSecond *
+                resolved.SingularitySpeed *
                 LeviathanStellarConverterTuning.WorldUnitsPerMeter;
-            shot.lifetime =
-                LeviathanStellarConverterTuning.SingularityLifetimeSeconds;
-            shot.visualScale =
-                LeviathanStellarConverterTuning.SingularityVisualScale;
+            shot.lifetime = resolved.SingularityLifetime;
+            shot.visualScale = resolved.SingularityVisualScale;
             shot.visualRadius =
-                LeviathanStellarConverterTuning.SingularityVisualRadiusMeters *
+                resolved.SingularityVisualRadius *
                 LeviathanStellarConverterTuning.WorldUnitsPerMeter;
             shot.haloRadius =
-                LeviathanStellarConverterTuning.SingularityHaloRadiusMeters *
+                resolved.SingularityHaloRadius *
+                resolved.FinalRangeMultiplier *
                 LeviathanStellarConverterTuning.WorldUnitsPerMeter;
         }
-        else if (networkMode == NetManifestationDyingStar)
+        else if (resolved.DyingStar)
         {
             shot.mode = GravityProjectileMode.DyingStar;
             shot.travelSpeed =
-                LeviathanStellarConverterTuning.DyingStarTravelSpeedMetersPerSecond *
+                resolved.DyingStarSpeed *
                 LeviathanStellarConverterTuning.WorldUnitsPerMeter;
-            shot.lifetime =
-                LeviathanStellarConverterTuning.DyingStarFuseSeconds;
-            shot.visualScale =
-                LeviathanStellarConverterTuning.DyingStarVisualScale;
+            shot.lifetime = resolved.DyingStarFuse;
+            shot.visualScale = resolved.DyingStarVisualScale;
             shot.visualRadius =
-                LeviathanStellarConverterTuning.DyingStarVisualRadiusMeters *
+                resolved.DyingStarVisualRadius *
                 LeviathanStellarConverterTuning.WorldUnitsPerMeter;
             shot.minimumDetonationScale =
-                LeviathanStellarConverterTuning.DyingStarMinimumDetonationScale;
+                resolved.DyingStarMinimumDetonationScale;
             shot.detonationCurveExponent =
-                LeviathanStellarConverterTuning.DyingStarDetonationCurveExponent;
+                resolved.DyingStarDetonationCurveExponent;
             shot.explosionRadius =
-                LeviathanStellarConverterTuning.DyingStarExplosionRadiusMeters *
+                resolved.DyingStarExplosionRadius *
+                resolved.FinalRangeMultiplier *
                 LeviathanStellarConverterTuning.WorldUnitsPerMeter;
             shot.explosionVisualTargetRadius =
-                LeviathanStellarConverterTuning.DyingStarExplosionVisualRadiusMeters *
+                resolved.DyingStarExplosionVisualRadius *
+                resolved.FinalRangeMultiplier *
                 LeviathanStellarConverterTuning.WorldUnitsPerMeter;
             shot.currentExplosionRadius = Mathf.Max(
                 0.01f,
@@ -2956,6 +3564,42 @@ public static class LeviathanStellarConverter
         state.remoteVisualShot = shot;
         BuildGravityProjectileVisual(shot);
         UpdateGravityProjectileVisual(shot);
+    }
+
+
+    private static void ReconcileRemoteGravityProgress(
+        GravityProjectileShot shot,
+        float normalizedProgress)
+    {
+        if (shot == null || shot.exploding)
+            return;
+
+        float progress = Mathf.Clamp01(normalizedProgress);
+        float timeToRange = shot.travelSpeed <= 0.0001f
+            ? float.PositiveInfinity
+            : shot.maxTravel / shot.travelSpeed;
+        float naturalDuration = Mathf.Min(
+            Mathf.Max(0.0001f, shot.lifetime),
+            timeToRange);
+
+        if (float.IsInfinity(naturalDuration))
+            naturalDuration = Mathf.Max(0.0001f, shot.lifetime);
+
+        float authoritativeAge = naturalDuration * progress;
+        float authoritativeTravel = Mathf.Min(
+            shot.maxTravel,
+            Mathf.Max(0f, shot.travelSpeed) * authoritativeAge);
+
+        if (authoritativeAge <= shot.age &&
+            authoritativeTravel <= shot.traveled)
+        {
+            return;
+        }
+
+        shot.age = Mathf.Max(shot.age, authoritativeAge);
+        shot.traveled = Mathf.Max(shot.traveled, authoritativeTravel);
+        shot.position =
+            shot.launchOrigin + shot.direction * shot.traveled;
     }
 
     private static void UpdateRemoteGravityVisual(RemoteState state)
@@ -2976,6 +3620,8 @@ public static class LeviathanStellarConverter
 
         if (!shot.exploding)
         {
+            // Interpolate between 20 Hz authoritative snapshots. The next slot
+            // update reconciles position/age back to owner progress.
             shot.age += delta;
 
             float step = Mathf.Max(0f, shot.travelSpeed * delta);
@@ -2986,24 +3632,6 @@ public static class LeviathanStellarConverter
 
             if (shot.mode == GravityProjectileMode.DyingStar)
                 TryPlayDyingStarExplosionLeadAudio(shot);
-
-            if (shot.mode == GravityProjectileMode.Singularity)
-            {
-                if (shot.age >= shot.lifetime ||
-                    shot.traveled >= shot.maxTravel - 0.0001f)
-                {
-                    DestroyRemoteGravityVisual(state);
-                    return;
-                }
-            }
-            else if (!state.networkStateReceived &&
-                (shot.age >= shot.lifetime ||
-                 shot.traveled >= shot.maxTravel - 0.0001f))
-            {
-                // Legacy fallback only. Once network presentation state is
-                // available, owner detonation state drives the remote explosion.
-                BeginRemoteDyingStarExplosion(shot);
-            }
         }
         else
         {
@@ -3012,10 +3640,10 @@ public static class LeviathanStellarConverter
                 shot.currentExplosionRadius +
                     shot.explosionExpansionSpeed * delta);
 
-            if (shot.currentExplosionRadius >=
-                shot.explosionRadius - 0.0001f)
+            // Do not end the replica from a guessed owner timer. The owner keeps
+            // projectileActive in the slot until the authoritative lifecycle ends.
+            if (!state.projectileActive)
             {
-                UpdateGravityProjectileVisual(shot);
                 DestroyRemoteGravityVisual(state);
                 return;
             }
@@ -3024,13 +3652,17 @@ public static class LeviathanStellarConverter
         UpdateGravityProjectileVisual(shot);
     }
 
+
     private static void BeginRemoteDyingStarExplosion(
-        GravityProjectileShot shot)
+        GravityProjectileShot shot,
+        float detonationScale)
     {
         if (shot == null || shot.exploding)
             return;
 
-        ApplyDyingStarDetonationScale(shot);
+        ApplyDyingStarDetonationScaleValue(
+            shot,
+            detonationScale);
         shot.exploding = true;
 
         if (!shot.explosionSoundPlayed)
@@ -3041,6 +3673,7 @@ public static class LeviathanStellarConverter
 
         TryBuildDyingStarExplosionVisual(shot);
     }
+
 
     private static void DestroyRemoteGravityVisual(RemoteState state)
     {
@@ -3163,11 +3796,6 @@ public static class LeviathanStellarConverter
             resolved.FinalRangeMultiplier *
             LeviathanStellarConverterTuning.WorldUnitsPerMeter;
         Vector2 tip = origin + direction * eventHorizonPullTipDistance;
-
-        UpdateEventHorizonTipVisual(
-            tip,
-            resolved.EventHorizonVisualRadius *
-                LeviathanStellarConverterTuning.WorldUnitsPerMeter);
 
         PullHostilesInGravityCorridor(
             owner,
@@ -3478,7 +4106,21 @@ public static class LeviathanStellarConverter
         if (shot == null || shot.mode != GravityProjectileMode.DyingStar)
             return;
 
-        float scale = GetDyingStarDetonationScale(shot);
+        ApplyDyingStarDetonationScaleValue(
+            shot,
+            GetDyingStarDetonationScale(shot));
+    }
+
+
+    private static void ApplyDyingStarDetonationScaleValue(
+        GravityProjectileShot shot,
+        float scale)
+    {
+        if (shot == null || shot.mode != GravityProjectileMode.DyingStar)
+            return;
+
+        scale = Mathf.Clamp01(scale);
+        shot.detonationScale = scale;
         shot.integratedDamageFraction *= scale;
         shot.explosionRadius *= scale;
         shot.explosionVisualTargetRadius *= scale;
@@ -4240,12 +4882,16 @@ public static class LeviathanStellarConverter
     }
 
     private static void UpdateEventHorizonTipVisual(
+        ConverterPresentationState presentation,
         Vector2 position,
         float visualRadius)
     {
+        if (presentation == null)
+            return;
+
         if (visualRadius <= 0.0001f)
         {
-            DestroyEventHorizonTipVisual();
+            DestroyEventHorizonTipVisual(presentation);
             return;
         }
 
@@ -4253,7 +4899,7 @@ public static class LeviathanStellarConverter
         if (cachedBlackHoleVisualPrefab == null)
             return;
 
-        if (eventHorizonTipVisual == null)
+        if (presentation.eventHorizonTipVisual == null)
         {
             GameObject obj = CustomObject.Instantiate<GameObject>(
                 cachedBlackHoleVisualPrefab,
@@ -4274,29 +4920,36 @@ public static class LeviathanStellarConverter
                     colliders[i].enabled = false;
             }
 
-            eventHorizonTipVisual = obj;
-            eventHorizonTipVisualBaseScale = obj.transform.localScale;
+            presentation.eventHorizonTipVisual = obj;
+            presentation.eventHorizonTipVisualBaseScale =
+                obj.transform.localScale;
             obj.SetActive(true);
         }
 
-        eventHorizonTipVisual.transform.position = position;
+        presentation.eventHorizonTipVisual.transform.position = position;
 
         ApplyBlackHoleVisualRadius(
-            eventHorizonTipVisual,
-            eventHorizonTipVisualBaseScale,
+            presentation.eventHorizonTipVisual,
+            presentation.eventHorizonTipVisualBaseScale,
             visualRadius,
             1f);
     }
 
-    private static void DestroyEventHorizonTipVisual()
-    {
-        if (eventHorizonTipVisual == null)
-            return;
 
-        CustomObject.Destroy(eventHorizonTipVisual);
-        eventHorizonTipVisual = null;
-        eventHorizonTipVisualBaseScale = Vector3.one;
+    private static void DestroyEventHorizonTipVisual(
+        ConverterPresentationState presentation)
+    {
+        if (presentation == null ||
+            presentation.eventHorizonTipVisual == null)
+        {
+            return;
+        }
+
+        CustomObject.Destroy(presentation.eventHorizonTipVisual);
+        presentation.eventHorizonTipVisual = null;
+        presentation.eventHorizonTipVisualBaseScale = Vector3.one;
     }
+
 
     private static void ResolveHaloFieldPrefab()
     {
@@ -4707,47 +5360,6 @@ public static class LeviathanStellarConverterStopByIndexPatch
         LeviathanStellarConverter.ExitInputStop();
     }
 }
-
-// RemoteShipDriver derives activation bits from Activatable.active. Stellar
-// deliberately toggles that flag across charge/output phases, so publish the
-// owner's actual input latch on the selected Primary or Special source bit.
-[HarmonyPatch(typeof(RemoteShipDriver), "BuildActiveSlotsMask")]
-public static class LeviathanStellarConverterNetworkSourceInputPatch
-{
-    public static void Postfix(GameShip __0, ref uint __result)
-    {
-        LeviathanStellarConverter.ScaleNetworkSourceInput(
-            __0,
-            ref __result
-        );
-    }
-}
-
-// Replicate Converter-only VFX/audio metadata through spare native status bits.
-// Base RemoteShipDriver ignores bits 10-14, so ordinary status reconciliation
-// remains unchanged.
-[HarmonyPatch(typeof(RemoteShipDriver), "BuildStatusMask")]
-public static class LeviathanStellarConverterNetworkVisualWritePatch
-{
-    public static void Postfix(GameShip __0, ref ushort __result)
-    {
-        LeviathanStellarConverter.ScaleNetworkVisualState(
-            __0,
-            ref __result);
-    }
-}
-
-[HarmonyPatch(typeof(RemoteShipDriver), "ReconcileStatusMask")]
-public static class LeviathanStellarConverterNetworkVisualReadPatch
-{
-    public static void Prefix(GameShip __0, ushort __1)
-    {
-        LeviathanStellarConverter.ReceiveNetworkVisualState(
-            __0,
-            __1);
-    }
-}
-
 [HarmonyPatch(typeof(Activatable), "Activate")]
 public static class LeviathanStellarConverterActivatePatch
 {
@@ -4833,6 +5445,15 @@ public static class LeviathanStellarConverterBeamWeaponUnequipPatch
         {
             LeviathanStellarConverter.ResetSource(source);
         }
+    }
+}
+
+[HarmonyPatch(typeof(RemoteShipDriver), "DestroyRep")]
+public static class LeviathanStellarConverterRemoteRepDestroyPatch
+{
+    public static void Prefix(GameShip __0)
+    {
+        LeviathanStellarConverter.ForgetRemoteShip(__0);
     }
 }
 

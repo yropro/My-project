@@ -18,8 +18,13 @@ public class LeviathanMod : IStarVortexMod
     public const Upgrade.Category LeviathanCategory =
         (Upgrade.Category)17;
 
+    // Native Growth no longer exists. Evolution is the single native Leviathan
+    // progression gateway. This temporary source alias keeps pre-rework sibling
+    // skills compiling while making their old Growth activation checks resolve
+    // against Evolution instead of a removed key-81 skill. Remove the alias as
+    // those skills are refactored onto LeviathanGrowth.IsGrowthActive().
     public const Upgrade.Key GrowthUpgrade =
-        (Upgrade.Key)81;
+        (Upgrade.Key)LeviathanSpecializationCurrency.UpgradeKeyValue;
 
     public const Upgrade.Key ConstrictorUpgrade =
         (Upgrade.Key)82;
@@ -72,7 +77,7 @@ public class LeviathanMod : IStarVortexMod
             UnityEngine.Object.Destroy(controllerObject);
     }
 
-    public static bool PlayerHasLeviathanUpgrade()
+    public static bool PlayerHasLeviathan()
     {
         Pilot pilot = null;
 
@@ -94,7 +99,7 @@ public class LeviathanMod : IStarVortexMod
         }
 
         return pilot != null &&
-            pilot.GetUpgradeLevel(GrowthUpgrade) >= 1;
+            pilot.GetUpgradeLevel(LeviathanSpecializationCurrency.UpgradeKey) >= 1;
     }
 }
 
@@ -127,6 +132,7 @@ public static class LeviathanWorldDestroyedPatch
         LeviathanSegmentStatusProtection.Reset();
         LeviathanSegmentDamageLimiter.Reset();
         LeviathanSegmentTransferProtection.Reset();
+        LeviathanAttachmentNormalizer.Reset();
     }
 }
 
@@ -169,7 +175,7 @@ public static class LeviathanShipBuilderTemplatesInitPatch
         integration.Configure(
             __instance,
             __4,
-            __5 && LeviathanMod.PlayerHasLeviathanUpgrade()
+            __5 && LeviathanMod.PlayerHasLeviathan()
         );
     }
 }
@@ -200,7 +206,7 @@ public static class LeviathanShipBuilderSetSectionPatch
             StringComparison.Ordinal
         );
 
-        bool enabled = LeviathanMod.PlayerHasLeviathanUpgrade() &&
+        bool enabled = LeviathanMod.PlayerHasLeviathan() &&
             LeviathanPresetUI.IsPlayerBuilder(__instance);
 
         if (leviathanFolder && (!enabled || section != 1))
@@ -223,7 +229,7 @@ public static class LeviathanShipBuilderSetSectionPatch
         object[] __args)
     {
         if (GetSection(__args) != 1 ||
-            !LeviathanMod.PlayerHasLeviathanUpgrade() ||
+            !LeviathanMod.PlayerHasLeviathan() ||
             !LeviathanPresetUI.IsPlayerBuilder(__instance))
         {
             return;
@@ -487,7 +493,7 @@ public class LeviathanShipBuilderIntegration : MonoBehaviour
                 out role))
         {
             shipBuilder.ShowError(
-                "Leviathan part must be Body, 1-15, or Tail."
+                "Leviathan part must be Body, a numbered body slot, Tail, Tail_a/Tail_b, Tail_aN/Tail_bN, or BifurcateN."
             );
             return;
         }
@@ -797,17 +803,91 @@ public static class LeviathanSegmentTemplates
             return true;
         }
 
+        if (text.Equals("Tail_a", StringComparison.OrdinalIgnoreCase))
+        {
+            role = "Tail_a";
+            return true;
+        }
+
+        if (text.Equals("Tail_b", StringComparison.OrdinalIgnoreCase))
+        {
+            role = "Tail_b";
+            return true;
+        }
+
         int segmentNumber;
 
         if (int.TryParse(text, out segmentNumber) &&
-            segmentNumber >= 1 &&
-            segmentNumber <= 15)
+            IsSupportedSegmentNumber(segmentNumber))
         {
             role = segmentNumber.ToString();
             return true;
         }
 
+        string lower = text.ToLowerInvariant();
+
+        if (TryNormalizeNumberedRole(
+                lower,
+                "tail_a",
+                "Tail_a",
+                out role))
+        {
+            return true;
+        }
+
+        if (TryNormalizeNumberedRole(
+                lower,
+                "tail_b",
+                "Tail_b",
+                out role))
+        {
+            return true;
+        }
+
+        if (TryNormalizeNumberedRole(
+                lower,
+                "bifurcate",
+                "Bifurcate",
+                out role))
+        {
+            return true;
+        }
+
         return false;
+    }
+
+    private static bool TryNormalizeNumberedRole(
+        string lower,
+        string prefix,
+        string canonicalPrefix,
+        out string role)
+    {
+        role = null;
+
+        if (string.IsNullOrEmpty(lower) ||
+            !lower.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string suffix = lower.Substring(prefix.Length);
+        int number;
+
+        if (!int.TryParse(suffix, out number) ||
+            !IsSupportedSegmentNumber(number))
+        {
+            return false;
+        }
+
+        role = canonicalPrefix + number.ToString();
+        return true;
+    }
+
+    private static bool IsSupportedSegmentNumber(int number)
+    {
+        // Deliberately larger than today's Growth tree maximum so saved anatomy
+        // does not need a file-format migration when future nodes add segments.
+        return number >= 1 && number <= 64;
     }
 
     public static string GetRolePath(string role)
@@ -880,6 +960,13 @@ public static class LeviathanSegmentTemplates
 
         Directory.CreateDirectory(GetDirectory());
 
+        if (normalized.StartsWith(
+                "Bifurcate",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            RemoveOtherBifurcationRoles(normalized);
+        }
+
         string path = GetRolePath(normalized);
         Template template = null;
 
@@ -914,31 +1001,62 @@ public static class LeviathanSegmentTemplates
                 StringComparer.OrdinalIgnoreCase
             );
 
-        Template body = LoadRole("Body");
+        AddLoadedRole(result, "Body");
 
-        if (body != null && !string.IsNullOrEmpty(body.serialized))
-            result["Body"] = body.serialized;
+        for (int i = 1; i <= 64; i++)
+            AddLoadedRole(result, i.ToString());
 
-        for (int i = 1; i <= 15; i++)
+        AddLoadedRole(result, "Tail");
+        AddLoadedRole(result, "Tail_a");
+        AddLoadedRole(result, "Tail_b");
+
+        for (int i = 1; i <= 64; i++)
         {
-            string role = i.ToString();
-            Template template = LoadRole(role);
-
-            if (template == null ||
-                string.IsNullOrEmpty(template.serialized))
-            {
-                continue;
-            }
-
-            result[role] = template.serialized;
+            AddLoadedRole(result, "Tail_a" + i.ToString());
+            AddLoadedRole(result, "Tail_b" + i.ToString());
+            AddLoadedRole(result, "Bifurcate" + i.ToString());
         }
 
-        Template tail = LoadRole("Tail");
-
-        if (tail != null && !string.IsNullOrEmpty(tail.serialized))
-            result["Tail"] = tail.serialized;
-
         return result;
+    }
+
+    private static void AddLoadedRole(
+        Dictionary<string, string> result,
+        string role)
+    {
+        Template template = LoadRole(role);
+
+        if (template != null &&
+            !string.IsNullOrEmpty(template.serialized))
+        {
+            result[role] = template.serialized;
+        }
+    }
+
+    public static void EnsureBifurcationDefaults()
+    {
+        string tailSerialized = null;
+
+        Template tail = LoadRole("Tail");
+        if (tail != null)
+            tailSerialized = tail.serialized;
+
+        if (string.IsNullOrEmpty(tailSerialized))
+        {
+            string stockBody;
+            string stockTail;
+            GetStockBodies(out stockBody, out stockTail);
+            tailSerialized = stockTail;
+        }
+
+        if (string.IsNullOrEmpty(tailSerialized))
+            return;
+
+        if (LoadRole("Tail_a") == null)
+            SaveRole("Tail_a", tailSerialized);
+
+        if (LoadRole("Tail_b") == null)
+            SaveRole("Tail_b", tailSerialized);
     }
 
     public static List<Template> GetPresetTemplates()
@@ -958,12 +1076,49 @@ public static class LeviathanSegmentTemplates
         if (body != null)
             result.Add(body);
 
-        for (int i = 1; i <= 15; i++)
+        for (int i = 1; i <= 64; i++)
         {
             Template segment = LoadRole(i.ToString());
 
             if (segment != null)
                 result.Add(segment);
+        }
+
+        // Only existing bifurcation/branch overrides are shown. Generic Tail
+        // remains the final fallback for either branch.
+        for (int i = 1; i <= 64; i++)
+        {
+            Template bifurcate =
+                LoadRole("Bifurcate" + i.ToString());
+
+            if (bifurcate != null)
+                result.Add(bifurcate);
+        }
+
+        Template tailA = LoadRole("Tail_a");
+        if (tailA != null)
+            result.Add(tailA);
+
+        for (int i = 1; i <= 64; i++)
+        {
+            Template branch =
+                LoadRole("Tail_a" + i.ToString());
+
+            if (branch != null)
+                result.Add(branch);
+        }
+
+        Template tailB = LoadRole("Tail_b");
+        if (tailB != null)
+            result.Add(tailB);
+
+        for (int i = 1; i <= 64; i++)
+        {
+            Template branch =
+                LoadRole("Tail_b" + i.ToString());
+
+            if (branch != null)
+                result.Add(branch);
         }
 
         if (tail == null && !string.IsNullOrEmpty(stockTail))
@@ -973,6 +1128,39 @@ public static class LeviathanSegmentTemplates
             result.Add(tail);
 
         return result;
+    }
+
+    private static void RemoveOtherBifurcationRoles(
+        string keepRole)
+    {
+        for (int i = 1; i <= 64; i++)
+        {
+            string role = "Bifurcate" + i.ToString();
+
+            if (role.Equals(
+                    keepRole,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string path = GetRolePath(role);
+
+            if (!File.Exists(path))
+                continue;
+
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning(
+                    "[Leviathan] Could not remove old bifurcation role '" +
+                    role + "': " + ex.Message
+                );
+            }
+        }
     }
 
     private static Template LoadRole(string role)
@@ -1277,6 +1465,9 @@ public static class LeviathanSegmentStatusProtection
 
     private static bool RollDiscard(GameShip player)
     {
+        // Growth no longer owns a legacy rank-based debuff discard path.
+        // Segment debuff protection belongs to Behemoth unless a future Growth
+        // specialization node explicitly introduces its own resolved knob.
         float discardChance =
             LeviathanGrowth.GetSegmentDebuffDiscardChance(player) +
             LeviathanBehemoth.GetSegmentDebuffDiscardChance(player);
@@ -2240,6 +2431,54 @@ public static class LeviathanRemotePlayerRenderOrderPatch
     }
 }
 
+public static class LeviathanWhipTuning
+{
+    // Geometry defaults are a strict passthrough: when these three values remain
+    // at their defaults, vanilla AttachedAIShip.UpdateAttachPosition(float) runs.
+    //
+    // Fraction of prior rear-point motion retained into the next simulation step.
+    // 0.00 = current/vanilla behavior.
+    // Recommended first test: 0.85f
+    public const float MomentumRetention = 0.00f;
+
+    // Native AttachedAIShip hardcodes 1.5f here.
+    // Lower values let the rear of each section preserve its lateral direction
+    // longer before aligning back toward the section in front.
+    // Recommended first test: 0.45f
+    public const float AlignmentStrength = 1.50f;
+
+    // 0 = no angular-speed cap, matching current behavior.
+    // Positive values cap section rotation in degrees per second.
+    // Recommended first test: 720f
+    public const float MaxAngularSpeedDegreesPerSecond = 0.00f;
+
+    // 0 = keep native Rigidbody behavior: each attached section inherits the
+    // preceding section's Rigidbody velocity.
+    // 1 = use the section's measured world-space center velocity instead.
+    //
+    // Recommended first movement test: leave at 0.00f.
+    // Recommended second test, after geometry feels right: 1.00f.
+    public const float SimulatedVelocityInfluence = 0.00f;
+
+    // Reserved for the contact-damage owner (LeviathanConstrictor).
+    // This file records rear/tail-point velocity but deliberately does not alter
+    // contact damage by itself.
+    //
+    // 0 = current damage behavior.
+    // Recommended only after movement is tuned: 1.00f.
+    public const float CollisionWhipVelocityScale = 0.00f;
+
+    public static bool UsesCustomGeometry
+    {
+        get
+        {
+            return MomentumRetention != 0.00f ||
+                AlignmentStrength != 1.50f ||
+                MaxAngularSpeedDegreesPerSecond > 0.00f;
+        }
+    }
+}
+
 [HarmonyPatch]
 public static class LeviathanAttachedAIShipPatch
 {
@@ -2252,17 +2491,411 @@ public static class LeviathanAttachedAIShipPatch
         );
     }
 
-    public static void Prefix(
+    public static bool Prefix(
         AttachedAIShip __instance,
+        float __0,
+        GameShip ___gameShip,
+        GameShip ___attachedShip,
+        float ___attachedTime,
+        bool ___initialAttach,
+        ref Vector2 ___lastThrusterWorldPos,
+        bool ___hasLastThruster,
+        float ___segmentLength,
+        float ___localThrusterAngle,
         ref LeviathanAttachmentNormalizer.State __state)
     {
         __state = LeviathanAttachmentNormalizer.Begin(__instance);
+
+        if (__state == null &&
+            ___gameShip != null &&
+            LeviathanMod.Controller != null &&
+            LeviathanMod.Controller.GetDamageRedirectTarget(
+                ___gameShip
+            ) != null)
+        {
+            __state =
+                LeviathanAttachmentNormalizer.CreateTrackingState(
+                    ___gameShip
+                );
+        }
+
+        if (__state == null)
+            return true;
+
+        __state.dt = __0;
+
+        if (!LeviathanWhipTuning.UsesCustomGeometry)
+            return true;
+
+        bool handled =
+            LeviathanWhipDynamics.TryUpdateAttachPosition(
+                __state.ship,
+                __0,
+                ___attachedShip,
+                ___attachedTime,
+                ___initialAttach,
+                ref ___lastThrusterWorldPos,
+                ___hasLastThruster,
+                ___segmentLength,
+                ___localThrusterAngle
+            );
+
+        // If the custom solver cannot safely reproduce the exact native branch
+        // for this tick (initial attach, rigid attachment, etc.), run vanilla.
+        return !handled;
     }
 
     public static void Postfix(
+        Vector2 ___lastThrusterWorldPos,
+        bool ___hasLastThruster,
         LeviathanAttachmentNormalizer.State __state)
     {
         LeviathanAttachmentNormalizer.End(__state);
+
+        LeviathanWhipDynamics.FinalizeFrame(
+            __state,
+            ___lastThrusterWorldPos,
+            ___hasLastThruster
+        );
+    }
+}
+
+public static class LeviathanWhipDynamics
+{
+    private static readonly Dictionary<GameShip, Vector2>
+        MomentumPreviousRearByShip =
+            new Dictionary<GameShip, Vector2>();
+
+    private static readonly Dictionary<GameShip, Vector2>
+        RearSampleByShip =
+            new Dictionary<GameShip, Vector2>();
+
+    private static readonly Dictionary<GameShip, Vector2>
+        RearVelocityByShip =
+            new Dictionary<GameShip, Vector2>();
+
+    private static readonly Dictionary<GameShip, Vector2>
+        CenterSampleByShip =
+            new Dictionary<GameShip, Vector2>();
+
+    private static readonly Dictionary<GameShip, Vector2>
+        CenterVelocityByShip =
+            new Dictionary<GameShip, Vector2>();
+
+    public static void Reset()
+    {
+        MomentumPreviousRearByShip.Clear();
+        RearSampleByShip.Clear();
+        RearVelocityByShip.Clear();
+        CenterSampleByShip.Clear();
+        CenterVelocityByShip.Clear();
+    }
+
+    public static bool TryUpdateAttachPosition(
+        GameShip ship,
+        float dt,
+        GameShip attachedShip,
+        float attachedTime,
+        bool initialAttach,
+        ref Vector2 lastThrusterWorldPos,
+        bool hasLastThruster,
+        float segmentLength,
+        float localThrusterAngle)
+    {
+        if (ship == null ||
+            ship.squadron == null ||
+            attachedShip == null ||
+            attachedShip.gameObject == null ||
+            dt <= 0f)
+        {
+            return false;
+        }
+
+        SquadronBase squadronBase =
+            ship.squadron.GetSquadronBase();
+
+        if (squadronBase == null ||
+            squadronBase.attachRotation ||
+            squadronBase.rigidAttachment ||
+            ship.IsMindControlled() ||
+            initialAttach ||
+            attachedTime > 0f ||
+            !hasLastThruster ||
+            segmentLength < 0.01f)
+        {
+            return false;
+        }
+
+        var parentThrusterEquipment = attachedShip.GetThruster();
+
+        if (parentThrusterEquipment == null ||
+            parentThrusterEquipment.gameObject == null)
+        {
+            return false;
+        }
+
+        Vector2 jointWorld =
+            parentThrusterEquipment.gameObject.transform.position;
+
+        Vector2 currentRear = lastThrusterWorldPos;
+        Vector2 previousRear;
+
+        Vector2 predictedRear = currentRear;
+
+        if (MomentumPreviousRearByShip.TryGetValue(
+                ship,
+                out previousRear))
+        {
+            Vector2 retainedMotion =
+                currentRear - previousRear;
+
+            predictedRear +=
+                retainedMotion *
+                Mathf.Max(
+                    0f,
+                    LeviathanWhipTuning.MomentumRetention
+                );
+        }
+
+        // Save the pre-solve rear point. On the next tick it becomes the
+        // previous sample used to derive inertial motion.
+        MomentumPreviousRearByShip[ship] = currentRear;
+
+        Vector2 jointToPredicted =
+            predictedRear - jointWorld;
+
+        Vector2 constrainedRear;
+
+        if (jointToPredicted.sqrMagnitude > 0.000001f)
+        {
+            constrainedRear =
+                jointWorld +
+                jointToPredicted.normalized * segmentLength;
+        }
+        else
+        {
+            Vector2 fallbackDirection =
+                attachedShip.transform.rotation * Vector2.left;
+
+            constrainedRear =
+                jointWorld +
+                fallbackDirection * segmentLength;
+        }
+
+        Vector2 rearVector =
+            constrainedRear - jointWorld;
+
+        float inertialRearAngle =
+            Mathf.Atan2(
+                rearVector.y,
+                rearVector.x
+            ) * Mathf.Rad2Deg;
+
+        float parentRearAngle =
+            attachedShip.transform.rotation.eulerAngles.z +
+            localThrusterAngle;
+
+        float alignmentStrength =
+            Mathf.Max(
+                0f,
+                LeviathanWhipTuning.AlignmentStrength
+            );
+
+        float solvedRearAngle =
+            Mathf.LerpAngle(
+                inertialRearAngle,
+                parentRearAngle,
+                alignmentStrength * dt
+            );
+
+        float maxAngularSpeed =
+            LeviathanWhipTuning
+                .MaxAngularSpeedDegreesPerSecond;
+
+        if (maxAngularSpeed > 0f)
+        {
+            float currentRearAngle =
+                ship.transform.rotation.eulerAngles.z +
+                localThrusterAngle;
+
+            solvedRearAngle =
+                Mathf.MoveTowardsAngle(
+                    currentRearAngle,
+                    solvedRearAngle,
+                    maxAngularSpeed * dt
+                );
+        }
+
+        float radians =
+            solvedRearAngle * Mathf.Deg2Rad;
+
+        Vector2 solvedDirection =
+            new Vector2(
+                Mathf.Cos(radians),
+                Mathf.Sin(radians)
+            );
+
+        Vector2 solvedRear =
+            jointWorld +
+            solvedDirection * segmentLength;
+
+        ship.transform.rotation =
+            Quaternion.Euler(
+                0f,
+                0f,
+                solvedRearAngle - localThrusterAngle
+            );
+
+        lastThrusterWorldPos = solvedRear;
+
+        // This is the exact stable flexible-attachment position/velocity branch
+        // used by native AttachedAIShip once attachedTime reaches zero.
+        Vector3 position = ship.transform.position;
+
+        ship.transform.position =
+            new Vector3(
+                jointWorld.x,
+                jointWorld.y,
+                position.z
+            );
+
+        Rigidbody2D body = ship.GetRigidBody();
+        Rigidbody2D parentBody = attachedShip.GetRigidBody();
+
+        if (body != null && parentBody != null)
+            body.velocity = parentBody.velocity;
+
+        return true;
+    }
+
+    public static void FinalizeFrame(
+        LeviathanAttachmentNormalizer.State state,
+        Vector2 rearWorldPosition,
+        bool hasRearSample)
+    {
+        if (state == null ||
+            state.ship == null ||
+            state.dt <= 0f)
+        {
+            return;
+        }
+
+        GameShip ship = state.ship;
+        float dt = state.dt;
+
+        if (hasRearSample)
+        {
+            Vector2 previousRear;
+
+            if (RearSampleByShip.TryGetValue(
+                    ship,
+                    out previousRear))
+            {
+                RearVelocityByShip[ship] =
+                    (rearWorldPosition - previousRear) / dt;
+            }
+            else
+            {
+                Rigidbody2D body = ship.GetRigidBody();
+
+                RearVelocityByShip[ship] =
+                    body == null
+                        ? Vector2.zero
+                        : body.velocity;
+            }
+
+            RearSampleByShip[ship] = rearWorldPosition;
+        }
+
+        Vector2 center =
+            new Vector2(
+                ship.transform.position.x,
+                ship.transform.position.y
+            );
+
+        Vector2 previousCenter;
+        bool hasPreviousCenter =
+            CenterSampleByShip.TryGetValue(
+                ship,
+                out previousCenter
+            );
+
+        Vector2 centerVelocity;
+
+        if (hasPreviousCenter)
+        {
+            centerVelocity =
+                (center - previousCenter) / dt;
+        }
+        else
+        {
+            Rigidbody2D body = ship.GetRigidBody();
+
+            centerVelocity =
+                body == null
+                    ? Vector2.zero
+                    : body.velocity;
+        }
+
+        CenterSampleByShip[ship] = center;
+        CenterVelocityByShip[ship] = centerVelocity;
+
+        float velocityInfluence =
+            Mathf.Clamp01(
+                LeviathanWhipTuning
+                    .SimulatedVelocityInfluence
+            );
+
+        if (velocityInfluence <= 0f ||
+            !hasPreviousCenter)
+        {
+            return;
+        }
+
+        Rigidbody2D rigidBody = ship.GetRigidBody();
+
+        if (rigidBody == null)
+            return;
+
+        rigidBody.velocity =
+            Vector2.Lerp(
+                rigidBody.velocity,
+                centerVelocity,
+                velocityInfluence
+            );
+    }
+
+    // Logical rear/tail-point velocity. For the final Leviathan section this is
+    // the useful "tail whip" velocity to feed into contact damage later.
+    public static Vector2 GetRearPointVelocity(GameShip ship)
+    {
+        Vector2 velocity;
+
+        if (ship != null &&
+            RearVelocityByShip.TryGetValue(
+                ship,
+                out velocity))
+        {
+            return velocity;
+        }
+
+        return Vector2.zero;
+    }
+
+    // Measured center velocity after attachment positioning.
+    public static Vector2 GetCenterVelocity(GameShip ship)
+    {
+        Vector2 velocity;
+
+        if (ship != null &&
+            CenterVelocityByShip.TryGetValue(
+                ship,
+                out velocity))
+        {
+            return velocity;
+        }
+
+        return Vector2.zero;
     }
 }
 
@@ -2308,6 +2941,7 @@ public static class LeviathanAttachmentNormalizer
         public Transform parentThruster;
         public Vector3 parentThrusterPosition;
         public Vector2 frontLocal;
+        public float dt;
     }
 
     private struct HullAnchors
@@ -2323,6 +2957,17 @@ public static class LeviathanAttachmentNormalizer
         AnchorCache.Clear();
         InitializedAttachedShips.Clear();
         leviathanSegmentNameKeys = null;
+        LeviathanWhipDynamics.Reset();
+    }
+
+    public static State CreateTrackingState(GameShip ship)
+    {
+        if (ship == null)
+            return null;
+
+        State state = new State();
+        state.ship = ship;
+        return state;
     }
 
     public static State Begin(AttachedAIShip attachedAI)

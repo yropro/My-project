@@ -46,7 +46,7 @@ public static class LeviathanFlipYAxisShipBuilderInitPatch
         integration.Configure(
             __instance,
             __4,
-            __5 && LeviathanMod.PlayerHasLeviathanUpgrade()
+            __5
         );
     }
 }

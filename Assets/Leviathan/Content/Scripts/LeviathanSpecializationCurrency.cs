@@ -5,17 +5,29 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
-// Native Leviathan skill that converts one ordinary Star Vortex upgrade point
-// into several specialization-only Growth Points.
+/// <summary>
+/// Native Evolution upgrade and the shared specialization-point economy.
+///
+/// Evolution is the only native Leviathan progression skill. Rank 1 awakens the
+/// Leviathan chassis and automatically unlocks Growth; every rank grants two
+/// Evolution Points that may be spent across any unlocked specialization tree.
+/// </summary>
 public static class LeviathanSpecializationCurrency
 {
     public const int UpgradeKeyValue = 87;
     public static readonly Upgrade.Key UpgradeKey = (Upgrade.Key)UpgradeKeyValue;
 
-    public const int PointsPerRank = 3;
-    public const int Levels = 5;
+    // Migration-only tombstone for saves made before native Growth was removed.
+    // It is registered but never shown or used for gameplay. Once an active Pilot
+    // is available, any old rank is removed after ensuring Evolution rank >= 1.
+    public const int LegacyGrowthUpgradeKeyValue = 81;
+    public static readonly Upgrade.Key LegacyGrowthUpgradeKey =
+        (Upgrade.Key)LegacyGrowthUpgradeKeyValue;
+
+    public const int PointsPerRank = 2;
+    public const int Levels = 999;
     public const string SkillName = "Evolution";
-    public const string CurrencyName = "Growth Points";
+    public const string CurrencyName = "Evolution Points";
 
     private static readonly FieldInfo UpgradesField =
         AccessTools.Field(typeof(Upgrade), "upgrades");
@@ -52,6 +64,15 @@ public static class LeviathanSpecializationCurrency
         );
 
     private static Upgrade upgrade;
+    private static Upgrade legacyGrowthTombstone;
+
+    [ThreadStatic]
+    private static bool migratingLegacyGrowth;
+
+    public static bool IsMigratingLegacyGrowth
+    {
+        get { return migratingLegacyGrowth; }
+    }
 
     public static Upgrade Upgrade
     {
@@ -64,7 +85,7 @@ public static class LeviathanSpecializationCurrency
 
     public static void EnsureRegistered()
     {
-        if (upgrade != null)
+        if (upgrade != null && legacyGrowthTombstone != null)
             return;
 
         if (UpgradesField == null ||
@@ -85,14 +106,94 @@ public static class LeviathanSpecializationCurrency
 
         List<Upgrade> expanded = new List<Upgrade>(native);
 
-        for (int i = 0; i < expanded.Count; i++)
+        upgrade = FindRegisteredUpgrade(expanded, UpgradeKey);
+        if (upgrade == null)
         {
-            Upgrade candidate = expanded[i];
+            upgrade = CreateUpgrade(
+                UpgradeKey,
+                0,
+                false,
+                PointsPerRank,
+                Levels,
+                SkillName
+            );
+            expanded.Add(upgrade);
+        }
+        else
+        {
+            RefreshEvolutionMetadata(upgrade);
+        }
+
+        // Keep old key 81 resolvable long enough to safely load/migrate older
+        // Pilots. This object is deliberately absent from LeviathanSkillUI.
+        legacyGrowthTombstone = FindRegisteredUpgrade(
+            expanded,
+            LegacyGrowthUpgradeKey
+        );
+
+        if (legacyGrowthTombstone == null)
+        {
+            legacyGrowthTombstone = CreateUpgrade(
+                LegacyGrowthUpgradeKey,
+                0,
+                false,
+                0,
+                1,
+                "Legacy Growth (Migration Only)"
+            );
+            expanded.Add(legacyGrowthTombstone);
+        }
+        else
+        {
+            legacyGrowthTombstone.requiredLevel = 0;
+            legacyGrowthTombstone.percentage = false;
+            legacyGrowthTombstone.value = 0;
+            legacyGrowthTombstone.levels = Math.Max(
+                1,
+                legacyGrowthTombstone.levels
+            );
+            legacyGrowthTombstone.name = "Legacy Growth (Migration Only)";
+        }
+
+        UpgradesField.SetValue(null, expanded.ToArray());
+
+        // Upgrade.GetUpgrade lazily caches the array. Rebuild after both key 87
+        // and the key-81 migration tombstone are guaranteed to be present.
+        UpgradeLookupField.SetValue(null, null);
+
+        if (GetUpgradeMethod.Invoke(null, new object[] { UpgradeKey }) == null)
+            throw new Exception("Upgrade lookup rebuilt without Evolution.");
+
+        if (GetUpgradeMethod.Invoke(
+                null,
+                new object[] { LegacyGrowthUpgradeKey }) == null)
+        {
+            throw new Exception(
+                "Upgrade lookup rebuilt without the legacy Growth migration tombstone."
+            );
+        }
+
+        Debug.Log(
+            "[Leviathan] Evolution ready: +" +
+            PointsPerRank.ToString() + " " + CurrencyName +
+            "/rank, " + Levels.ToString() + " ranks."
+        );
+    }
+
+    private static Upgrade FindRegisteredUpgrade(
+        List<Upgrade> upgrades,
+        Upgrade.Key key)
+    {
+        for (int i = 0; i < upgrades.Count; i++)
+        {
+            Upgrade candidate = upgrades[i];
             if (candidate == null)
                 continue;
 
-            Upgrade.Key key = (Upgrade.Key)UpgradeKeyField.GetValue(candidate);
-            if (key != UpgradeKey)
+            Upgrade.Key candidateKey =
+                (Upgrade.Key)UpgradeKeyField.GetValue(candidate);
+
+            if (candidateKey != key)
                 continue;
 
             Upgrade.Category category =
@@ -101,53 +202,91 @@ public static class LeviathanSpecializationCurrency
             if (category != LeviathanMod.LeviathanCategory)
             {
                 throw new Exception(
-                    "Upgrade key " + UpgradeKeyValue.ToString() +
+                    "Upgrade key " + ((int)key).ToString() +
                     " is already owned by another category."
                 );
             }
 
-            upgrade = candidate;
-            break;
+            return candidate;
         }
 
-        if (upgrade == null)
+        return null;
+    }
+
+    private static Upgrade CreateUpgrade(
+        Upgrade.Key key,
+        int requiredLevel,
+        bool percentage,
+        int value,
+        int levels,
+        string name)
+    {
+        Upgrade created = UpgradeConstructor.Invoke(
+            new object[]
+            {
+                LeviathanMod.LeviathanCategory,
+                key,
+                requiredLevel,
+                percentage,
+                value,
+                levels,
+                name
+            }
+        ) as Upgrade;
+
+        if (created == null)
         {
-            upgrade = UpgradeConstructor.Invoke(
-                new object[]
-                {
-                    LeviathanMod.LeviathanCategory,
-                    UpgradeKey,
-                    0,
-                    false,
-                    PointsPerRank,
-                    Levels,
-                    SkillName
-                }
-            ) as Upgrade;
-
-            if (upgrade == null)
-                throw new Exception("Failed to construct Evolution Upgrade.");
-
-            expanded.Add(upgrade);
-            UpgradesField.SetValue(null, expanded.ToArray());
-
-            Debug.Log(
-                "[Leviathan] Registered native Evolution upgrade. Key = " +
-                UpgradeKeyValue.ToString() + ", +" +
-                PointsPerRank.ToString() + " Growth Points/rank."
+            throw new Exception(
+                "Failed to construct Leviathan native upgrade '" + name + "'."
             );
         }
 
-        // The lookup may already have been materialized by LeviathanSkillSystem.
-        // Clear it and force a rebuild containing key 87.
-        UpgradeLookupField.SetValue(null, null);
-        object rebuilt = GetUpgradeMethod.Invoke(
-            null,
-            new object[] { UpgradeKey }
-        );
+        return created;
+    }
 
-        if (rebuilt == null)
-            throw new Exception("Upgrade lookup rebuilt without Evolution.");
+    private static void RefreshEvolutionMetadata(Upgrade evolution)
+    {
+        evolution.requiredLevel = 0;
+        evolution.percentage = false;
+        evolution.value = PointsPerRank;
+        evolution.levels = Levels;
+        evolution.name = SkillName;
+    }
+
+    /// <summary>
+    /// One-way save migration from the removed native Growth key (81).
+    /// Old Growth ownership means the character was already a Leviathan, so it
+    /// awakens Evolution rank 1 if necessary, then removes key 81 entirely.
+    /// </summary>
+    public static void MigrateLegacyGrowth(Pilot pilot)
+    {
+        if (pilot == null)
+            return;
+
+        EnsureRegistered();
+
+        int oldGrowth = pilot.GetUpgradeLevel(LegacyGrowthUpgradeKey);
+        if (oldGrowth <= 0)
+            return;
+
+        migratingLegacyGrowth = true;
+        try
+        {
+            int evolution = pilot.GetUpgradeLevel(UpgradeKey);
+            if (evolution < 1)
+                pilot.SetUpgrade(UpgradeKey, 1);
+
+            pilot.SetUpgrade(LegacyGrowthUpgradeKey, 0);
+        }
+        finally
+        {
+            migratingLegacyGrowth = false;
+        }
+
+        Debug.Log(
+            "[Leviathan] Migrated removed native Growth rank " +
+            oldGrowth.ToString() + " into Evolution activation."
+        );
     }
 }
 
@@ -191,8 +330,9 @@ public static class LeviathanEvolutionUpgradeDescriptionPatch
             return true;
 
         __result =
-            "Grants 3 Growth Points per rank. Spend Growth Points in the " +
-            "Evolution tree to unlock Leviathan skill trees, then specialize them.";
+            "Grants 2 Evolution Points per rank. Evolution rank 1 awakens " +
+            "the Leviathan chassis and Growth tree automatically; spend " +
+            "Evolution Points to specialize Growth or unlock other Leviathan trees.";
         return false;
     }
 }
@@ -219,73 +359,6 @@ public static class LeviathanEvolutionUpgradeIsFreePatch
     }
 }
 
-// Existing Leviathan UI code manually adds its known skills. Intercept the first
-// AddUpgrade for category 17 and inject Evolution exactly once without requiring
-// edits to LeviathanSkills.cs. Later, Evolution can be moved into the native list
-// there and this bridge can simply be removed.
-[HarmonyPatch(typeof(UpgradeClassDisplay), "AddUpgrade")]
-public static class LeviathanEvolutionDisplayInjectionPatch
-{
-    [ThreadStatic]
-    private static bool injecting;
-
-    private static readonly FieldInfo UpgradeDisplaysField =
-        AccessTools.Field(typeof(UpgradeClassDisplay), "upgradeDisplays");
-
-    public static void Prefix(UpgradeClassDisplay __instance, Upgrade upgrade)
-    {
-        if (injecting || __instance == null || upgrade == null)
-            return;
-
-        if (__instance.GetCategory() != LeviathanMod.LeviathanCategory)
-            return;
-
-        LeviathanSpecializationCurrency.EnsureRegistered();
-
-        if (upgrade.key == LeviathanSpecializationCurrency.UpgradeKey ||
-            ContainsEvolution(__instance))
-        {
-            return;
-        }
-
-        injecting = true;
-        try
-        {
-            __instance.AddUpgrade(LeviathanSpecializationCurrency.Upgrade);
-        }
-        finally
-        {
-            injecting = false;
-        }
-    }
-
-    private static bool ContainsEvolution(UpgradeClassDisplay display)
-    {
-        if (UpgradeDisplaysField == null)
-            return false;
-
-        object raw = UpgradeDisplaysField.GetValue(display);
-        System.Collections.IEnumerable enumerable =
-            raw as System.Collections.IEnumerable;
-
-        if (enumerable == null)
-            return false;
-
-        foreach (object item in enumerable)
-        {
-            UpgradeDisplay existing = item as UpgradeDisplay;
-            if (existing != null &&
-                existing.upgrade != null &&
-                existing.upgrade.key == LeviathanSpecializationCurrency.UpgradeKey)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-}
-
 [HarmonyPatch(typeof(UpgradeDisplay), "Init")]
 public static class LeviathanEvolutionIconPatch
 {
@@ -307,8 +380,8 @@ public static class LeviathanEvolutionIconPatch
     }
 }
 
-// Never permit the source skill to be refunded below the number of Growth Points
-// already committed to specialization nodes.
+// Never permit Evolution to be refunded below the amount of specialization
+// currency already committed across the trees.
 [HarmonyPatch(typeof(Pilot), "SetUpgrade")]
 public static class LeviathanEvolutionDowngradeGuardPatch
 {
@@ -332,10 +405,39 @@ public static class LeviathanEvolutionDowngradeGuardPatch
 
         Debug.LogWarning(
             "[Leviathan] Evolution downgrade blocked: " +
-            spent.ToString() + " Growth Points are invested, but rank " +
-            level.ToString() + " would provide only " + capacity.ToString() + "."
+            spent.ToString() + " " +
+            LeviathanSpecializationCurrency.CurrencyName +
+            " are invested, but rank " + level.ToString() +
+            " would provide only " + capacity.ToString() + "."
         );
         return false;
+    }
+
+    public static void Postfix(Pilot __instance, Upgrade.Key key)
+    {
+        if (__instance == null ||
+            key != LeviathanSpecializationCurrency.UpgradeKey)
+        {
+            return;
+        }
+
+        // Native upgrade mutations are outside specialization persistence, so
+        // explicitly invalidate derived unlock/root/Growth caches.
+        LeviathanSpecializationRuntime.InvalidateConfiguration();
+
+        GameShip player = WorldController.instance == null
+            ? null
+            : WorldController.instance.GetCurrentPlayerShip();
+
+        if (!LeviathanSpecializationCurrency.IsMigratingLegacyGrowth &&
+            player != null &&
+            LeviathanMod.Controller != null &&
+            object.ReferenceEquals(
+                GameShip.GetPlayerSourcePilot(player),
+                __instance))
+        {
+            LeviathanMod.Controller.RequestGrowthRefreshIfNeeded(player);
+        }
     }
 }
 
@@ -369,7 +471,11 @@ public static class LeviathanEvolutionCoreDowngradeTooltipPatch
         int spent = LeviathanSpecializationRuntime.GetTotalSpentPoints(pilot);
 
         if (spent > capacity)
-            result = "Refund Growth Points from specialization trees first.";
+        {
+            result = "Refund " +
+                LeviathanSpecializationCurrency.CurrencyName +
+                " from specialization trees first.";
+        }
     }
 }
 

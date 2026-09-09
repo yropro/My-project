@@ -1,8 +1,13 @@
 using static LeviathanTreeDsl;
-using Behemoth = LeviathanBehemoth;
 
-// Behemoth specialization config only. Temporal Dive implementation, state,
-// networking and tuning ownership remain in LeviathanBehemoth.cs.
+/// <summary>
+/// Behemoth specialization definition.
+///
+/// Behemoth is currently only its native five-rank core skill. The tree keeps
+/// a granted root so the Evolution unlock and future specialization branches
+/// already have a stable tree identity, but there are no player-purchased
+/// Behemoth specialization nodes in this basic refactor.
+/// </summary>
 public static class LeviathanBehemothTree
 {
     public const string TreeId = "behemoth";
@@ -10,18 +15,17 @@ public static class LeviathanBehemothTree
 
     public static LeviathanSpecializationTree Create()
     {
-        LeviathanSpecializationTree tree = Tree(TreeId, "Behemoth", RootNodeId, 40);
+        LeviathanSpecializationTree tree = Tree(
+            TreeId,
+            "Behemoth",
+            RootNodeId,
+            40
+        );
 
         tree.Add(Root(
             RootNodeId,
             "Behemoth",
-            "Granted automatically when Behemoth is unlocked in Evolution."
-        ));
-
-        tree.Add(Keystone(
-            "Temporal Dive",
-            Requires("Behemoth"),
-            Enable(Behemoth.Flags.TemporalDive)
+            "Behemoth's current behavior is provided by its five native ranks."
         ));
 
         tree.Validate();

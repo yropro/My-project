@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using static StarVortex.Damageable;
 
 /// <summary>
@@ -51,9 +52,15 @@ public static class LeviathanStarfireTuning
     public const float BaselineRecoverySecondsPerSecond = 0.50f;
     public const float BaselineRecoveryDelaySeconds = 0.00f;
     public const float BaselineRecoveryCurveExponent = 1.00f;
-    public const float BaselineMinimumDamageFraction = 0.00f;
+    public const float BaselineMinimumDamageFraction = 0.25f;
     public const float BaselineMinimumLengthFraction = 0.00f;
     public const float BaselineMinimumWidthFraction = 0.00f;
+    public const float BaselineMinimumVelocityFraction = 0.25f;
+
+    // Velocity begins falling at 60% of the normalized damage-falloff rate,
+    // then smoothly catches up near exhaustion so both reach their 25% floors.
+    public const float BaselineVelocityFalloffRate = 0.60f;
+
     public const float BaselineFalloffCurveExponent = 2.00f;
     public const float BaselineStartupDelaySeconds = 0.00f;
 }
@@ -331,6 +338,8 @@ public static class LeviathanStarfireRuntime
         public float MinimumDamageFraction;
         public float MinimumLengthFraction;
         public float MinimumWidthFraction;
+        public float MinimumVelocityFraction;
+        public float VelocityFalloffRate;
         public float DamageFalloffCurveExponent;
         public float LengthFalloffCurveExponent;
         public float WidthFalloffCurveExponent;
@@ -351,6 +360,12 @@ public static class LeviathanStarfireRuntime
         public float BlastWaveStartRadius;
         public float BlastWaveEndRadius;
         public float BlastWaveKnockback;
+    }
+
+    public struct BreathIconInitState
+    {
+        public bool changedCooldown;
+        public float originalBaseCooldown;
     }
 
     private sealed class BreathState
@@ -676,9 +691,8 @@ public static class LeviathanStarfireRuntime
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
         if (pilot == null ||
-            pilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade) < 1 ||
-            LeviathanMod.Controller.GetActiveSectionCount(player) <
-                LeviathanGrowth.GetBodySegmentCountForRank(1) + 2)
+            !LeviathanGrowth.IsGrowthActive(player) ||
+            LeviathanMod.Controller.GetActiveSectionCount(player) < 3)
         {
             return false;
         }
@@ -795,6 +809,73 @@ public static class LeviathanStarfireRuntime
             return false;
 
         resolved = GetResolvedStarfireState();
+        return true;
+    }
+
+    public static void PrepareBreathIcon(
+        Activatable source,
+        out BreathIconInitState state)
+    {
+        state = new BreathIconInitState();
+
+        GameShip player;
+        StarfireSourceFamily family;
+        ResolvedStarfireState resolved;
+        if (!TryGetSourceContext(
+            source,
+            out player,
+            out family,
+            out resolved) ||
+            source.Cooldown > 0f)
+        {
+            return;
+        }
+
+        // ActivatableIcon destroys its native cooldown Slider when Cooldown is
+        // zero. Temporarily expose a harmless value so Starfire can reuse the
+        // exact native overlay for Breath Power, then restore the real weapon.
+        state.changedCooldown = true;
+        state.originalBaseCooldown = source.BaseCooldown;
+        source.BaseCooldown = 1f;
+    }
+
+    public static void RestoreBreathIcon(
+        Activatable source,
+        BreathIconInitState state)
+    {
+        if (source != null && state.changedCooldown)
+            source.BaseCooldown = state.originalBaseCooldown;
+    }
+
+    public static bool TryGetBreathIconOverlay(
+        Activatable source,
+        out float overlay)
+    {
+        overlay = 0f;
+
+        GameShip player;
+        StarfireSourceFamily family;
+        ResolvedStarfireState resolved;
+        if (!TryGetSourceContext(
+            source,
+            out player,
+            out family,
+            out resolved))
+        {
+            return false;
+        }
+
+        BreathState breath;
+        if (!BreathStates.TryGetValue(source, out breath) ||
+            breath == null ||
+            breath.capacitySeconds <= 0.0001f)
+        {
+            return true;
+        }
+
+        overlay = 1f - Mathf.Clamp01(
+            breath.remainingSeconds / breath.capacitySeconds
+        );
         return true;
     }
 
@@ -1013,6 +1094,13 @@ public static class LeviathanStarfireRuntime
         }
 
         proxy.parentShip = owner;
+
+        // Projectile.Init immediately asks its parent Launcher for a weapon name.
+        // ItemBase-backed launcher templates discovered from LauncherItemBase are
+        // not equipped Item instances, so their clone has no resolvable ItemBase.
+        // Supply the real Torch name directly; GetName() returns nameOverwrite
+        // before touching ItemBase, while Starfire still owns hit attribution.
+        proxy.nameOverwrite = torch.GetName(false, false);
         return proxy;
     }
 
@@ -1306,6 +1394,35 @@ public static class LeviathanStarfireRuntime
             1f,
             Mathf.Clamp01(minimumFraction),
             curved
+        );
+    }
+
+    private static float GetVelocityFalloffMultiplier(
+        float damageFraction,
+        ResolvedStarfireState resolved)
+    {
+        if (resolved == null)
+            return 1f;
+
+        float minimumDamage = Mathf.Clamp01(resolved.MinimumDamageFraction);
+        float minimumVelocity = Mathf.Clamp01(resolved.MinimumVelocityFraction);
+        float damageRange = Mathf.Max(0.0001f, 1f - minimumDamage);
+        float damageFalloffProgress = Mathf.Clamp01(
+            (1f - Mathf.Clamp(damageFraction, minimumDamage, 1f)) /
+            damageRange
+        );
+
+        // Start at the configured fraction of damage's falloff rate, then blend
+        // toward full progress as the reservoir empties so velocity still reaches
+        // its own floor instead of asymptoting above it.
+        float rate = Mathf.Clamp01(resolved.VelocityFalloffRate);
+        float velocityFalloffProgress = damageFalloffProgress *
+            (rate + (1f - rate) * damageFalloffProgress);
+
+        return Mathf.Lerp(
+            1f,
+            minimumVelocity,
+            velocityFalloffProgress
         );
     }
 
@@ -1934,6 +2051,9 @@ public static class LeviathanStarfireRuntime
         if (profile == null)
             return;
 
+        float velocityMultiplier =
+            GetVelocityFalloffMultiplier(damageFraction, resolved);
+
         SpawnProjectile(
             torch,
             player,
@@ -1943,7 +2063,7 @@ public static class LeviathanStarfireRuntime
             damageFraction,
             lengthFraction,
             widthFraction,
-            GetTorchProjectileVelocity(profile, breath),
+            GetTorchProjectileVelocity(profile, breath) * velocityMultiplier,
             GetTorchShotCount(profile)
         );
     }
@@ -2104,6 +2224,8 @@ public static class LeviathanStarfireRuntime
             float speed = shotVelocity.magnitude;
             if (speed <= 0.0001f)
                 speed = Mathf.Max(0.01f, launcher.GetCurrentVelocity());
+
+            speed *= GetVelocityFalloffMultiplier(damageFraction, resolved);
 
             float angle = UnityEngine.Random.Range(-halfAngle, halfAngle);
             Vector2 direction = Utils.RotateVector(forward, angle).normalized;
@@ -2684,6 +2806,10 @@ public static class LeviathanStarfireRuntime
             LeviathanStarfireTuning.BaselineMinimumLengthFraction;
         state.MinimumWidthFraction =
             LeviathanStarfireTuning.BaselineMinimumWidthFraction;
+        state.MinimumVelocityFraction =
+            LeviathanStarfireTuning.BaselineMinimumVelocityFraction;
+        state.VelocityFalloffRate =
+            LeviathanStarfireTuning.BaselineVelocityFalloffRate;
         state.DamageFalloffCurveExponent = Mathf.Max(
             0.01f,
             ApplyKnob(
@@ -3833,6 +3959,66 @@ public static class LeviathanStarfireRuntime
     }
 
 
+}
+
+[HarmonyPatch(typeof(ActivatableIcon), "Init")]
+public static class LeviathanStarfireActivatableIconInitPatch
+{
+    public static void Prefix(
+        Activatable activatable,
+        out LeviathanStarfireRuntime.BreathIconInitState __state)
+    {
+        LeviathanStarfireRuntime.PrepareBreathIcon(
+            activatable,
+            out __state
+        );
+    }
+
+    public static void Postfix(
+        Activatable activatable,
+        LeviathanStarfireRuntime.BreathIconInitState __state)
+    {
+        LeviathanStarfireRuntime.RestoreBreathIcon(
+            activatable,
+            __state
+        );
+    }
+}
+
+[HarmonyPatch(typeof(ActivatableIcon), "UpdateCooldownAndDuration")]
+public static class LeviathanStarfireActivatableIconBreathPatch
+{
+    public static bool Prefix(
+        ActivatableIcon __instance,
+        Activatable ___activatable,
+        Slider ___cooldownSlider,
+        ref float ___cachedCooldownSlider,
+        ref bool ___cachedCountdownActive)
+    {
+        float overlay;
+        if (!LeviathanStarfireRuntime.TryGetBreathIconOverlay(
+            ___activatable,
+            out overlay))
+        {
+            return true;
+        }
+
+        if (__instance.countdown != null &&
+            __instance.countdown.activeSelf)
+        {
+            __instance.countdown.SetActive(false);
+        }
+        ___cachedCountdownActive = false;
+
+        if (___cooldownSlider != null &&
+            Mathf.Abs(overlay - ___cachedCooldownSlider) >= 0.005f)
+        {
+            ___cachedCooldownSlider = overlay;
+            ___cooldownSlider.value = overlay;
+        }
+
+        return false;
+    }
 }
 
 [HarmonyPatch(typeof(WorldController), "PostInit")]

@@ -126,9 +126,7 @@ public static class LeviathanStellarConverterTree
             Requires("Deep Capacitors", 2),
             ManifestationPath,
             "Keeps the Converter beam. An invisible gravity corridor grows down the beam and drags enemies toward its independently-moving tip.",
-            Enable(Converter.Flags.EventHorizon),
-            Increment(Converter.Knobs.PulseDuration, 0.5f),
-            Increment(Converter.Knobs.WidthMultiplier, 10.00f)
+            Enable(Converter.Flags.EventHorizon)
         ));
 
         // =====================================================================
@@ -183,6 +181,33 @@ public static class LeviathanStellarConverterTree
             Increment(Converter.Knobs.HeatGenerationPercent, 25f),
             Increment(Converter.Knobs.FinalRangePercent, 10f),
             Increment(Converter.Knobs.FinalDamagePercent, 10f)
+        ));
+
+        // =====================================================================
+        // STRUCTURAL CONDUCTION
+        // =====================================================================
+
+        tree.Add(Node(
+            "Conduction",
+            1,
+            Requires("Stellar Converter"),
+            "Stellar Converter deals +1% damage per active body segment.",
+            Enable(Converter.Flags.Conduction)
+        ));
+
+        tree.Add(Node(
+            "Internal Heat Sinks",
+            1,
+            Requires("Conduction"),
+            "Stellar Converter generates 10% less heat relative to its baseline.",
+            Increment(Converter.Knobs.HeatGenerationPercent, -10f)
+        ));
+
+        tree.Add(Keystone(
+            "Convergence",
+            Requires("Internal Heat Sinks"),
+            "Stellar Converter deals +10% damage per active tail. Each tail channels a secondary Converter beam into the head while charging and firing.",
+            Enable(Converter.Flags.Convergence)
         ));
 
         tree.Validate();

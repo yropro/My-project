@@ -16,7 +16,8 @@ public class LeviathanController : MonoBehaviour
 
     private GameShip currentPlayer;
     private GameShip builtForPlayer;
-    private int builtForUpgradeLevel;
+    private int builtForNonHeadSegments;
+    private bool builtForBifurcation;
     private Squadron activeLeviathanSquadron;
     private Coroutine growthRefreshCoroutine;
 
@@ -34,19 +35,11 @@ public class LeviathanController : MonoBehaviour
         }
 
         // Preserve the existing controller's "already built" fast path,
-        // but immediately schedule a clean rebuild if Growth changed on the
-        // same live player ship. This also catches rank changes that reach us
-        // through some path other than GameShip.SetUpgrade.
+        // but rebuild when the resolved Growth anatomy changes. Ordinary stat
+        // node changes do not reconstruct the physical chain.
         if (player == builtForPlayer)
         {
-            Pilot existingPilot = GameShip.GetPlayerSourcePilot(player);
-            int existingUpgradeLevel = existingPilot == null
-                ? builtForUpgradeLevel
-                : existingPilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade);
-
-            if (existingUpgradeLevel != builtForUpgradeLevel)
-                RequestGrowthRefresh(player);
-
+            RequestGrowthRefreshIfNeeded(player);
             return;
         }
 
@@ -59,7 +52,8 @@ public class LeviathanController : MonoBehaviour
 
         currentPlayer = player;
         builtForPlayer = null;
-        builtForUpgradeLevel = 0;
+        builtForNonHeadSegments = 0;
+        builtForBifurcation = false;
         activeLeviathanSquadron = null;
         segments.Clear();
         ClearCustomTemplateSlots();
@@ -75,45 +69,82 @@ public class LeviathanController : MonoBehaviour
             return;
         }
 
-        int upgradeLevel =
-            pilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade);
+        LeviathanSpecializationCurrency.MigrateLegacyGrowth(pilot);
 
-        if (upgradeLevel < 1)
+
+        LeviathanGrowth.ResolvedState growth =
+            LeviathanGrowth.GetResolvedState(player);
+
+        if (growth == null || !growth.Active)
         {
             RestorePlayerMass();
 
             Debug.Log(
-                "[Leviathan] Growth rank is 0; Leviathan inactive."
+                "[Leviathan] Evolution rank is 0; Leviathan inactive."
             );
             return;
         }
 
         Debug.Log(
-            "[Leviathan] Growth detected. Rank = " +
-            upgradeLevel
+            "[Leviathan] Leviathan chassis active. Growth tree active = " +
+            growth.TreeActive +
+            ", Segment budget = " +
+            growth.NonHeadSegments
         );
 
-        if (!TryCreateLeviathan(player, upgradeLevel))
+        if (!TryCreateLeviathan(player, growth))
             return;
 
-        ApplyPlayerMass(player, upgradeLevel);
+        ApplyPlayerMass(player, growth);
 
         builtForPlayer = player;
-        builtForUpgradeLevel = upgradeLevel;
+        builtForNonHeadSegments = growth.NonHeadSegments;
+        builtForBifurcation = growth.Bifurcation;
 
         Debug.Log(
-            "[Leviathan] Build complete. Rank = " +
-            upgradeLevel +
-            ", Segments = " +
+            "[Leviathan] Build complete. Segments = " +
             segments.Count +
             ", Mass multiplier = " +
-            GetMassMultiplier(upgradeLevel).ToString("0.00")
+            growth.MassMultiplier.ToString("0.00") +
+            ", Air resistance strength = " +
+            growth.AirResistanceStrength.ToString("0.000")
         );
+    }
+
+    public void RequestGrowthRefreshIfNeeded(GameShip player)
+    {
+        if (player == null || !IsCurrentPlayerShip(player))
+            return;
+
+        LeviathanGrowth.ResolvedState growth =
+            LeviathanGrowth.GetResolvedState(player);
+
+        int desiredSegments =
+            growth == null || !growth.Active
+                ? 0
+                : growth.NonHeadSegments;
+
+        bool desiredBifurcation =
+            growth != null && growth.Bifurcation;
+
+        if (player != builtForPlayer ||
+            desiredSegments != builtForNonHeadSegments ||
+            desiredBifurcation != builtForBifurcation)
+        {
+            RequestGrowthRefresh(player);
+            return;
+        }
+
+        // Stat-only Growth changes (Higgs/Ancient Wyrm, etc.) do not need to
+        // destroy/rebuild the chain, but mass is a stored Rigidbody value rather
+        // than a property getter, so refresh it explicitly.
+        if (growth != null && growth.Active)
+            ApplyPlayerMass(player, growth);
     }
 
     /// <summary>
     /// Rebuild the live Leviathan after Growth changes. Multiple changes in
-    /// quick succession are coalesced so only the final rank is constructed.
+    /// quick succession are coalesced so only the final resolved anatomy is constructed.
     /// </summary>
     public void RequestGrowthRefresh(GameShip player)
     {
@@ -130,8 +161,8 @@ public class LeviathanController : MonoBehaviour
 
     private IEnumerator RefreshGrowthRoutine(GameShip player)
     {
-        // Let the native SetUpgrade/UI transaction finish first. This also
-        // coalesces several rapid +/- clicks into one reconstruction.
+        // Let the native upgrade/specialization transaction finish first.
+        // This also coalesces several rapid changes into one reconstruction.
         yield return null;
 
         if (!IsCurrentPlayerShip(player))
@@ -196,7 +227,8 @@ public class LeviathanController : MonoBehaviour
 
         currentPlayer = player;
         builtForPlayer = null;
-        builtForUpgradeLevel = 0;
+        builtForNonHeadSegments = 0;
+        builtForBifurcation = false;
 
         for (int i = 0; i < oldSegments.Count; i++)
         {
@@ -223,6 +255,7 @@ public class LeviathanController : MonoBehaviour
     {
         LeviathanConstrictor.Tick(currentPlayer);
         LeviathanPredatorRuntime.FixedTick();
+        LeviathanGrowth.TickOwnerResources(currentPlayer);
         ApplyHighSpeedResistance();
     }
 
@@ -241,7 +274,8 @@ public class LeviathanController : MonoBehaviour
 
         currentPlayer = null;
         builtForPlayer = null;
-        builtForUpgradeLevel = 0;
+        builtForNonHeadSegments = 0;
+        builtForBifurcation = false;
         activeLeviathanSquadron = null;
         segments.Clear();
         ClearCustomTemplateSlots();
@@ -295,7 +329,7 @@ public class LeviathanController : MonoBehaviour
 
     private bool TryCreateLeviathan(
         GameShip player,
-        int upgradeLevel)
+        LeviathanGrowth.ResolvedState growth)
     {
         SquadronBase leviathanBase =
             Resources.FindObjectsOfTypeAll<SquadronBase>()
@@ -309,9 +343,9 @@ public class LeviathanController : MonoBehaviour
             return false;
         }
 
-        // LeviathanTest now contains the complete physical pool:
-        // head + 15 body slots + tail. We request that authored definition
-        // and trim only the unused body slots for the current skill rank.
+        // LeviathanTest is the authored seed pool: head + 15 body
+        // definitions + tail. Runtime anatomy is resolved entirely from Growth;
+        // extra body definitions are cloned when the specialization exceeds it.
         Squadron squadron =
             leviathanBase.GetSquadron(1);
 
@@ -335,8 +369,11 @@ public class LeviathanController : MonoBehaviour
             return false;
         }
 
-        if (!PrepareSquadronForRank(ships, upgradeLevel))
+        if (!PrepareSquadronForSegmentBudget(ships, growth.NonHeadSegments))
             return false;
+
+        if (growth.Bifurcation)
+            LeviathanSegmentTemplates.EnsureBifurcationDefaults();
 
         ApplySegmentTemplates(ships);
 
@@ -404,66 +441,128 @@ public class LeviathanController : MonoBehaviour
         return true;
     }
 
-    private bool PrepareSquadronForRank(
+    private bool PrepareSquadronForSegmentBudget(
         List<Squadron.SquadronShip> ships,
-        int upgradeLevel)
+        int desiredNonHeadSegments)
     {
         if (ships == null)
             return false;
 
-        // LeviathanTest is authored as a fixed 17-slot pool:
+        // LeviathanTest remains the authored seed pool:
         // [head, body1 ... body15, tail].
-        // Growth exposes the first N authored body slots for the current rank.
+        const int authoredBodyCount =
+            LeviathanGrowth.Tuning.AuthoredSeedBodySlots;
         const int expectedShipCount =
-            1 + LeviathanGrowth.MaxBodySegmentsInPrefab + 1;
+            1 + authoredBodyCount + 1;
 
         if (ships.Count != expectedShipCount)
         {
             Debug.LogError(
                 "[Leviathan] LeviathanTest must contain exactly " +
                 expectedShipCount +
-                " ships (head + 15 body + tail). Found " +
+                " authored ships (head + 15 body + tail). Found " +
                 ships.Count +
                 "."
             );
             return false;
         }
 
-        int effectiveRank = Mathf.Clamp(
-            upgradeLevel,
-            1,
-            LeviathanGrowth.MaxRank
+        int desiredSegments = Mathf.Clamp(
+            desiredNonHeadSegments,
+            2,
+            64
         );
 
-        int desiredBodyCount =
-            LeviathanGrowth.GetBodySegmentCountForRank(effectiveRank);
+        int desiredBodyCount = desiredSegments - 1;
 
-        int maxBodyCount =
-            LeviathanGrowth.MaxBodySegmentsInPrefab;
-
-        int firstUnusedBodyIndex = 1 + desiredBodyCount;
-        int unusedBodyCount = maxBodyCount - desiredBodyCount;
-
-        // The tail starts at the end of the list. Remove only the unused
-        // body entries immediately before it; the tail then slides into the
-        // correct final position for this rank.
-        if (unusedBodyCount > 0)
+        if (desiredBodyCount < authoredBodyCount)
         {
             ships.RemoveRange(
-                firstUnusedBodyIndex,
-                unusedBodyCount
+                1 + desiredBodyCount,
+                authoredBodyCount - desiredBodyCount
             );
+        }
+        else if (desiredBodyCount > authoredBodyCount)
+        {
+            Squadron.SquadronShip prototype = ships[authoredBodyCount];
+
+            for (int bodyNumber = authoredBodyCount + 1;
+                bodyNumber <= desiredBodyCount;
+                bodyNumber++)
+            {
+                Squadron.SquadronShip clone =
+                    CloneBodySlotDefinition(prototype);
+
+                if (clone == null)
+                {
+                    Debug.LogError(
+                        "[Leviathan] Could not clone a body definition for " +
+                        "segment " + bodyNumber + "."
+                    );
+                    return false;
+                }
+
+                // Keep the authored tail as the final list item.
+                ships.Insert(ships.Count - 1, clone);
+            }
         }
 
         Debug.Log(
-            "[Leviathan] Rank " +
-            upgradeLevel +
-            " using body segments 1-" +
+            "[Leviathan] Using " +
             desiredBodyCount +
-            " + tail."
+            " body segments + tail (" +
+            desiredSegments +
+            " non-head pieces)."
         );
 
         return true;
+    }
+
+    private static Squadron.SquadronShip CloneBodySlotDefinition(
+        Squadron.SquadronShip source)
+    {
+        if (source == null)
+            return null;
+
+        Squadron.SquadronShip result =
+            source.Clone() as Squadron.SquadronShip;
+
+        if (result == null)
+            return null;
+
+        // SquadronShip.Clone intentionally shares its NPC reference. Extra
+        // Growth slots need independent Ship definitions so Tail/Body numbered
+        // template overrides cannot mutate another slot that shares the NPC.
+        NPC sourceNpc = source.npc as NPC;
+
+        if (sourceNpc == null)
+            return null;
+
+        NPCBase npcBase = sourceNpc.GetNPCBase();
+
+        if (npcBase == null)
+            return null;
+
+        int level = 1;
+
+        if (sourceNpc.ship != null &&
+            sourceNpc.ship.pilot != null)
+        {
+            level = Mathf.Max(
+                1,
+                sourceNpc.ship.pilot.GetLevel(0)
+            );
+        }
+
+        result.npc = npcBase.GetNPC(level);
+
+        if (result.npc == null)
+            return null;
+
+        result.ship = null;
+        result.spawned = false;
+        result.temporary = true;
+        return result;
     }
 
     private void ApplySegmentTemplates(
@@ -484,8 +583,8 @@ public class LeviathanController : MonoBehaviour
 
         for (int i = 1; i < tailIndex; i++)
         {
-            // Numbered templates now map one-to-one to physical body slots:
-            // 1,2,3 at rank 1; 4,5,6 added at rank 2; ... up to 15.
+            // Numbered templates map one-to-one to resolved physical
+            // body positions; Body remains the generic fallback.
             int templateNumber = i;
 
             string serialized;
@@ -533,10 +632,14 @@ public class LeviathanController : MonoBehaviour
 
     private void ApplyPlayerMass(
         GameShip player,
-        int upgradeLevel)
+        LeviathanGrowth.ResolvedState growth)
     {
-        if (player == null || upgradeLevel < 1)
+        if (player == null ||
+            growth == null ||
+            !growth.Active)
+        {
             return;
+        }
 
         Rigidbody2D body = player.GetRigidBody();
 
@@ -560,7 +663,7 @@ public class LeviathanController : MonoBehaviour
             hasOriginalPlayerMass = true;
         }
 
-        body.mass = originalPlayerMass * GetMassMultiplier(upgradeLevel);
+        body.mass = originalPlayerMass * Mathf.Max(0.01f, growth.MassMultiplier);
     }
 
     private void RestorePlayerMass()
@@ -574,17 +677,22 @@ public class LeviathanController : MonoBehaviour
         hasOriginalPlayerMass = false;
     }
 
-    private static float GetMassMultiplier(int upgradeLevel)
-    {
-        return LeviathanGrowth.GetMassMultiplier(upgradeLevel);
-    }
 
     private void ApplyHighSpeedResistance()
     {
-        // This is intentionally player-only and Leviathan-only. NPCs and
-        // players without the Growth upgrade never pass these checks.
-        if (currentPlayer == null || builtForUpgradeLevel < 1)
+        // This is intentionally player-only and Leviathan-only.
+        if (currentPlayer == null || builtForPlayer != currentPlayer)
             return;
+
+        LeviathanGrowth.ResolvedState growth =
+            LeviathanGrowth.GetResolvedState(currentPlayer);
+
+        if (growth == null ||
+            !growth.Active ||
+            growth.AirResistanceStrength <= 0f)
+        {
+            return;
+        }
 
         // Native weapon lunges should not be damped by the Leviathan cruising
         // resistance curve. Predator explicitly uses GameShip.Lunge.
@@ -603,7 +711,7 @@ public class LeviathanController : MonoBehaviour
 
         Vector2 velocity = body.velocity;
         float speed = velocity.magnitude;
-        float resistanceStart = maxSpeed * LeviathanGrowth.ResistanceStartFraction;
+        float resistanceStart = maxSpeed * LeviathanGrowth.Tuning.AirResistanceStartFraction;
 
         if (speed <= resistanceStart)
             return;
@@ -618,7 +726,7 @@ public class LeviathanController : MonoBehaviour
         // as actual speed approaches the ship's theoretical MaxSpeed.
         float resistanceFactor = t * t;
         float decelerationPerSecond =
-            maxSpeed * LeviathanGrowth.ResistanceStrength * resistanceFactor;
+            maxSpeed * growth.AirResistanceStrength * resistanceFactor;
 
         body.velocity = Vector2.MoveTowards(
             velocity,
@@ -636,7 +744,7 @@ public class LeviathanController : MonoBehaviour
     {
         if (player == null ||
             player != currentPlayer ||
-            builtForUpgradeLevel < 1)
+            builtForPlayer != player)
         {
             return 0;
         }
@@ -649,7 +757,7 @@ public class LeviathanController : MonoBehaviour
     {
         if (player == null ||
             player != currentPlayer ||
-            builtForUpgradeLevel < 1)
+            builtForPlayer != player)
         {
             return 0;
         }
@@ -662,7 +770,9 @@ public class LeviathanController : MonoBehaviour
     {
         int segmentCount = GetActiveLeviathanSegmentCount(player);
 
-        // One attached segment is always the tail while Growth is active.
+        // Until forked Bifurcation topology is physically instantiated, the
+        // active squadron contains one terminal tail. Report the live physical
+        // body count rather than the future logical branch allocation.
         return segmentCount > 0
             ? segmentCount - 1
             : 0;

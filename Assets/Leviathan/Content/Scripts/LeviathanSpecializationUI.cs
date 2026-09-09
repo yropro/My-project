@@ -230,14 +230,17 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
             : 0;
 
         pointsText.text = canSpend
-            ? "Growth Points: " + available.ToString() +
+            ? LeviathanSpecializationCurrency.CurrencyName + ": " +
+              available.ToString() +
               " available / " + granted.ToString() +
-              " granted   |   Evolution " + evolutionRank.ToString() + "/5"
+              " granted   |   Evolution " + evolutionRank.ToString() +
+              "/" + LeviathanSpecializationCurrency.Levels.ToString()
             : "Spending disabled";
 
         statusText.text = canSpend
-            ? spent.ToString() +
-              " Growth Points invested. Unlock skill trees from Evolution; granted roots cost 0. F10 closes."
+            ? spent.ToString() + " " +
+              LeviathanSpecializationCurrency.CurrencyName +
+              " invested. Growth is automatic at Evolution rank 1; unlock other skill trees from Evolution. Granted roots cost 0. F10 closes."
             : "PERSISTENCE SAFETY MODE: " + pointReason;
 
         bool treeChanged = !string.Equals(
@@ -598,8 +601,10 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         }
         else
         {
-            text += "Cost: " + node.PointCostPerRank.ToString() +
-                " Growth Point" + (node.PointCostPerRank == 1 ? string.Empty : "s") +
+            text += "Cost: " + node.PointCostPerRank.ToString() + " " +
+                (node.PointCostPerRank == 1
+                    ? "Evolution Point"
+                    : "Evolution Points") +
                 " per rank\n";
         }
 
@@ -682,9 +687,9 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         Refresh();
 
         statusText.text = success
-            ? "Spent " + cost.ToString() + " Growth Point" +
+            ? "Spent " + cost.ToString() + " Evolution Point" +
               (cost == 1 ? string.Empty : "s") + " on " + nodeName + "."
-            : "Could not spend Growth Point: " + reason;
+            : "Could not spend Evolution Point: " + reason;
     }
 
     private void RefundSelected()
@@ -711,9 +716,9 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         Refresh();
 
         statusText.text = success
-            ? "Refunded " + cost.ToString() + " Growth Point" +
+            ? "Refunded " + cost.ToString() + " Evolution Point" +
               (cost == 1 ? string.Empty : "s") + " from " + nodeName + "."
-            : "Could not refund Growth Point: " + reason;
+            : "Could not refund Evolution Point: " + reason;
     }
 
     private Button CreateNodeButton(
