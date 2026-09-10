@@ -19,7 +19,7 @@ public static class LeviathanSkillSystem
     private const int PredatorLevels = 5;
     private const int BehemothLevels = 5;
     private const int StarfireLevels = 5;
-    private const int StellarConverterLevels = LeviathanStellarConverter.MaxRank;
+    private const int StellarConverterLevels = 1;
 
     private static readonly FieldInfo UpgradesField =
         AccessTools.Field(typeof(Upgrade), "upgrades");

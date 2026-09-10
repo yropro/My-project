@@ -10,7 +10,7 @@ using UnityEngine;
 /// Current responsibilities:
 /// - expose stable Growth knobs/flags for the tree,
 /// - resolve Growth once per Pilot/configuration,
-/// - provide one canonical non-head segment budget,
+/// - own canonical intended and live Leviathan anatomy,
 /// - capture fully resolved vanilla Heat Capacity + Heat Loss Time,
 /// - apply the 90% Leviathan thermal baseline before Growth modifiers,
 /// - bridge straightforward chassis stats through native getter boundaries,
@@ -19,12 +19,14 @@ using UnityEngine;
 /// - apply Gigantism through native ship-builder class-override semantics.
 ///
 /// Deliberately deferred to behavior-specific passes:
-/// forked Bifurcation attachment topology, Specialized Predator slot removal and
-/// purchase validation, Ancient Wyrm global crit/status hooks, Cold Blooded
+/// multi-head construction and deeper branched-body topology, Specialized Predator
+/// slot removal and purchase validation, Ancient Wyrm global crit/status hooks, Cold Blooded
 /// dynamic movement, Star Dragon/Supernova, and Coronal Mass Ejection.
 /// </summary>
 public static class LeviathanGrowth
 {
+    private const int AnatomyProbeRetryFrames = 10;
+
     public static class Tuning
     {
         // Vanilla modifiers are already inside the captured values. These
@@ -32,10 +34,17 @@ public static class LeviathanGrowth
         public const float BaselineMaxHeatMultiplier = 0.90f;
         public const float BaselineHeatDissipationMultiplier = 0.90f;
 
-        // Growth's granted root anatomy. "Segment" everywhere else means every
-        // Leviathan piece except the head, so the root starts at 2 segments.
+        // Root anatomy. A "segment" is a Body or Tail. Heads are not literal
+        // segments, although every Head after the primary Head contributes one
+        // ScalingSegment for ordinary "per segment" stat bonuses.
+        public const int RootHeads = 1;
         public const int RootBodySegments = 1;
         public const int RootTails = 1;
+        public const int RootSegmentCount = RootBodySegments + RootTails;
+        public const int RootTotalSectionCount =
+            RootHeads + RootBodySegments + RootTails;
+        public const int RootScalingSegmentCount =
+            RootTotalSectionCount - 1;
 
         // Segment-originated negative status protection. The chassis starts at
         // 20%, then gains +1 percentage point for every 2 Evolution Points spent
@@ -45,9 +54,11 @@ public static class LeviathanGrowth
         public const int SegmentDebuffDiscardPointsPerStep = 2;
         public const float SegmentDebuffDiscardPerStep = 0.01f;
 
-        // New Growth chassis scaling is authored per non-head segment. These
-        // values are rederived from the old full-Growth reference point:
-        // 16 non-head pieces (15 bodies + tail) = 3.0x player mass and
+        // Growth chassis scaling is authored per ScalingSegment. With one Head,
+        // this is identical to the historical non-head count. Future additional
+        // Heads count for scaling but remain ineligible for segment protections.
+        // These values are rederived from the old full-Growth reference point:
+        // 16 scaling segments (15 bodies + tail) = 3.0x player mass and
         // 0.65 MaxSpeed/sec high-speed resistance at the top of the curve.
         public const float InherentMassPercentPerSegment = 0.125f;
         public const float AirResistanceStrengthPerSegment = 0.65f / 16f;
@@ -74,10 +85,22 @@ public static class LeviathanGrowth
     public static class Knobs
     {
         // Anatomy.
-        public static readonly LeviathanSpecializationKnob AdditionalBodySegments =
+        // Adds physical section budget without prescribing a terminal role.
+        // Current growth nodes describe these as body segments because Body is
+        // the default residual role. Morphology nodes may reclassify that same
+        // budget into Heads/Tails without changing how many sections exist.
+        // Future terminal-granting nodes combine this with AdditionalHeads or
+        // AdditionalTails when they also add a new physical section.
+        public static readonly LeviathanSpecializationKnob AdditionalSections =
             LeviathanSpecializationKnob.Flat(
-                "growth.additional_body_segments",
-                "Body Segments"
+                "growth.additional_sections",
+                "Sections"
+            );
+
+        public static readonly LeviathanSpecializationKnob AdditionalHeads =
+            LeviathanSpecializationKnob.Flat(
+                "growth.additional_heads",
+                "Heads"
             );
 
         public static readonly LeviathanSpecializationKnob AdditionalTails =
@@ -301,14 +324,87 @@ public static class LeviathanGrowth
             );
     }
 
+    public enum AnatomyRole : byte
+    {
+        Unknown = 0,
+        Head = 1,
+        Body = 2,
+        Tail = 3
+    }
+
+    /// <summary>
+    /// Progression-derived anatomy requested from the builder. This is build
+    /// intent, not a claim that every requested section currently exists.
+    /// </summary>
+    public struct AnatomyIntent
+    {
+        public bool Active;
+        public bool TreeActive;
+        public bool TopologyFitsBudget;
+        public int HeadCount;
+        public int BodySegmentCount;
+        public int TailCount;
+        public int SegmentCount;
+        public int ScalingSegmentCount;
+        public int TotalSectionCount;
+    }
+
+    /// <summary>
+    /// Immutable live anatomy snapshot. Counts describe instantiated sections.
+    /// The primary Head is the player ship and is the only section excluded from
+    /// ScalingSegmentCount. Body and Tail are literal segments; every additional
+    /// Head contributes to scaling but never becomes segment-protection eligible.
+    /// </summary>
+    public sealed class AnatomySnapshot
+    {
+        public GameShip PrimaryHead { get; private set; }
+        public int Revision { get; private set; }
+        public bool PublishedByBuilder { get; private set; }
+        public int HeadCount { get; private set; }
+        public int BodySegmentCount { get; private set; }
+        public int TailCount { get; private set; }
+        public int SegmentCount { get; private set; }
+        public int ScalingSegmentCount { get; private set; }
+        public int TotalSectionCount { get; private set; }
+
+        private AnatomySnapshot()
+        {
+        }
+
+        internal static AnatomySnapshot Create(
+            GameShip primaryHead,
+            int revision,
+            bool publishedByBuilder,
+            int headCount,
+            int bodySegmentCount,
+            int tailCount)
+        {
+            AnatomySnapshot snapshot = new AnatomySnapshot();
+            snapshot.PrimaryHead = primaryHead;
+            snapshot.Revision = revision;
+            snapshot.PublishedByBuilder = publishedByBuilder;
+            snapshot.HeadCount = Mathf.Max(0, headCount);
+            snapshot.BodySegmentCount = Mathf.Max(0, bodySegmentCount);
+            snapshot.TailCount = Mathf.Max(0, tailCount);
+            snapshot.SegmentCount =
+                snapshot.BodySegmentCount + snapshot.TailCount;
+            snapshot.TotalSectionCount =
+                snapshot.HeadCount + snapshot.SegmentCount;
+            snapshot.ScalingSegmentCount = Mathf.Max(
+                0,
+                snapshot.TotalSectionCount -
+                    (snapshot.PrimaryHead == null ? 0 : 1));
+            return snapshot;
+        }
+    }
+
     public sealed class ResolvedState
     {
         public bool Active;
         public bool TreeActive;
 
-        public int BodySegments;
-        public int TailSegments;
-        public int NonHeadSegments;
+        public AnatomyIntent IntendedAnatomy;
+        public AnatomySnapshot Anatomy;
         public int GrowthTreePointsSpent;
         public float SegmentDebuffDiscardChance;
 
@@ -361,22 +457,62 @@ public static class LeviathanGrowth
         public int Revision;
     }
 
+    private sealed class AnatomyIntentCacheEntry
+    {
+        public GameShip Ship;
+        public int ConfigurationRevision;
+        public int EvolutionRank;
+        public AnatomyIntent Intent;
+    }
+
+    private sealed class AnatomyCacheEntry
+    {
+        public GameShip PrimaryHead;
+        public AnatomySnapshot Snapshot;
+        public bool PublishedByBuilder;
+        public int ConfigurationRevision;
+        public Squadron Squadron;
+        public int SquadronSlotCount;
+        public int NextProbeFrame;
+        public readonly List<GameShip> Heads = new List<GameShip>();
+        public readonly List<GameShip> Bodies = new List<GameShip>();
+        public readonly List<GameShip> Tails = new List<GameShip>();
+        public readonly Dictionary<GameShip, AnatomyRole> Roles =
+            new Dictionary<GameShip, AnatomyRole>();
+    }
+
     private sealed class ResolvedCacheEntry
     {
         public GameShip Ship;
         public int ConfigurationRevision;
         public int BaselineRevision;
         public int EvolutionRank;
+        public int AnatomyRevision;
         public ResolvedState State;
     }
 
     private static readonly Dictionary<GameShip, VanillaHeatBaseline> heatBaselines =
         new Dictionary<GameShip, VanillaHeatBaseline>();
 
+    private static readonly Dictionary<Pilot, AnatomyIntentCacheEntry>
+        anatomyIntentByPilot =
+            new Dictionary<Pilot, AnatomyIntentCacheEntry>();
+
+    private static readonly Dictionary<GameShip, AnatomyCacheEntry> anatomyByShip =
+        new Dictionary<GameShip, AnatomyCacheEntry>();
+
+    // Reverse membership makes section destruction/invalidation O(1). It also
+    // gives protection/damage systems one canonical owner lookup if needed.
+    private static readonly Dictionary<GameShip, GameShip> anatomyOwnerBySection =
+        new Dictionary<GameShip, GameShip>();
+
     private static readonly Dictionary<Pilot, ResolvedCacheEntry> resolvedByPilot =
         new Dictionary<Pilot, ResolvedCacheEntry>();
 
     private static int nextBaselineRevision;
+    private static int nextAnatomyRevision;
+
+    private static readonly AnatomySnapshot emptyAnatomy = CreateEmptyAnatomy();
 
     // Shared immutable fail-closed result for null/unsynchronized remote queries.
     // Avoid allocating one ResolvedState per presentation frame while a remote
@@ -390,30 +526,807 @@ public static class LeviathanGrowth
     private static bool handlingSpecializationInvalidation;
 
     // ---------------------------------------------------------------------
+    // Anatomy contract
+    // ---------------------------------------------------------------------
+
+    public static AnatomyIntent GetAnatomyIntent(GameShip ship)
+    {
+        Pilot pilot;
+        if (!TryGetSynchronizedPilot(ship, out pilot))
+            return new AnatomyIntent();
+
+        return GetAnatomyIntent(ship, pilot);
+    }
+
+    public static AnatomySnapshot GetAnatomy(GameShip ship)
+    {
+        Pilot pilot;
+        if (!TryGetSynchronizedPilot(ship, out pilot))
+            return emptyAnatomy;
+
+        AnatomyIntent intent = GetAnatomyIntent(ship, pilot);
+        if (!intent.Active)
+            return emptyAnatomy;
+
+        return GetOrBuildLiveAnatomy(ship, intent);
+    }
+
+    public static int GetHeadCount(GameShip ship)
+    {
+        return GetAnatomy(ship).HeadCount;
+    }
+
+    public static int GetBodySegmentCount(GameShip ship)
+    {
+        return GetAnatomy(ship).BodySegmentCount;
+    }
+
+    public static int GetTailCount(GameShip ship)
+    {
+        return GetAnatomy(ship).TailCount;
+    }
+
+    /// <summary>
+    /// Literal anatomical segments: Body + Tail. Heads are never segments for
+    /// hit/protection semantics.
+    /// </summary>
+    public static int GetSegmentCount(GameShip ship)
+    {
+        return GetAnatomy(ship).SegmentCount;
+    }
+
+    /// <summary>
+    /// Count used by ordinary "gain X per segment" stat scaling: every live
+    /// Leviathan section except the primary Head. Additional Heads therefore
+    /// contribute to scaling without becoming literal/protected segments.
+    /// </summary>
+    public static int GetScalingSegmentCount(GameShip ship)
+    {
+        return GetAnatomy(ship).ScalingSegmentCount;
+    }
+
+    public static int GetTotalSectionCount(GameShip ship)
+    {
+        return GetAnatomy(ship).TotalSectionCount;
+    }
+
+    public static AnatomyRole GetSectionRole(
+        GameShip owner,
+        GameShip section)
+    {
+        if (owner == null || section == null)
+            return AnatomyRole.Unknown;
+
+        AnatomyCacheEntry entry;
+        if (!TryGetLiveAnatomyEntry(owner, out entry))
+            return AnatomyRole.Unknown;
+
+        AnatomyRole role;
+        return entry.Roles.TryGetValue(section, out role)
+            ? role
+            : AnatomyRole.Unknown;
+    }
+
+    public static bool IsSegment(GameShip owner, GameShip section)
+    {
+        AnatomyRole role = GetSectionRole(owner, section);
+        return role == AnatomyRole.Body || role == AnatomyRole.Tail;
+    }
+
+    public static bool IsSegmentProtectionEligible(
+        GameShip owner,
+        GameShip section)
+    {
+        // Protection semantics are deliberately narrower than stat scaling.
+        // Additional Heads count toward ScalingSegmentCount but remain Heads.
+        return IsSegment(owner, section);
+    }
+
+    public static bool TryGetAnatomyOwner(
+        GameShip section,
+        out GameShip owner)
+    {
+        owner = null;
+        if (section == null)
+            return false;
+
+        return anatomyOwnerBySection.TryGetValue(section, out owner) &&
+            owner != null;
+    }
+
+    /// <summary>
+    /// Resolve a live section directly to its owning Leviathan and anatomical
+    /// role. Hit/protection systems should use this instead of reconstructing
+    /// ownership or inferring role from squadron order.
+    /// </summary>
+    public static bool TryGetSectionContext(
+        GameShip section,
+        out GameShip owner,
+        out AnatomyRole role)
+    {
+        owner = null;
+        role = AnatomyRole.Unknown;
+
+        if (!TryGetAnatomyOwner(section, out owner))
+            return false;
+
+        AnatomyCacheEntry entry;
+        if (!anatomyByShip.TryGetValue(owner, out entry) ||
+            entry == null ||
+            entry.Snapshot == null)
+        {
+            owner = null;
+            return false;
+        }
+
+        if (!entry.Roles.TryGetValue(section, out role) ||
+            role == AnatomyRole.Unknown)
+        {
+            owner = null;
+            role = AnatomyRole.Unknown;
+            return false;
+        }
+
+        return true;
+    }
+
+    public static AnatomyRole GetSectionRole(GameShip section)
+    {
+        GameShip owner;
+        AnatomyRole role;
+        return TryGetSectionContext(section, out owner, out role)
+            ? role
+            : AnatomyRole.Unknown;
+    }
+
+    public static bool IsHead(GameShip section)
+    {
+        return GetSectionRole(section) == AnatomyRole.Head;
+    }
+
+    public static bool IsBodySegment(GameShip section)
+    {
+        return GetSectionRole(section) == AnatomyRole.Body;
+    }
+
+    public static bool IsTail(GameShip section)
+    {
+        return GetSectionRole(section) == AnatomyRole.Tail;
+    }
+
+    public static bool IsPrimaryHead(GameShip section)
+    {
+        GameShip owner;
+        AnatomyRole role;
+        return TryGetSectionContext(section, out owner, out role) &&
+            role == AnatomyRole.Head &&
+            ReferenceEquals(section, owner);
+    }
+
+    public static bool IsAdditionalHead(GameShip section)
+    {
+        GameShip owner;
+        AnatomyRole role;
+        return TryGetSectionContext(section, out owner, out role) &&
+            role == AnatomyRole.Head &&
+            !ReferenceEquals(section, owner);
+    }
+
+    public static bool IsSegment(GameShip section)
+    {
+        AnatomyRole role = GetSectionRole(section);
+        return role == AnatomyRole.Body || role == AnatomyRole.Tail;
+    }
+
+    public static bool IsSegmentProtectionEligible(GameShip section)
+    {
+        return IsSegment(section);
+    }
+
+    public static void CollectHeadShips(
+        GameShip owner,
+        List<GameShip> output)
+    {
+        CollectRoleShips(owner, AnatomyRole.Head, output);
+    }
+
+    public static void CollectBodyShips(
+        GameShip owner,
+        List<GameShip> output)
+    {
+        CollectRoleShips(owner, AnatomyRole.Body, output);
+    }
+
+    public static void CollectTailShips(
+        GameShip owner,
+        List<GameShip> output)
+    {
+        CollectRoleShips(owner, AnatomyRole.Tail, output);
+    }
+
+    public static void CollectSegmentShips(
+        GameShip owner,
+        List<GameShip> output)
+    {
+        if (output == null)
+            return;
+
+        output.Clear();
+
+        AnatomyCacheEntry entry;
+        if (!TryGetLiveAnatomyEntry(owner, out entry))
+            return;
+
+        AppendShips(entry.Bodies, output);
+        AppendShips(entry.Tails, output);
+    }
+
+    public static void CollectScalingShips(
+        GameShip owner,
+        List<GameShip> output)
+    {
+        if (output == null)
+            return;
+
+        output.Clear();
+
+        AnatomyCacheEntry entry;
+        if (!TryGetLiveAnatomyEntry(owner, out entry))
+            return;
+
+        GameShip primaryHead = entry.Snapshot.PrimaryHead;
+        for (int i = 0; i < entry.Heads.Count; i++)
+        {
+            GameShip head = entry.Heads[i];
+            if (head != null && !ReferenceEquals(head, primaryHead))
+                output.Add(head);
+        }
+
+        AppendShips(entry.Bodies, output);
+        AppendShips(entry.Tails, output);
+    }
+
+    /// <summary>
+    /// Builder-owned atomic publication of live roles. The player ship is the
+    /// primary Head and is added automatically. Call this after a successful
+    /// build/rebuild, and call InvalidateLiveAnatomy before tearing topology down.
+    /// </summary>
+    public static bool PublishLiveAnatomy(
+        GameShip primaryHead,
+        IList<GameShip> additionalHeads,
+        IList<GameShip> bodySegments,
+        IList<GameShip> tails)
+    {
+        if (primaryHead == null)
+            return false;
+
+        AnatomyCacheEntry candidate = new AnatomyCacheEntry();
+        candidate.PrimaryHead = primaryHead;
+
+        if (!TryAddSection(candidate, primaryHead, AnatomyRole.Head) ||
+            !TryAddSections(candidate, additionalHeads, AnatomyRole.Head) ||
+            !TryAddSections(candidate, bodySegments, AnatomyRole.Body) ||
+            !TryAddSections(candidate, tails, AnatomyRole.Tail))
+        {
+            Debug.LogError(
+                "[Leviathan] Rejected live anatomy publication because a " +
+                "section was null, duplicated, or assigned multiple roles."
+            );
+            return false;
+        }
+
+        CommitLiveAnatomy(primaryHead, candidate, true);
+        return true;
+    }
+
+    public static void InvalidateLiveAnatomy(GameShip owner)
+    {
+        if (owner == null)
+            return;
+
+        RemoveAnatomyRecord(owner);
+        InvalidateResolvedState(owner);
+    }
+
+    private static bool TryGetLiveAnatomyEntry(
+        GameShip owner,
+        out AnatomyCacheEntry entry)
+    {
+        entry = null;
+        if (owner == null)
+            return false;
+
+        // Ensure the lazy native-replica path has had a chance to materialize.
+        GetAnatomy(owner);
+
+        return anatomyByShip.TryGetValue(owner, out entry) &&
+            entry != null &&
+            entry.Snapshot != null;
+    }
+
+    private static void CollectRoleShips(
+        GameShip owner,
+        AnatomyRole role,
+        List<GameShip> output)
+    {
+        if (output == null)
+            return;
+
+        output.Clear();
+
+        AnatomyCacheEntry entry;
+        if (!TryGetLiveAnatomyEntry(owner, out entry))
+            return;
+
+        if (role == AnatomyRole.Head)
+            AppendShips(entry.Heads, output);
+        else if (role == AnatomyRole.Body)
+            AppendShips(entry.Bodies, output);
+        else if (role == AnatomyRole.Tail)
+            AppendShips(entry.Tails, output);
+    }
+
+    private static void AppendShips(
+        List<GameShip> source,
+        List<GameShip> output)
+    {
+        if (source == null || output == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            GameShip ship = source[i];
+            if (ship != null)
+                output.Add(ship);
+        }
+    }
+
+    private static bool TryAddSections(
+        AnatomyCacheEntry entry,
+        IList<GameShip> sections,
+        AnatomyRole role)
+    {
+        if (sections == null)
+            return true;
+
+        for (int i = 0; i < sections.Count; i++)
+        {
+            if (!TryAddSection(entry, sections[i], role))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryAddSection(
+        AnatomyCacheEntry entry,
+        GameShip section,
+        AnatomyRole role)
+    {
+        if (entry == null || section == null || role == AnatomyRole.Unknown)
+            return false;
+
+        if (entry.Roles.ContainsKey(section))
+            return false;
+
+        entry.Roles.Add(section, role);
+
+        if (role == AnatomyRole.Head)
+            entry.Heads.Add(section);
+        else if (role == AnatomyRole.Body)
+            entry.Bodies.Add(section);
+        else if (role == AnatomyRole.Tail)
+            entry.Tails.Add(section);
+
+        return true;
+    }
+
+    private static AnatomyIntent GetAnatomyIntent(
+        GameShip ship,
+        Pilot pilot)
+    {
+        int configurationRevision =
+            LeviathanSpecializationRuntime.ConfigurationRevision;
+        int evolutionRank = pilot.GetUpgradeLevel(
+            LeviathanSpecializationCurrency.UpgradeKey
+        );
+
+        AnatomyIntentCacheEntry cached;
+        if (anatomyIntentByPilot.TryGetValue(pilot, out cached) &&
+            cached != null &&
+            cached.Ship == ship &&
+            cached.ConfigurationRevision == configurationRevision &&
+            cached.EvolutionRank == evolutionRank)
+        {
+            return cached.Intent;
+        }
+
+        AnatomyIntent intent = BuildAnatomyIntent(pilot, evolutionRank);
+
+        if (cached == null)
+        {
+            cached = new AnatomyIntentCacheEntry();
+            anatomyIntentByPilot[pilot] = cached;
+        }
+
+        cached.Ship = ship;
+        cached.ConfigurationRevision = configurationRevision;
+        cached.EvolutionRank = evolutionRank;
+        cached.Intent = intent;
+        return intent;
+    }
+
+    private static AnatomyIntent BuildAnatomyIntent(
+        Pilot pilot,
+        int evolutionRank)
+    {
+        AnatomyIntent intent = new AnatomyIntent();
+        if (pilot == null || evolutionRank < 1)
+            return intent;
+
+        intent.Active = true;
+        intent.TreeActive = LeviathanSpecializationRuntime.IsTreeUnlocked(
+            pilot,
+            LeviathanGrowthTree.TreeId
+        );
+
+        int additionalSections = intent.TreeActive
+            ? Mathf.Max(0, Mathf.RoundToInt(
+                LeviathanSpecializationRuntime.GetKnobFlat(
+                    pilot,
+                    Knobs.AdditionalSections)))
+            : 0;
+
+        int additionalHeads = intent.TreeActive
+            ? Mathf.Max(0, Mathf.RoundToInt(
+                LeviathanSpecializationRuntime.GetKnobFlat(
+                    pilot,
+                    Knobs.AdditionalHeads)))
+            : 0;
+
+        int additionalTails = intent.TreeActive
+            ? Mathf.Max(0, Mathf.RoundToInt(
+                LeviathanSpecializationRuntime.GetKnobFlat(
+                    pilot,
+                    Knobs.AdditionalTails)))
+            : 0;
+
+        int totalBudget =
+            Tuning.RootTotalSectionCount +
+            additionalSections;
+
+        int requestedHeads = Tuning.RootHeads + additionalHeads;
+        int requestedTails = Tuning.RootTails + additionalTails;
+
+        intent.TopologyFitsBudget =
+            requestedHeads >= 1 &&
+            requestedTails >= 0 &&
+            requestedHeads + requestedTails <= totalBudget;
+
+        if (!intent.TopologyFitsBudget)
+        {
+            Debug.LogError(
+                "[Leviathan] Growth anatomy intent exceeds its physical " +
+                "section budget. Requested heads=" + requestedHeads +
+                ", tails=" + requestedTails +
+                ", total sections=" + totalBudget + "."
+            );
+        }
+
+        // Stay fail-safe even if a future tree definition is authored
+        // incorrectly. The validation flag and error expose the content bug;
+        // clamping prevents negative body counts or invalid runtime geometry.
+        intent.HeadCount = Mathf.Clamp(
+            requestedHeads,
+            1,
+            Mathf.Max(1, totalBudget));
+
+        intent.TailCount = Mathf.Clamp(
+            requestedTails,
+            0,
+            Mathf.Max(0, totalBudget - intent.HeadCount));
+
+        intent.BodySegmentCount = Mathf.Max(
+            0,
+            totalBudget - intent.HeadCount - intent.TailCount);
+
+        intent.SegmentCount =
+            intent.BodySegmentCount + intent.TailCount;
+        intent.TotalSectionCount =
+            intent.HeadCount + intent.SegmentCount;
+        intent.ScalingSegmentCount =
+            Mathf.Max(0, intent.TotalSectionCount - 1);
+
+        return intent;
+    }
+
+    private static AnatomySnapshot GetOrBuildLiveAnatomy(
+        GameShip ship,
+        AnatomyIntent intent)
+    {
+        if (ship == null || !intent.Active)
+            return emptyAnatomy;
+
+        AnatomyCacheEntry cached;
+        if (!anatomyByShip.TryGetValue(ship, out cached) || cached == null)
+        {
+            cached = new AnatomyCacheEntry();
+            anatomyByShip[ship] = cached;
+        }
+
+        // Builder publication is the authoritative live topology. It remains
+        // valid until the builder explicitly invalidates/replaces it; a tree
+        // change describes new intent, not an already-completed rebuild.
+        if (cached.PublishedByBuilder && cached.Snapshot != null)
+            return cached.Snapshot;
+
+        Squadron squadron = ship.squadron;
+        List<Squadron.SquadronShip> slots =
+            squadron == null ? null : squadron.ships;
+        int slotCount = slots == null ? 0 : slots.Count;
+        int configurationRevision =
+            LeviathanSpecializationRuntime.ConfigurationRevision;
+
+        if (cached.Snapshot != null &&
+            cached.ConfigurationRevision == configurationRevision &&
+            ReferenceEquals(cached.Squadron, squadron) &&
+            cached.SquadronSlotCount == slotCount)
+        {
+            return cached.Snapshot;
+        }
+
+        // A configuration change invalidates a previous probe throttle. The
+        // cached live snapshot remains usable until a replacement can be proven.
+        if (cached.ConfigurationRevision != configurationRevision)
+            cached.NextProbeFrame = 0;
+
+        if (Time.frameCount < cached.NextProbeFrame)
+            return cached.Snapshot ?? emptyAnatomy;
+
+        // The current builder publishes a deterministic single-Head slot role
+        // layout: [primary Head, Body..., Tail...]. Remote replicas receive the
+        // same physical slot order plus synchronized anatomy intent, so Growth
+        // can classify live roles without replicating redundant counts or relying
+        // on the owner's private AttachedAIShip parent pointers. Multi-Head
+        // topology remains explicit-only until a verified forward-branch builder
+        // and replica representation exist.
+        if (intent.HeadCount != 1 ||
+            slots == null ||
+            slots.Count != intent.TotalSectionCount)
+        {
+            cached.ConfigurationRevision = configurationRevision;
+            cached.Squadron = squadron;
+            cached.SquadronSlotCount = slotCount;
+            cached.NextProbeFrame = Time.frameCount + AnatomyProbeRetryFrames;
+            return cached.Snapshot ?? emptyAnatomy;
+        }
+
+        // Before the first successful snapshot, reuse the cache entry itself as
+        // reconstruction scratch so a temporarily incomplete native replica does
+        // not allocate a new AnatomyCacheEntry every retry. Once a valid snapshot
+        // exists, rebuild into a separate candidate so failure cannot destroy the
+        // last proven live anatomy.
+        AnatomyCacheEntry candidate = cached.Snapshot == null
+            ? cached
+            : new AnatomyCacheEntry();
+
+        if (!TryBuildNativeReplicaAnatomy(ship, intent, candidate))
+        {
+            // TryBuildNativeReplicaAnatomy clears candidate state before probing.
+            // When candidate == cached there is no proven snapshot to preserve;
+            // retain the scratch buffers and only update the retry metadata.
+            cached.ConfigurationRevision = configurationRevision;
+            cached.Squadron = squadron;
+            cached.SquadronSlotCount = slotCount;
+            cached.NextProbeFrame = Time.frameCount + AnatomyProbeRetryFrames;
+            return cached.Snapshot ?? emptyAnatomy;
+        }
+
+        CommitLiveAnatomy(ship, candidate, false);
+        return candidate.Snapshot;
+    }
+
+    private static bool TryBuildNativeReplicaAnatomy(
+        GameShip primaryHead,
+        AnatomyIntent intent,
+        AnatomyCacheEntry entry)
+    {
+        if (entry == null)
+            return false;
+
+        ClearAnatomyEntry(entry);
+
+        if (primaryHead == null ||
+            intent.HeadCount != 1 ||
+            primaryHead.squadron == null ||
+            primaryHead.squadron.ships == null)
+        {
+            return false;
+        }
+
+        List<Squadron.SquadronShip> slots =
+            primaryHead.squadron.ships;
+
+        if (slots.Count != intent.TotalSectionCount ||
+            slots.Count < 2 ||
+            slots[0] == null ||
+            !ReferenceEquals(slots[0].ship, primaryHead))
+        {
+            return false;
+        }
+
+        entry.PrimaryHead = primaryHead;
+
+        if (!TryAddSection(entry, primaryHead, AnatomyRole.Head))
+            return false;
+
+        int bodyEndExclusive =
+            1 + intent.BodySegmentCount;
+
+        for (int i = 1; i < slots.Count; i++)
+        {
+            Squadron.SquadronShip slot = slots[i];
+            GameShip section = slot == null ? null : slot.ship;
+
+            if (section == null || ReferenceEquals(section, primaryHead))
+                return false;
+
+            AnatomyRole role = i < bodyEndExclusive
+                ? AnatomyRole.Body
+                : AnatomyRole.Tail;
+
+            if (!TryAddSection(entry, section, role))
+                return false;
+        }
+
+        return entry.Bodies.Count == intent.BodySegmentCount &&
+            entry.Tails.Count == intent.TailCount;
+    }
+
+    private static void ClearAnatomyEntry(AnatomyCacheEntry entry)
+    {
+        if (entry == null)
+            return;
+
+        entry.PrimaryHead = null;
+        entry.Snapshot = null;
+        entry.PublishedByBuilder = false;
+        entry.Heads.Clear();
+        entry.Bodies.Clear();
+        entry.Tails.Clear();
+        entry.Roles.Clear();
+    }
+
+    private static void CommitLiveAnatomy(
+        GameShip owner,
+        AnatomyCacheEntry entry,
+        bool publishedByBuilder)
+    {
+        if (owner == null || entry == null || entry.PrimaryHead == null)
+            return;
+
+        RemoveAnatomyRecord(owner);
+
+        unchecked
+        {
+            nextAnatomyRevision++;
+            if (nextAnatomyRevision == 0)
+                nextAnatomyRevision = 1;
+        }
+
+        AnatomySnapshot snapshot = AnatomySnapshot.Create(
+            entry.PrimaryHead,
+            nextAnatomyRevision,
+            publishedByBuilder,
+            entry.Heads.Count,
+            entry.Bodies.Count,
+            entry.Tails.Count
+        );
+        entry.Snapshot = snapshot;
+
+        entry.PublishedByBuilder = publishedByBuilder;
+        entry.ConfigurationRevision =
+            LeviathanSpecializationRuntime.ConfigurationRevision;
+        entry.Squadron = owner.squadron;
+        entry.SquadronSlotCount =
+            entry.Squadron == null || entry.Squadron.ships == null
+                ? 0
+                : entry.Squadron.ships.Count;
+        entry.NextProbeFrame = 0;
+        anatomyByShip[owner] = entry;
+
+        foreach (KeyValuePair<GameShip, AnatomyRole> pair in entry.Roles)
+        {
+            if (pair.Key != null)
+                anatomyOwnerBySection[pair.Key] = owner;
+        }
+
+        InvalidateResolvedState(owner);
+    }
+
+    private static void RemoveReverseMappings(
+        GameShip owner,
+        AnatomyCacheEntry entry)
+    {
+        if (owner == null || entry == null)
+            return;
+
+        foreach (KeyValuePair<GameShip, AnatomyRole> pair in entry.Roles)
+        {
+            GameShip section = pair.Key;
+            if (ReferenceEquals(section, null))
+                continue;
+
+            GameShip mappedOwner;
+            if (anatomyOwnerBySection.TryGetValue(section, out mappedOwner) &&
+                ReferenceEquals(mappedOwner, owner))
+            {
+                anatomyOwnerBySection.Remove(section);
+            }
+        }
+    }
+
+    private static void RemoveAnatomyRecord(GameShip owner)
+    {
+        if (owner == null)
+            return;
+
+        AnatomyCacheEntry entry;
+        if (anatomyByShip.TryGetValue(owner, out entry) && entry != null)
+            RemoveReverseMappings(owner, entry);
+
+        anatomyByShip.Remove(owner);
+    }
+
+    private static void InvalidateResolvedState(GameShip ship)
+    {
+        Pilot pilot = ship == null ? null : GameShip.GetPlayerSourcePilot(ship);
+        if (pilot != null)
+            resolvedByPilot.Remove(pilot);
+    }
+
+    private static bool TryGetSynchronizedPilot(
+        GameShip ship,
+        out Pilot pilot)
+    {
+        pilot = null;
+        if (ship == null)
+            return false;
+
+        pilot = GameShip.GetPlayerSourcePilot(ship);
+        if (pilot == null)
+            return false;
+
+        return IsLocalOwner(ship) ||
+            LeviathanNetwork.HasSynchronizedSpecialization(ship);
+    }
+
+    // ---------------------------------------------------------------------
     // Public resolved API
     // ---------------------------------------------------------------------
 
     public static ResolvedState GetResolvedState(GameShip ship)
     {
-        if (ship == null)
+        Pilot pilot;
+        if (!TryGetSynchronizedPilot(ship, out pilot))
             return inactiveState;
 
-        Pilot pilot = GameShip.GetPlayerSourcePilot(ship);
-        if (pilot == null)
+        AnatomyIntent intent = GetAnatomyIntent(ship, pilot);
+        if (!intent.Active)
             return inactiveState;
 
-        bool localOwner = IsLocalOwner(ship);
-        if (!localOwner && !LeviathanNetwork.HasSynchronizedSpecialization(ship))
-            return inactiveState;
+        AnatomySnapshot anatomy = GetOrBuildLiveAnatomy(ship, intent);
 
         VanillaHeatBaseline baseline;
         heatBaselines.TryGetValue(ship, out baseline);
 
         int baselineRevision = baseline == null ? 0 : baseline.Revision;
-        int configurationRevision = LeviathanSpecializationRuntime.ConfigurationRevision;
+        int configurationRevision =
+            LeviathanSpecializationRuntime.ConfigurationRevision;
         int evolutionRank = pilot.GetUpgradeLevel(
             LeviathanSpecializationCurrency.UpgradeKey
         );
+        int anatomyRevision = anatomy == null ? 0 : anatomy.Revision;
 
         ResolvedCacheEntry cached;
         if (resolvedByPilot.TryGetValue(pilot, out cached) &&
@@ -422,12 +1335,17 @@ public static class LeviathanGrowth
             cached.ConfigurationRevision == configurationRevision &&
             cached.BaselineRevision == baselineRevision &&
             cached.EvolutionRank == evolutionRank &&
+            cached.AnatomyRevision == anatomyRevision &&
             cached.State != null)
         {
             return cached.State;
         }
 
-        ResolvedState state = BuildResolvedState(pilot, baseline);
+        ResolvedState state = BuildResolvedState(
+            pilot,
+            baseline,
+            intent,
+            anatomy);
 
         if (cached == null)
         {
@@ -439,43 +1357,19 @@ public static class LeviathanGrowth
         cached.ConfigurationRevision = configurationRevision;
         cached.BaselineRevision = baselineRevision;
         cached.EvolutionRank = evolutionRank;
+        cached.AnatomyRevision = anatomyRevision;
         cached.State = state;
         return state;
     }
 
-    public static int GetBodySegmentCount(GameShip ship)
-    {
-        return GetResolvedState(ship).BodySegments;
-    }
-
-    // Narrow compile bridge for the current pre-rework Constrictor, which asks
-    // only for the old "rank 1" minimum-body baseline. There is no rank scaling
-    // behind this method anymore: positive input means the one-rank chassis
-    // baseline, zero means inactive. Remove this bridge with the Constrictor
-    // rework and use the live controller/resolved-state APIs instead.
-    public static int GetBodySegmentCountForRank(int rank)
-    {
-        return rank > 0 ? Tuning.RootBodySegments : 0;
-    }
-
-    public static int GetTailCount(GameShip ship)
-    {
-        return GetResolvedState(ship).TailSegments;
-    }
-
-    public static int GetNonHeadSegmentCount(GameShip ship)
-    {
-        return GetResolvedState(ship).NonHeadSegments;
-    }
-
     public static bool IsGrowthActive(GameShip ship)
     {
-        return GetResolvedState(ship).Active;
+        return GetAnatomyIntent(ship).Active;
     }
 
     public static bool IsGrowthTreeActive(GameShip ship)
     {
-        return GetResolvedState(ship).TreeActive;
+        return GetAnatomyIntent(ship).TreeActive;
     }
 
     public static float GetSegmentDebuffDiscardChance(GameShip ship)
@@ -715,23 +1609,21 @@ public static class LeviathanGrowth
 
     private static ResolvedState BuildResolvedState(
         Pilot pilot,
-        VanillaHeatBaseline baseline)
+        VanillaHeatBaseline baseline,
+        AnatomyIntent intent,
+        AnatomySnapshot anatomy)
     {
         ResolvedState state = CreateInactiveState();
 
-        if (pilot == null)
-            return state;
-
-        // Evolution is the single native Leviathan gateway. Growth is automatically
-        // unlocked at Evolution rank 1 and its root is derived/auto-granted.
-        if (pilot.GetUpgradeLevel(LeviathanSpecializationCurrency.UpgradeKey) < 1)
+        if (pilot == null || !intent.Active)
             return state;
 
         state.Active = true;
-        state.TreeActive = LeviathanSpecializationRuntime.IsTreeUnlocked(
-            pilot,
-            LeviathanGrowthTree.TreeId
-        );
+        state.TreeActive = intent.TreeActive;
+        state.IntendedAnatomy = intent;
+        state.Anatomy = anatomy ?? emptyAnatomy;
+
+        int scalingSegmentCount = state.Anatomy.ScalingSegmentCount;
 
         state.GrowthTreePointsSpent = state.TreeActive
             ? LeviathanSpecializationRuntime.GetTreeSpentPoints(
@@ -746,36 +1638,6 @@ public static class LeviathanGrowth
         state.SegmentDebuffDiscardChance = Mathf.Clamp01(
             Tuning.BaselineSegmentDebuffDiscardChance +
             discardSteps * Tuning.SegmentDebuffDiscardPerStep
-        );
-
-        int additionalBodies = state.TreeActive
-            ? Mathf.Max(
-                0,
-                Mathf.RoundToInt(
-                    LeviathanSpecializationRuntime.GetKnobFlat(
-                        pilot,
-                        Knobs.AdditionalBodySegments)
-                )
-            )
-            : 0;
-
-        // The Evolution-awakened Leviathan chassis always starts as one body segment + one tail.
-        // The specialization only adds to that baseline. Bifurcation redistributes
-        // the same total budget into two branches; it never grants a free segment.
-        state.NonHeadSegments =
-            Tuning.RootBodySegments +
-            Tuning.RootTails +
-            additionalBodies;
-
-        state.Bifurcation = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
-                pilot,
-                Flags.Bifurcation);
-
-        state.TailSegments = state.Bifurcation ? 2 : 1;
-        state.BodySegments = Mathf.Max(
-            0,
-            state.NonHeadSegments - state.TailSegments
         );
 
         if (baseline != null)
@@ -813,7 +1675,7 @@ public static class LeviathanGrowth
                 0f,
                 1f +
                 dissipationPercent +
-                dissipationPerSegmentPercent * state.NonHeadSegments
+                dissipationPerSegmentPercent * scalingSegmentCount
             );
 
             state.FinalMaxHeat = Mathf.Max(
@@ -864,7 +1726,7 @@ public static class LeviathanGrowth
                 pilot,
                 state.TreeActive,
                 Knobs.TurnSpeedPerSegmentPercent) *
-                state.NonHeadSegments
+                scalingSegmentCount
         );
 
         state.TopSpeedMultiplier = Mathf.Max(
@@ -875,7 +1737,7 @@ public static class LeviathanGrowth
                 pilot,
                 state.TreeActive,
                 Knobs.TopSpeedPerSegmentPercent) *
-                state.NonHeadSegments
+                scalingSegmentCount
         );
 
         state.BoostMultiplier = Mathf.Max(
@@ -885,7 +1747,7 @@ public static class LeviathanGrowth
                 pilot,
                 state.TreeActive,
                 Knobs.BoostPerSegmentPercent) *
-                state.NonHeadSegments
+                scalingSegmentCount
         );
 
         state.ArmorBonus =
@@ -897,7 +1759,7 @@ public static class LeviathanGrowth
                 pilot,
                 state.TreeActive,
                 Knobs.ArmorPerSegmentPoints) *
-                state.NonHeadSegments;
+                scalingSegmentCount;
 
         state.AllResistanceBonus =
             GrowthFlat(
@@ -912,18 +1774,18 @@ public static class LeviathanGrowth
                 pilot,
                 state.TreeActive,
                 Knobs.ShieldPerSegmentPercent) *
-                state.NonHeadSegments
+                scalingSegmentCount
         );
 
         float massPercent =
             Tuning.InherentMassPercentPerSegment *
-                state.NonHeadSegments +
+                scalingSegmentCount +
             GrowthPercentContribution(pilot, state.TreeActive, Knobs.MassPercent) +
             GrowthPercentContribution(
                 pilot,
                 state.TreeActive,
                 Knobs.MassPerSegmentPercent) *
-                state.NonHeadSegments;
+                scalingSegmentCount;
 
         state.MassMultiplier =
             Mathf.Max(0.01f, 1f + massPercent);
@@ -939,7 +1801,7 @@ public static class LeviathanGrowth
 
         state.AirResistanceStrength =
             Tuning.AirResistanceStrengthPerSegment *
-            state.NonHeadSegments *
+            scalingSegmentCount *
             airResistanceMultiplier;
 
         state.CritDamageBonus =
@@ -947,14 +1809,14 @@ public static class LeviathanGrowth
                 pilot,
                 state.TreeActive,
                 Knobs.CritDamagePerSegmentPercent) *
-            state.NonHeadSegments;
+            scalingSegmentCount;
 
         state.StatusChanceBonus =
             GrowthFlat(
                 pilot,
                 state.TreeActive,
                 Knobs.StatusChancePerSegmentPoints) *
-            state.NonHeadSegments;
+            scalingSegmentCount;
 
         state.GlobalDamageMultiplier =
             GrowthMultiplier(
@@ -978,6 +1840,11 @@ public static class LeviathanGrowth
                     Knobs.ShipSizeCategoryIncrease)
             )
         );
+
+        state.Bifurcation = state.TreeActive &&
+            LeviathanSpecializationRuntime.HasFlag(
+                pilot,
+                Flags.Bifurcation);
 
         state.ColdBlooded = state.TreeActive &&
             LeviathanSpecializationRuntime.HasFlag(
@@ -1067,9 +1934,22 @@ public static class LeviathanGrowth
             : 1f;
     }
 
+    private static AnatomySnapshot CreateEmptyAnatomy()
+    {
+        return AnatomySnapshot.Create(
+            null,
+            0,
+            false,
+            0,
+            0,
+            0
+        );
+    }
+
     private static ResolvedState CreateInactiveState()
     {
         ResolvedState state = new ResolvedState();
+        state.Anatomy = emptyAnatomy;
         state.AccelerationMultiplier = 1f;
         state.MobilityMultiplier = 1f;
         state.TurnSpeedMultiplier = 1f;
@@ -1120,11 +2000,8 @@ public static class LeviathanGrowth
 
             ClampLocalDefensiveResources(ship);
 
-            if (!LeviathanSpecializationCurrency.IsMigratingLegacyGrowth &&
-                LeviathanMod.Controller != null)
-            {
+            if (LeviathanMod.Controller != null)
                 LeviathanMod.Controller.RequestGrowthRefreshIfNeeded(ship);
-            }
         }
         finally
         {
@@ -1137,17 +2014,24 @@ public static class LeviathanGrowth
         if (ship == null)
             return;
 
+        GameShip owner;
+        if (anatomyOwnerBySection.TryGetValue(ship, out owner) && owner != null)
+        {
+            RemoveAnatomyRecord(owner);
+            InvalidateResolvedState(owner);
+        }
+        else
+        {
+            RemoveAnatomyRecord(ship);
+        }
+
         heatBaselines.Remove(ship);
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(ship);
         if (pilot != null)
         {
-            ResolvedCacheEntry cached;
-            if (resolvedByPilot.TryGetValue(pilot, out cached) &&
-                cached != null && cached.Ship == ship)
-            {
-                resolvedByPilot.Remove(pilot);
-            }
+            anatomyIntentByPilot.Remove(pilot);
+            resolvedByPilot.Remove(pilot);
         }
 
         if (suppressedHeatOverrideShip == ship)
@@ -1157,10 +2041,14 @@ public static class LeviathanGrowth
     public static void ResetRuntime()
     {
         heatBaselines.Clear();
+        anatomyIntentByPilot.Clear();
+        anatomyByShip.Clear();
+        anatomyOwnerBySection.Clear();
         resolvedByPilot.Clear();
         suppressedHeatOverrideShip = null;
         handlingSpecializationInvalidation = false;
         nextBaselineRevision = 0;
+        nextAnatomyRevision = 0;
     }
 
     // ---------------------------------------------------------------------

@@ -686,16 +686,12 @@ public static class LeviathanStarfireRuntime
 
     private static bool IsStarfireActive(GameShip player)
     {
-        if (!IsCurrentPlayer(player) || LeviathanMod.Controller == null)
+        if (!IsCurrentPlayer(player))
             return false;
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
-        if (pilot == null ||
-            !LeviathanGrowth.IsGrowthActive(player) ||
-            LeviathanMod.Controller.GetActiveSectionCount(player) < 3)
-        {
+        if (pilot == null || !LeviathanGrowth.IsGrowthActive(player))
             return false;
-        }
 
         return LeviathanSpecializationRuntime.IsTreeActive(
             pilot,

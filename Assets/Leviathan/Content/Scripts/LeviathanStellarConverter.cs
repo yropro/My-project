@@ -28,14 +28,12 @@ public static class LeviathanStellarConverterTuning
 
     // Baseline charge presentation.
     public const float ChargeOrbStartingSizeFraction = 0.05f;
-    public const float ChargeOrbOpacityMultiplier = 1.00f;
+    public const float ChargeOrbOpacityMultiplier = 0.70f;
 
-    // Structure-powered branch. These percentages add against the finished
-    // Stellar Converter baseline rather than multiplying one another.
-    public const float ConductionDamagePerBodySegment = 0.01f;
-    public const float ConvergenceDamagePerTail = 0.10f;
-    public const float ConvergenceFeederWidthFraction = 0.50f;
-    public const float ConvergenceFeederOpacityMultiplier = 1.00f;
+    // Structure presentation only. Mechanical per-body/per-tail values are
+    // ordinary specialization knobs authored by the tree.
+    public const float ConvergenceFeederWidthFraction = 0.20f;
+    public const float ConvergenceFeederOpacityMultiplier = 0.70f;
 
     // Existing Converter presentation/crit behavior retained by the new baseline.
     public const float BaselineCritChanceMultiplier = 1.10f;
@@ -43,29 +41,6 @@ public static class LeviathanStellarConverterTuning
     public const float BaselineDebuffChanceMultiplier = 1.00f;
     public const float BaselineBrightnessMultiplier = 0.91f;
     public const float HitboxWidthMultiplier = 1.20f;
-
-    // Historical targets used by the heavy branch.
-    public const float OldRank3ChargeSeconds = 1.50f;
-    public const float OldRank3PulseSeconds = 1.20f;
-    public const float OldRank3DamageMultiplier = 4.45f;
-    public const float OldRank3WidthMultiplier = 20.00f;
-    public const float OldRank3RangeMultiplier = 1.35f;
-
-    public const float OldRank5PulseSeconds = 1.40f;
-    public const float OldRank5DamageMultiplier = 4.90f;
-    public const float OldRank5WidthMultiplier = 35.00f;
-    public const float OldRank5RangeMultiplier = 1.50f;
-
-    // Deep Capacitors deliberately takes longer than historical rank 5. This
-    // damage multiplier preserves the old rank-5 cycle-average damage:
-    // 4.9 * 1.4 / (1.5 + 1.4) == 5.744827... * 1.4 / (2.0 + 1.4).
-    public const float DeepCapacitorsChargeSeconds = 2.00f;
-    public const float DeepCapacitorsDamageMultiplier = 5.744828f;
-
-    // Continuous Conversion hard overrides after ordinary tree modifiers.
-    public const float ContinuousDamageMultiplier = 1.00f;
-    public const float ContinuousWidthMultiplier = 2.00f;
-    public const float ContinuousRandomStatusChance = 0.05f;
 
     // Star Vortex displays 20 meters per Unity world unit.
     public const float WorldUnitsPerMeter = 1f / 20f;
@@ -167,6 +142,12 @@ public static class LeviathanStellarConverter
             LeviathanSpecializationKnob.Flat(
                 "stellar_converter.width_multiplier", "Width Multiplier", "x");
 
+        public static readonly LeviathanSpecializationKnob CritChanceMultiplier =
+            LeviathanSpecializationKnob.Flat(
+                "stellar_converter.crit_chance_multiplier",
+                "Critical Chance Multiplier",
+                "x");
+
         public static readonly LeviathanSpecializationKnob CritChance =
             LeviathanSpecializationKnob.PercentagePoints(
                 "stellar_converter.crit_chance", "Critical Chance");
@@ -174,6 +155,21 @@ public static class LeviathanStellarConverter
         public static readonly LeviathanSpecializationKnob StatusChance =
             LeviathanSpecializationKnob.PercentagePoints(
                 "stellar_converter.status_chance", "Status Chance");
+
+        public static readonly LeviathanSpecializationKnob RandomBasicStatusChance =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "stellar_converter.random_basic_status_chance",
+                "Random Basic Status Chance");
+
+        public static readonly LeviathanSpecializationKnob BodySegmentDamagePercent =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "stellar_converter.body_segment_damage_percent",
+                "Damage per Body Segment");
+
+        public static readonly LeviathanSpecializationKnob TailDamagePercent =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "stellar_converter.tail_damage_percent",
+                "Damage per Tail");
 
         public static readonly LeviathanSpecializationKnob ChainTargets =
             LeviathanSpecializationKnob.Flat(
@@ -313,118 +309,10 @@ public static class LeviathanStellarConverter
                 "stellar_converter.structure.convergence", "Convergence");
     }
 
-    // =========================================================================
-    // BALANCE TUNING
-    // =========================================================================
-    // Arrays are Rank 1 -> Rank 5.
-
-    public const int MaxRank = 5;
-
-    // Time the source Laser must be held before the burst commits.
-    private static readonly float[] ChargeDurationByRank =
-    {
-        1.50f, // Rank 1
-        1.50f, // Rank 2
-        1.50f, // Rank 3
-        1.50f, // Rank 4
-        1.50f  // Rank 5
-    };
-
-    // Once committed, native beam firing continues for this full duration.
-    private static readonly float[] OutputDurationByRank =
-    {
-        1.00f, // Rank 1
-        1.10f, // Rank 2
-        1.20f, // Rank 3
-        1.30f, // Rank 4
-        1.40f  // Rank 5
-    };
-
-    // Multiplier on the source Laser's complete native DamageData packet.
-    private static readonly float[] DamageMultiplierByRank =
-    {
-        4.000f, // Rank 1
-        4.225f, // Rank 2
-        4.450f, // Rank 3
-        4.675f, // Rank 4
-        4.900f  // Rank 5
-    };
-
-    // Multiplier on native crit chance while the burst is firing.
-    private static readonly float[] CritChanceMultiplierByRank =
-    {
-        1.10f, // Rank 1
-        1.10f, // Rank 2
-        1.10f, // Rank 3
-        1.10f, // Rank 4
-        1.10f  // Rank 5
-    };
-
-    // Multiplier on the native crit BONUS portion while the burst is firing.
-    private static readonly float[] CritDamageMultiplierByRank =
-    {
-        1.00f, // Rank 1
-        1.00f, // Rank 2
-        1.00f, // Rank 3
-        1.00f, // Rank 4
-        1.00f  // Rank 5
-    };
-
-    // Multiplier on native status/debuff chance while the burst is firing.
-    private static readonly float[] DebuffChanceMultiplierByRank =
-    {
-        1.00f, // Rank 1
-        1.00f, // Rank 2
-        1.00f, // Rank 3
-        1.00f, // Rank 4
-        1.00f  // Rank 5
-    };
-
-    // Multiplier on the source Laser's native MaxRange result, injected at the same
-    // Equippable.ApplyModifier(MaxRange) boundary used by Striker. Beam raycasts,
-    // chain range and drawing therefore inherit it through vanilla code.
-    private static readonly float[] LengthMultiplierByRank =
-    {
-        1.100f, // Rank 1
-        1.275f, // Rank 2
-        1.350f, // Rank 3
-        1.425f, // Rank 4
-        1.500f  // Rank 5
-    };
-
-    // Multiplier on visual beam width and the matching CircleCast radius.
-    private static readonly float[] WidthMultiplierByRank =
-    {
-        10.00f, // Rank 1
-        15.0f, // Rank 2
-        20.00f, // Rank 3
-        25.0f, // Rank 4
-        35.00f  // Rank 5
-    };
-
     // Extra mechanical width only. 1.20 = hitbox radius reaches 20% farther
     // from the beam centerline than the rendered beam edge.
     private const float HitboxWidthMultiplier =
         LeviathanStellarConverterTuning.HitboxWidthMultiplier;
-
-    // Visual brightness only. 1.0 = vanilla brightness.
-    private static readonly float[] BrightnessMultiplierByRank =
-    {
-    0.91f, // Rank 1
-    0.91f, // Rank 2
-    0.91f, // Rank 3
-    0.91f, // Rank 4
-    0.91f  // Rank 5
-    };
-
-    private static readonly bool[] PiercingByRank =
-    {
-    false, // Rank 1
-    false, // Rank 2
-    true, // Rank 3
-    true, // Rank 4
-    true  // Rank 5
-    };
 
     // =========================================================================
     // NATIVE MEMBERS
@@ -712,13 +600,10 @@ public static class LeviathanStellarConverter
 
         public GameObject blackHoleVisual;
         public Vector3 blackHoleBaseScale = Vector3.one;
-        public float blackHoleBaseVisualRadius;
         public GameObject haloVisual;
         public float haloVisualBaseRadius = 1f;
         public LineRenderer fallbackRing;
         public ExplosiveArea explosionVisual;
-        public Vector3 explosionVisualBaseScale = Vector3.one;
-        public float explosionVisualBaseRadius;
         public float explosionVisualTargetRadius;
         public readonly HashSet<GameShip> hitShips = new HashSet<GameShip>();
     }
@@ -774,18 +659,13 @@ public static class LeviathanStellarConverter
     {
         public int configurationRevision;
         public int registryRevision;
-        public int rank;
-        public int bodySegments;
-        public int tails;
+        public int anatomyRevision;
         public ResolvedState state;
     }
 
     private static readonly Dictionary<Pilot, ResolvedCacheEntry>
         ResolvedStateCache =
             new Dictionary<Pilot, ResolvedCacheEntry>();
-
-    private static readonly ResolvedState[] LegacyStateCache =
-        new ResolvedState[MaxRank + 1];
 
     private static readonly HashSet<GameShip> GravityTargetScratch =
         new HashSet<GameShip>();
@@ -801,68 +681,8 @@ public static class LeviathanStellarConverter
 
 
     // =========================================================================
-    // SOURCE / RANK
+    // SOURCE / SPECIALIZATION
     // =========================================================================
-
-    private static bool TryGetVisualRank(GameShip player, out int rank)
-    {
-        rank = 0;
-
-        if (player == null || !player.IsAnyPlayerShip())
-            return false;
-
-        Pilot pilot = GameShip.GetPlayerSourcePilot(player);
-        if (pilot == null ||
-            pilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade) < 1)
-        {
-            return false;
-        }
-
-        bool localOwner =
-            WorldController.instance != null &&
-            ReferenceEquals(
-                WorldController.instance.GetCurrentPlayerShip(),
-                player);
-
-        bool synchronizedRemote =
-            player.IsRemotePlayer() &&
-            LeviathanNetwork.HasSynchronizedSpecialization(player);
-
-        if ((localOwner || synchronizedRemote) &&
-            LeviathanSpecializationRuntime.IsTreeActive(
-                pilot,
-                LeviathanStellarConverterTree.TreeId))
-        {
-            rank = 1;
-            return true;
-        }
-
-        // Until the exact remote replica has received its transient tree, retain
-        // the legacy/native-rank presentation fallback.
-        rank = Mathf.Clamp(
-            pilot.GetUpgradeLevel(LeviathanMod.StellarConverterUpgrade),
-            0,
-            MaxRank);
-
-        return rank >= 1;
-    }
-
-
-    public static bool TryGetRank(GameShip player, out int rank)
-    {
-        rank = 0;
-
-        if (player == null ||
-            LeviathanMod.Controller == null ||
-            WorldController.instance == null ||
-            WorldController.instance.GetCurrentPlayerShip() != player ||
-            LeviathanMod.Controller.GetActiveSectionCount(player) < 5)
-        {
-            return false;
-        }
-
-        return TryGetVisualRank(player, out rank);
-    }
 
     public static Laser FindSourceLaser(GameShip player)
     {
@@ -945,15 +765,17 @@ public static class LeviathanStellarConverter
 
     private static bool TryGetContext(
         Laser laser,
-        out GameShip player,
-        out int rank)
+        out GameShip player)
     {
         player = laser == null ? null : laser.parentShip;
-        rank = 0;
 
         if (laser == null ||
             player == null ||
-            !TryGetRank(player, out rank))
+            WorldController.instance == null ||
+            !ReferenceEquals(
+                WorldController.instance.GetCurrentPlayerShip(),
+                player) ||
+            !IsSpecializationProfile(player))
         {
             return false;
         }
@@ -963,16 +785,14 @@ public static class LeviathanStellarConverter
 
     private static bool TryGetRemoteSourceContext(
         Laser laser,
-        out GameShip player,
-        out int rank)
+        out GameShip player)
     {
         player = laser == null ? null : laser.parentShip;
-        rank = 0;
 
         if (laser == null ||
             player == null ||
             !player.IsRemotePlayer() ||
-            !TryGetVisualRank(player, out rank))
+            !IsSpecializationProfile(player))
         {
             return false;
         }
@@ -980,12 +800,8 @@ public static class LeviathanStellarConverter
         return ReferenceEquals(FindSourceLaser(player), laser);
     }
 
-    private static bool IsFiringSource(
-        BeamWeapon beamWeapon,
-        out int rank)
+    private static bool IsFiringSource(BeamWeapon beamWeapon)
     {
-        rank = 0;
-
         Laser laser = beamWeapon as Laser;
         GameShip player;
 
@@ -994,27 +810,29 @@ public static class LeviathanStellarConverter
 
         if (ReferenceEquals(sourceLaser, laser) &&
             phase == Phase.Firing &&
-            TryGetContext(laser, out player, out rank))
+            TryGetContext(laser, out player))
         {
             return true;
         }
 
         RemoteState remoteState;
 
-        return TryGetRemoteSourceContext(laser, out player, out rank) &&
+        return TryGetRemoteSourceContext(laser, out player) &&
             RemoteStates.TryGetValue(laser, out remoteState) &&
             remoteState.phase == Phase.Firing;
     }
 
-
     private static bool IsSpecializationProfile(GameShip player)
     {
-        if (player == null)
+        if (player == null || !player.IsAnyPlayerShip())
             return false;
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
-        if (pilot == null)
+        if (pilot == null ||
+            pilot.GetUpgradeLevel(LeviathanSpecializationCurrency.UpgradeKey) < 1)
+        {
             return false;
+        }
 
         bool localOwner =
             WorldController.instance != null &&
@@ -1032,7 +850,6 @@ public static class LeviathanStellarConverter
                 LeviathanStellarConverterTree.TreeId);
     }
 
-
     private static float ApplyKnob(
         Pilot pilot,
         LeviathanSpecializationKnob knob,
@@ -1046,64 +863,25 @@ public static class LeviathanStellarConverter
                 baseValue);
     }
 
-    private static void GetStructureCounts(
-        GameShip player,
-        out int bodySegments,
-        out int tails)
-    {
-        bodySegments = 0;
-        tails = 0;
-
-        if (player == null)
-            return;
-
-        // The local controller is authoritative for the owner's live chain.
-        if (LeviathanMod.Controller != null &&
-            WorldController.instance != null &&
-            ReferenceEquals(
-                WorldController.instance.GetCurrentPlayerShip(),
-                player))
-        {
-            int sections =
-                LeviathanMod.Controller.GetActiveSectionCount(player);
-            bodySegments = Mathf.Max(
-                0,
-                LeviathanMod.Controller.GetActiveBodySegmentCount(player));
-            tails = Mathf.Max(0, sections - 1 - bodySegments);
-            return;
-        }
-
-        // Remote Leviathan replicas carry their actual built Squadron. The
-        // current authored format is [head, body..., tail], so no local
-        // LeviathanController state is required to reconstruct structure counts.
-        if (player.squadron == null || player.squadron.ships == null)
-            return;
-
-        int count = player.squadron.ships.Count;
-        if (count < 2)
-            return;
-
-        bodySegments = Mathf.Max(0, count - 2);
-        tails = 1;
-    }
-
-    private static ResolvedState GetResolvedState(GameShip player, int rank)
+    private static ResolvedState GetResolvedState(GameShip player)
     {
         if (!IsSpecializationProfile(player))
-            return BuildLegacyState(rank);
+            return null;
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
         if (pilot == null)
-            return BuildLegacyState(rank);
+            return null;
 
-        int bodySegments;
-        int tails;
-        GetStructureCounts(player, out bodySegments, out tails);
+        LeviathanGrowth.AnatomySnapshot anatomy =
+            LeviathanGrowth.GetAnatomy(player);
+        int bodySegments = anatomy.BodySegmentCount;
+        int tails = anatomy.TailCount;
 
         int configurationRevision =
             LeviathanSpecializationRuntime.ConfigurationRevision;
         int registryRevision =
             LeviathanSpecializationRegistry.Revision;
+        int anatomyRevision = anatomy.Revision;
 
         ResolvedCacheEntry cached;
         if (ResolvedStateCache.TryGetValue(pilot, out cached) &&
@@ -1111,9 +889,7 @@ public static class LeviathanStellarConverter
             cached.state != null &&
             cached.configurationRevision == configurationRevision &&
             cached.registryRevision == registryRevision &&
-            cached.rank == rank &&
-            cached.bodySegments == bodySegments &&
-            cached.tails == tails)
+            cached.anatomyRevision == anatomyRevision)
         {
             return cached.state;
         }
@@ -1156,8 +932,10 @@ public static class LeviathanStellarConverter
                 pilot,
                 Knobs.HeatGenerationPercent));
 
-        state.CritChanceMultiplier =
-            LeviathanStellarConverterTuning.BaselineCritChanceMultiplier;
+        state.CritChanceMultiplier = Mathf.Max(0f, ApplyKnob(
+            pilot,
+            Knobs.CritChanceMultiplier,
+            LeviathanStellarConverterTuning.BaselineCritChanceMultiplier));
         state.CritChanceBonus = LeviathanSpecializationRuntime.GetKnobFlat(
             pilot,
             Knobs.CritChance);
@@ -1168,6 +946,10 @@ public static class LeviathanStellarConverter
         state.DebuffChanceBonus = LeviathanSpecializationRuntime.GetKnobFlat(
             pilot,
             Knobs.StatusChance);
+        state.RandomBasicStatusChance = Mathf.Clamp01(
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.RandomBasicStatusChance));
         state.BrightnessMultiplier =
             LeviathanStellarConverterTuning.BaselineBrightnessMultiplier;
         state.ExtraChainTargets = Mathf.Max(
@@ -1205,22 +987,29 @@ public static class LeviathanStellarConverter
 
         if (state.Conduction)
         {
-            structureDamageBonus +=
-                bodySegments *
-                LeviathanStellarConverterTuning.ConductionDamagePerBodySegment;
+            float perBodySegment =
+                LeviathanSpecializationRuntime.GetKnobFlat(
+                    pilot,
+                    Knobs.BodySegmentDamagePercent);
+            structureDamageBonus += bodySegments * perBodySegment;
         }
 
         if (state.Convergence)
         {
-            structureDamageBonus +=
-                tails *
-                LeviathanStellarConverterTuning.ConvergenceDamagePerTail;
+            float perTail =
+                LeviathanSpecializationRuntime.GetKnobFlat(
+                    pilot,
+                    Knobs.TailDamagePercent);
+            structureDamageBonus += tails * perTail;
         }
 
-        if (structureDamageBonus > 0f)
+        if (!Mathf.Approximately(structureDamageBonus, 0f))
         {
-            // Join the ordinary additive final-damage bucket.
-            state.FinalDamageMultiplier += structureDamageBonus;
+            // Structural flags provide anatomy-dependent behavior only. Their
+            // numeric values are ordinary tree knobs in the shared damage bucket.
+            state.FinalDamageMultiplier = Mathf.Max(
+                0f,
+                state.FinalDamageMultiplier + structureDamageBonus);
             state.DamageMultiplier =
                 LeviathanStellarConverterTuning.BaselineDamageMultiplier *
                 state.FinalDamageMultiplier;
@@ -1317,31 +1106,8 @@ public static class LeviathanStellarConverter
         state.Piercing = LeviathanSpecializationRuntime.GetKnobFlat(
             pilot,
             Knobs.Piercing) >= 0.5f;
-        state.SuppressPiercing = state.Continuous || arcCascade || fractalCascade;
-
-        if (state.Continuous)
-        {
-            state.ChargeSeconds = 0f;
-
-            // Continuous has its own damage baseline and still inherits the
-            // structure branch. Ordinary FinalDamagePercent nodes remain
-            // intentionally overridden by Continuous's special profile.
-            state.DamageMultiplier =
-                LeviathanStellarConverterTuning.ContinuousDamageMultiplier *
-                (1f + structureDamageBonus);
-            state.FinalDamageMultiplier =
-                state.DamageMultiplier /
-                Mathf.Max(
-                    0.0001f,
-                    LeviathanStellarConverterTuning.BaselineDamageMultiplier);
-            state.WidthMultiplier =
-                LeviathanStellarConverterTuning.ContinuousWidthMultiplier;
-            state.CritChanceMultiplier = 1f;
-            state.Piercing = false;
-            state.SuppressPiercing = true;
-            state.RandomBasicStatusChance =
-                LeviathanStellarConverterTuning.ContinuousRandomStatusChance;
-        }
+        state.SuppressPiercing =
+            state.Continuous || arcCascade || fractalCascade;
 
         if (cached == null)
         {
@@ -1351,57 +1117,14 @@ public static class LeviathanStellarConverter
 
         cached.configurationRevision = configurationRevision;
         cached.registryRevision = registryRevision;
-        cached.rank = rank;
-        cached.bodySegments = bodySegments;
-        cached.tails = tails;
+        cached.anatomyRevision = anatomyRevision;
         cached.state = state;
         return state;
     }
 
-    private static ResolvedState BuildLegacyState(int rank)
+    private static ResolvedState GetResolvedState(Laser laser)
     {
-        int cacheRank = Mathf.Clamp(rank, 0, MaxRank);
-        ResolvedState cached = LegacyStateCache[cacheRank];
-        if (cached != null)
-            return cached;
-
-        ResolvedState state = new ResolvedState();
-        state.ChargeSeconds = GetRankValue(ChargeDurationByRank, rank);
-        state.PulseSeconds = GetRankValue(OutputDurationByRank, rank);
-        state.DamageMultiplier = GetRankValue(DamageMultiplierByRank, rank);
-        state.WidthMultiplier = GetRankValue(WidthMultiplierByRank, rank);
-        state.RangeMultiplier = GetRankValue(LengthMultiplierByRank, rank);
-        state.FinalDamageMultiplier = 1f;
-        state.FinalRangeMultiplier = 1f;
-        state.AdditionalHeatFraction = 0f;
-        state.CritChanceMultiplier = GetRankValue(
-            CritChanceMultiplierByRank,
-            rank);
-        state.CritDamageMultiplier = GetRankValue(
-            CritDamageMultiplierByRank,
-            rank);
-        state.DebuffChanceMultiplier = GetRankValue(
-            DebuffChanceMultiplierByRank,
-            rank);
-        state.BrightnessMultiplier = GetRankValue(
-            BrightnessMultiplierByRank,
-            rank);
-        state.Piercing = PiercingByRank[
-            Mathf.Clamp(rank - 1, 0, PiercingByRank.Length - 1)];
-        state.ManifestationCooldownSeconds = 0f;
-        state.GravityVelocityScaling =
-            LeviathanStellarConverterTuning.GravityVelocityScaling;
-        state.DyingStarMinimumDetonationScale =
-            LeviathanStellarConverterTuning.DyingStarMinimumDetonationScale;
-        state.DyingStarDetonationCurveExponent =
-            LeviathanStellarConverterTuning.DyingStarDetonationCurveExponent;
-        LegacyStateCache[cacheRank] = state;
-        return state;
-    }
-
-    private static ResolvedState GetResolvedState(Laser laser, int rank)
-    {
-        return GetResolvedState(laser == null ? null : laser.parentShip, rank);
+        return GetResolvedState(laser == null ? null : laser.parentShip);
     }
 
     private static bool IsManifestation(ResolvedState resolved)
@@ -1566,16 +1289,14 @@ public static class LeviathanStellarConverter
 
         Laser laser = activatable as Laser;
         GameShip player;
-        int rank;
-
         if (laser == null || laser.parentShip != inputStartShip)
             return false;
 
-        bool localSource = TryGetContext(laser, out player, out rank);
+        bool localSource = TryGetContext(laser, out player);
         bool remoteSource = false;
 
         if (!localSource)
-            remoteSource = TryGetRemoteSourceContext(laser, out player, out rank);
+            remoteSource = TryGetRemoteSourceContext(laser, out player);
 
         if (!localSource && !remoteSource)
             return false;
@@ -1593,7 +1314,7 @@ public static class LeviathanStellarConverter
                     laser,
                     existing.hasNetworkState &&
                     existing.phase == Phase.Firing &&
-                    IsRemoteBeamOutput(GetResolvedState(player, rank)));
+                    IsRemoteBeamOutput(GetResolvedState(player)));
             }
 
             return true;
@@ -1603,7 +1324,7 @@ public static class LeviathanStellarConverter
         {
             SelectSource(laser);
             inputHeld = true;
-            ResolvedState resolved = GetResolvedState(player, rank);
+            ResolvedState resolved = GetResolvedState(player);
 
             if (resolved.DyingStar && dyingStarNeedsRelease)
             {
@@ -1634,7 +1355,7 @@ public static class LeviathanStellarConverter
             laser,
             state.hasNetworkState &&
             state.phase == Phase.Firing &&
-            IsRemoteBeamOutput(GetResolvedState(player, rank)));
+            IsRemoteBeamOutput(GetResolvedState(player)));
         return true;
     }
 
@@ -1645,16 +1366,14 @@ public static class LeviathanStellarConverter
 
         Laser laser = activatable as Laser;
         GameShip player;
-        int rank;
-
         if (laser == null || laser.parentShip != inputStopShip)
             return false;
 
-        bool localSource = TryGetContext(laser, out player, out rank);
+        bool localSource = TryGetContext(laser, out player);
         bool remoteSource = false;
 
         if (!localSource)
-            remoteSource = TryGetRemoteSourceContext(laser, out player, out rank);
+            remoteSource = TryGetRemoteSourceContext(laser, out player);
 
         if (!localSource && !remoteSource)
             return false;
@@ -1672,7 +1391,7 @@ public static class LeviathanStellarConverter
                     laser,
                     existing.hasNetworkState &&
                     existing.phase == Phase.Firing &&
-                    IsRemoteBeamOutput(GetResolvedState(player, rank)));
+                    IsRemoteBeamOutput(GetResolvedState(player)));
             }
 
             return true;
@@ -1681,7 +1400,7 @@ public static class LeviathanStellarConverter
         if (localSource)
         {
             SelectSource(laser);
-            ResolvedState resolved = GetResolvedState(player, rank);
+            ResolvedState resolved = GetResolvedState(player);
 
             if (resolved.Continuous)
             {
@@ -1735,7 +1454,7 @@ public static class LeviathanStellarConverter
             laser,
             state.hasNetworkState &&
             state.phase == Phase.Firing &&
-            IsRemoteBeamOutput(GetResolvedState(player, rank)));
+            IsRemoteBeamOutput(GetResolvedState(player)));
         return true;
     }
 
@@ -1977,9 +1696,7 @@ public static class LeviathanStellarConverter
     public static void PrepareFixedUpdate(Laser laser)
     {
         GameShip player;
-        int rank;
-
-        if (TryGetContext(laser, out player, out rank))
+        if (TryGetContext(laser, out player))
         {
             if (IsTerminalStopped(player))
             {
@@ -1992,7 +1709,7 @@ public static class LeviathanStellarConverter
             }
 
             SelectSource(laser);
-            ResolvedState resolved = GetResolvedState(player, rank);
+            ResolvedState resolved = GetResolvedState(player);
             UpdateGravityProjectileShot();
 
             if (resolved.Continuous)
@@ -2018,7 +1735,7 @@ public static class LeviathanStellarConverter
             return;
         }
 
-        if (TryGetRemoteSourceContext(laser, out player, out rank))
+        if (TryGetRemoteSourceContext(laser, out player))
         {
             RemoteState state = GetRemoteState(laser);
 
@@ -2028,7 +1745,7 @@ public static class LeviathanStellarConverter
                 return;
             }
 
-            ResolvedState resolved = GetResolvedState(player, rank);
+            ResolvedState resolved = GetResolvedState(player);
             ReadRemoteNetworkState(
                 laser,
                 player,
@@ -2050,13 +1767,11 @@ public static class LeviathanStellarConverter
     public static void CompleteFixedUpdate(Laser laser)
     {
         GameShip player;
-        int rank;
-
         if (ReferenceEquals(sourceLaser, laser) &&
-            TryGetContext(laser, out player, out rank))
+            TryGetContext(laser, out player))
         {
-            AdvanceLocalState(laser, rank);
-            ResolvedState resolved = GetResolvedState(player, rank);
+            AdvanceLocalState(laser);
+            ResolvedState resolved = GetResolvedState(player);
             PublishNetworkState(resolved);
             UpdateConverterPresentation(
                 LocalPresentation,
@@ -2068,13 +1783,13 @@ public static class LeviathanStellarConverter
             return;
         }
 
-        if (TryGetRemoteSourceContext(laser, out player, out rank))
+        if (TryGetRemoteSourceContext(laser, out player))
         {
             RemoteState state;
             if (!RemoteStates.TryGetValue(laser, out state))
                 return;
 
-            ResolvedState resolved = GetResolvedState(player, rank);
+            ResolvedState resolved = GetResolvedState(player);
             UpdateConverterPresentation(
                 state.presentation,
                 laser,
@@ -2086,10 +1801,10 @@ public static class LeviathanStellarConverter
     }
 
 
-    private static void AdvanceLocalState(Laser laser, int rank)
+    private static void AdvanceLocalState(Laser laser)
     {
         GameShip player = laser == null ? null : laser.parentShip;
-        ResolvedState resolved = GetResolvedState(player, rank);
+        ResolvedState resolved = GetResolvedState(player);
 
         if (resolved.Continuous)
             return;
@@ -2339,7 +2054,6 @@ public static class LeviathanStellarConverter
 
         RemoteStates.Clear();
         ResolvedStateCache.Clear();
-        Array.Clear(LegacyStateCache, 0, LegacyStateCache.Length);
         manifestationShotSequence = 0;
         OriginalBeamColors.Clear();
 
@@ -2348,14 +2062,23 @@ public static class LeviathanStellarConverter
             UnityEngine.Object.Destroy(cachedGravityFallbackMaterial);
             cachedGravityFallbackMaterial = null;
         }
+
+        cachedBlackHoleVisualPrefab = null;
+        searchedBlackHoleVisualPrefab = false;
+        cachedNativeBlackHolePullPower = 0f;
+        cachedNativeBlackHolePullRadius = 0f;
+
+        cachedHaloFieldPrefab = null;
+        cachedHaloFieldRadius = 1f;
+        searchedHaloField = false;
+
+        cachedExplosiveAreaPrefab = null;
+        searchedExplosiveAreaPrefab = false;
     }
 
-    // Stellar deliberately toggles the native active flag across charge/output
-    // phases, so publish its actual input-held state on the network bit belonging
-    // to the selected source. Primary uses shared bit 0; Special uses its native
-    // activatable-index bit. Remote clients can then reconstruct the same cycle.
-
-
+    // Native active is an implementation detail of the selected Laser. Co-op
+    // presentation is published through LeviathanNetwork.SlotStellarConverter;
+    // remote replicas never infer Converter phase from native active bits.
 
     private static void SetNativeActive(Laser laser, bool active)
     {
@@ -2390,16 +2113,14 @@ public static class LeviathanStellarConverter
             return true;
 
         GameShip player;
-        int rank;
-
-        if (TryGetContext(laser, out player, out rank))
+        if (TryGetContext(laser, out player))
         {
             return ReferenceEquals(sourceLaser, laser) &&
                 phase == Phase.Firing &&
                 !IsTerminalStopped(player);
         }
 
-        if (TryGetRemoteSourceContext(laser, out player, out rank))
+        if (TryGetRemoteSourceContext(laser, out player))
         {
             // Remote Converter beams are reconstructed presentation only. The
             // owner already performs authoritative damage and hit registration.
@@ -2429,15 +2150,14 @@ public static class LeviathanStellarConverter
         if (player == null || GameShipHeatPerSecondField == null)
             return state;
 
-        int rank;
-        if (!TryGetRank(player, out rank))
+        if (!IsSpecializationProfile(player))
             return state;
 
         Laser laser = FindSourceLaser(player);
         if (laser == null || laser.durability == 0 || !laser.IsActive())
             return state;
 
-        ResolvedState resolved = GetResolvedState(player, rank);
+        ResolvedState resolved = GetResolvedState(player);
         if (Mathf.Approximately(resolved.AdditionalHeatFraction, 0f))
             return state;
 
@@ -2524,9 +2244,7 @@ public static class LeviathanStellarConverter
         BeamWeapon beamWeapon,
         ref DamageData[] damageData)
     {
-        int rank;
-
-        if (!IsFiringSource(beamWeapon, out rank) ||
+        if (!IsFiringSource(beamWeapon) ||
             damageData == null ||
             damageData.Length == 0)
         {
@@ -2534,7 +2252,7 @@ public static class LeviathanStellarConverter
         }
 
         Laser laser = beamWeapon as Laser;
-        float multiplier = GetResolvedState(laser, rank).DamageMultiplier;
+        float multiplier = GetResolvedState(laser).DamageMultiplier;
 
         if (Mathf.Approximately(multiplier, 1f))
             return;
@@ -2554,13 +2272,11 @@ public static class LeviathanStellarConverter
 
     public static void ScaleCritChance(BeamWeapon beamWeapon, ref float value)
     {
-        int rank;
-
-        if (!IsFiringSource(beamWeapon, out rank))
+        if (!IsFiringSource(beamWeapon))
             return;
 
         Laser laser = beamWeapon as Laser;
-        ResolvedState resolved = GetResolvedState(laser, rank);
+        ResolvedState resolved = GetResolvedState(laser);
         value = Mathf.Clamp01(
             value * resolved.CritChanceMultiplier + resolved.CritChanceBonus
         );
@@ -2568,31 +2284,27 @@ public static class LeviathanStellarConverter
 
     public static void ScaleCritModifier(BeamWeapon beamWeapon, ref float value)
     {
-        int rank;
-
-        if (!IsFiringSource(beamWeapon, out rank))
+        if (!IsFiringSource(beamWeapon))
             return;
 
         Laser laser = beamWeapon as Laser;
-        value *= GetResolvedState(laser, rank).CritDamageMultiplier;
+        value *= GetResolvedState(laser).CritDamageMultiplier;
     }
 
     public static void ScaleDebuffChance(BeamWeapon beamWeapon, ref float value)
     {
-        int rank;
-
-        if (!IsFiringSource(beamWeapon, out rank))
+        if (!IsFiringSource(beamWeapon))
             return;
 
         Laser laser = beamWeapon as Laser;
-        ResolvedState resolved = GetResolvedState(laser, rank);
+        ResolvedState resolved = GetResolvedState(laser);
         value = Mathf.Clamp01(
             value * resolved.DebuffChanceMultiplier + resolved.DebuffChanceBonus
         );
     }
 
     // Native Beam.DoDamageTick recomputes piercing every damage tick as
-    // basePiercing || GetJuggernautPiercing(). OR Stellar's rank flag into that
+    // basePiercing || GetJuggernautPiercing(). Apply Converter suppression to that
     // native decision so vanilla piercing damage, hit ordering, visuals, chaining
     // and attribution remain in control.
     public static BeamPiercingState PrepareBeamPiercing(Beam beam)
@@ -2602,9 +2314,8 @@ public static class LeviathanStellarConverter
             return state;
 
         Laser laser;
-        int rank;
-        if (!TryGetBeamContext(beam, out laser, out rank) ||
-            !GetResolvedState(laser, rank).SuppressPiercing)
+        if (!TryGetBeamContext(beam, out laser) ||
+            !GetResolvedState(laser).SuppressPiercing)
         {
             return state;
         }
@@ -2637,12 +2348,10 @@ public static class LeviathanStellarConverter
     public static void ScalePiercing(Beam beam, ref bool value)
     {
         Laser laser;
-        int rank;
-
-        if (!TryGetBeamContext(beam, out laser, out rank))
+        if (!TryGetBeamContext(beam, out laser))
             return;
 
-        ResolvedState resolved = GetResolvedState(laser, rank);
+        ResolvedState resolved = GetResolvedState(laser);
         if (resolved.SuppressPiercing)
         {
             value = false;
@@ -2662,14 +2371,13 @@ public static class LeviathanStellarConverter
             return;
 
         GameShip player;
-        int rank;
-        bool valid = TryGetContext(laser, out player, out rank);
+        bool valid = TryGetContext(laser, out player);
         if (!valid)
-            valid = TryGetRemoteSourceContext(laser, out player, out rank);
+            valid = TryGetRemoteSourceContext(laser, out player);
         if (!valid)
             return;
 
-        ResolvedState resolved = GetResolvedState(laser, rank);
+        ResolvedState resolved = GetResolvedState(laser);
         if (resolved.ExtraChainTargets > 0)
             value = resolved.ExtraChainTargets;
     }
@@ -2688,20 +2396,18 @@ public static class LeviathanStellarConverter
 
         Laser laser = equippable as Laser;
         GameShip player;
-        int rank;
-
         if (laser == null)
             return;
 
-        bool valid = TryGetContext(laser, out player, out rank);
+        bool valid = TryGetContext(laser, out player);
 
         if (!valid)
-            valid = TryGetRemoteSourceContext(laser, out player, out rank);
+            valid = TryGetRemoteSourceContext(laser, out player);
 
         if (!valid)
             return;
 
-        value *= GetResolvedState(laser, rank).RangeMultiplier;
+        value *= GetResolvedState(laser).RangeMultiplier;
     }
 
     // =========================================================================
@@ -2760,9 +2466,7 @@ public static class LeviathanStellarConverter
                     as LineRenderer;
 
         Laser laser;
-        int rank;
-
-        if (!TryGetBeamContext(beam, out laser, out rank))
+        if (!TryGetBeamContext(beam, out laser))
         {
             RestoreBeamBrightness(line);
             RestoreBeamBrightness(end);
@@ -2770,7 +2474,7 @@ public static class LeviathanStellarConverter
             return;
         }
 
-        ResolvedState resolved = GetResolvedState(laser, rank);
+        ResolvedState resolved = GetResolvedState(laser);
         float multiplier = resolved.WidthMultiplier;
         float brightness = resolved.BrightnessMultiplier;
 
@@ -2868,9 +2572,7 @@ public static class LeviathanStellarConverter
         radius = 0f;
 
         Laser laser;
-        int rank;
-
-        if (!TryGetBeamContext(beam, out laser, out rank))
+        if (!TryGetBeamContext(beam, out laser))
             return false;
 
         float baseWidth = GetFloat(BeamMaxWidthField, beam);
@@ -2886,7 +2588,7 @@ public static class LeviathanStellarConverter
         radius = 0.5f *
             baseWidth *
             GetVisualState(beam) *
-            GetResolvedState(laser, rank).WidthMultiplier *
+            GetResolvedState(laser).WidthMultiplier *
             HitboxWidthMultiplier;
 
         return radius > 0f;
@@ -2894,11 +2596,9 @@ public static class LeviathanStellarConverter
 
     private static bool TryGetBeamContext(
         Beam beam,
-        out Laser laser,
-        out int rank)
+        out Laser laser)
     {
         laser = null;
-        rank = 0;
 
         if (beam == null || BeamParentWeaponField == null)
             return false;
@@ -2906,7 +2606,7 @@ public static class LeviathanStellarConverter
         laser = BeamParentWeaponField.GetValue(beam) as Laser;
 
         return laser != null &&
-            IsFiringSource(laser, out rank);
+            IsFiringSource(laser);
     }
 
     private static float GetVisualState(Beam beam)
@@ -3253,27 +2953,7 @@ public static class LeviathanStellarConverter
         GameShip player,
         List<GameShip> output)
     {
-        if (output == null)
-            return;
-
-        output.Clear();
-
-        if (player == null ||
-            player.squadron == null ||
-            player.squadron.ships == null)
-        {
-            return;
-        }
-
-        List<Squadron.SquadronShip> ships = player.squadron.ships;
-        if (ships.Count < 2)
-            return;
-
-        // Current Leviathan squadron format is [head, body..., tail]. Reading
-        // the replica itself makes this work for both the owner and co-op peers.
-        Squadron.SquadronShip tailSlot = ships[ships.Count - 1];
-        if (tailSlot != null && tailSlot.ship != null)
-            output.Add(tailSlot.ship);
+        LeviathanGrowth.CollectTailShips(player, output);
     }
 
     private static void HideConvergenceFeeders(
@@ -4217,13 +3897,11 @@ public static class LeviathanStellarConverter
         {
             return;
         }
-
-        int rank;
         GameShip contextOwner;
-        if (!TryGetContext(source, out contextOwner, out rank))
+        if (!TryGetContext(source, out contextOwner))
             return;
 
-        ResolvedState resolved = GetResolvedState(contextOwner, rank);
+        ResolvedState resolved = GetResolvedState(contextOwner);
         float tickRate = GetBeamTickRateSeconds(owner, source);
         float integratedTicks = Mathf.Max(0f, resolved.PulseSeconds / tickRate);
 
@@ -4822,50 +4500,6 @@ public static class LeviathanStellarConverter
             baseScale * Mathf.Clamp(fallbackScale, 0.01f, 4f);
     }
 
-    private static float MeasureVisibleRadius(GameObject obj)
-    {
-        if (obj == null)
-            return 0f;
-
-        float radius = 0f;
-
-        // Sprite bounds are stable immediately and are preferable to particle
-        // bounds, which can be empty or enormous depending on simulation state.
-        SpriteRenderer[] sprites =
-            obj.GetComponentsInChildren<SpriteRenderer>(true);
-        for (int i = 0; i < sprites.Length; i++)
-        {
-            if (sprites[i] == null || !sprites[i].enabled)
-                continue;
-
-            Bounds bounds = sprites[i].bounds;
-            radius = Mathf.Max(
-                radius,
-                Mathf.Max(bounds.extents.x, bounds.extents.y));
-        }
-
-        if (radius > 0.0001f)
-            return radius;
-
-        Renderer[] renderers = obj.GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            Renderer renderer = renderers[i];
-            if (renderer == null || !renderer.enabled ||
-                renderer is ParticleSystemRenderer)
-            {
-                continue;
-            }
-
-            Bounds bounds = renderer.bounds;
-            radius = Mathf.Max(
-                radius,
-                Mathf.Max(bounds.extents.x, bounds.extents.y));
-        }
-
-        return radius;
-    }
-
     private static Material GetGravityFallbackMaterial()
     {
         if (cachedGravityFallbackMaterial != null)
@@ -5163,10 +4797,9 @@ public static class LeviathanStellarConverter
         gravityProjectileShot = null;
     }
 
-    // Continuous Conversion's extra random status is intentionally local-authority
-    // only for now. The specialization save itself is not network-synced, so remote
-    // victim authority cannot reconstruct this keystone safely. Native status chance
-    // bonuses still travel in the ordinary damage event in multiplayer.
+    // Continuous Conversion's extra random status remains local-authority-only.
+    // Remote Converter presentation never rolls gameplay, and remote-owned targets
+    // are rejected below rather than mutating a non-authoritative replica.
     public static void TryApplyContinuousRandomStatus(
         GameShip target,
         BeamWeapon sourceWeapon,
@@ -5177,11 +4810,10 @@ public static class LeviathanStellarConverter
             return;
 
         GameShip player;
-        int rank;
-        if (!TryGetContext(laser, out player, out rank))
+        if (!TryGetContext(laser, out player))
             return;
 
-        ResolvedState resolved = GetResolvedState(player, rank);
+        ResolvedState resolved = GetResolvedState(player);
         if (!resolved.Continuous || resolved.RandomBasicStatusChance <= 0f ||
             target.IsDrone() || target.health <= 0f)
         {
@@ -5243,14 +4875,6 @@ public static class LeviathanStellarConverter
             target.AddStatusEffect(effect);
     }
 
-    private static float GetRankValue(float[] values, int rank)
-    {
-        if (values == null || values.Length == 0)
-            return 0f;
-
-        int index = Mathf.Clamp(rank - 1, 0, values.Length - 1);
-        return values[index];
-    }
 }
 
 // =============================================================================

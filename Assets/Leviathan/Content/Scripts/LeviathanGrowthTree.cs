@@ -45,7 +45,7 @@ public static class LeviathanGrowthTree
         tree.Add(LeviathanNode.GrantedRoot(
             RootNodeId,
             "Growth 1",
-            "Evolution rank 1 awakens the Leviathan chassis with one body segment and one tail. Segment hits have 20% baseline debuff discard, plus 1 percentage point for every 2 Evolution Points spent in Growth. Maximum Heat Capacity and Heat Dissipation use the Leviathan 90% native baseline before Growth modifiers are applied."
+            "Evolution rank 1 awakens the Leviathan chassis with one body segment and one tail. Ordinary per-segment stat scaling counts every section except the primary head; segment protections apply only to body and tail sections. Segment hits have 20% baseline debuff discard, plus 1 percentage point for every 2 Evolution Points spent in Growth. Maximum Heat Capacity and Heat Dissipation use the Leviathan 90% native baseline before Growth modifiers are applied."
         ));
 
         tree.Add(Node(
@@ -56,7 +56,7 @@ public static class LeviathanGrowthTree
             1,
             "Gain 200 Hull and 2 body segments per rank.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.HullFlat, 200f),
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 2f)
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 2f)
         ));
 
         tree.Add(Node(
@@ -67,7 +67,7 @@ public static class LeviathanGrowthTree
             1,
             "Gain 5% maximum Heat Capacity and 1 body segment per rank.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.MaxHeatPercent, 5f),
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 1f)
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 1f)
         ));
 
         tree.Add(Node(
@@ -78,7 +78,7 @@ public static class LeviathanGrowthTree
             1,
             "Gain 5% Acceleration and 1 body segment per rank.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.AccelerationPercent, 5f),
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 1f)
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 1f)
         ));
 
         tree.Add(Node(
@@ -90,7 +90,7 @@ public static class LeviathanGrowthTree
                 LeviathanReq.Rank(CellDivisionId)
             ),
             1,
-            "Gain 5% Heat Dissipation plus 1% Heat Dissipation per non-head segment per rank.",
+            "Gain 5% Heat Dissipation plus 1% Heat Dissipation per segment per rank.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.HeatDissipationPercent, 5f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.HeatDissipationPerSegmentPercent, 1f)
         ));
@@ -103,7 +103,7 @@ public static class LeviathanGrowthTree
             1,
             "Gain 15 health regeneration per second and 1 body segment per rank.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.HealthRegenFlat, 15f),
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 1f)
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 1f)
         ));
 
         tree.Add(Node(
@@ -115,7 +115,7 @@ public static class LeviathanGrowthTree
                 LeviathanReq.Rank(EnhancedMusculatureId)
             ),
             1,
-            "Gain 0.75% Turn Speed per non-head segment and 5% Maneuverability.",
+            "Gain 0.75% Turn Speed per segment and 5% Maneuverability.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.TurnSpeedPerSegmentPercent, 0.75f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.MobilityPercent, 5f)
         ));
@@ -138,10 +138,10 @@ public static class LeviathanGrowthTree
             2,
             LeviathanReq.Rank(EnhancedMusculatureId),
             1,
-            "Gain 1.5% Top Speed and Boost per non-head segment and 1 body segment per rank.",
+            "Gain 1.5% Top Speed and Boost per segment and 1 body segment per rank.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.TopSpeedPerSegmentPercent, 1.5f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.BoostPerSegmentPercent, 1.5f),
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 1f)
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 1f)
         ));
 
         tree.Add(Node(
@@ -160,10 +160,10 @@ public static class LeviathanGrowthTree
             2,
             LeviathanReq.Rank(RedundantSystemsId),
             1,
-            "Gain 5% Armor, 1% Armor per non-head segment, and 1 body segment per rank.",
+            "Gain 5% Armor, 1% Armor per segment, and 1 body segment per rank.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.ArmorPoints, 5f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.ArmorPerSegmentPoints, 1f),
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 1f)
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 1f)
         ));
 
         tree.Add(Node(
@@ -183,10 +183,10 @@ public static class LeviathanGrowthTree
             2,
             LeviathanReq.Rank(RedundantSystemsId),
             1,
-            "Gain 5% all resistances, 1.5% Shield per non-head segment, and 1 body segment per rank.",
+            "Gain 5% all resistances, 1.5% Shield per segment, and 1 body segment per rank.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.AllResistancePoints, 5f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.ShieldPerSegmentPercent, 1.5f),
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 1f)
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 1f)
         ));
 
         tree.Add(Node(
@@ -196,7 +196,7 @@ public static class LeviathanGrowthTree
             LeviathanReq.Rank(RedundantSystemsId),
             1,
             "Gain 2 body segments per rank.",
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 2f)
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 2f)
         ));
 
         tree.Add(Node(
@@ -208,6 +208,7 @@ public static class LeviathanGrowthTree
             "Split your existing segment budget into two tail branches and gain 7.5% Turn Speed and 7.5% Maneuverability. Save Tail_a / Tail_b for branch-wide designs, Tail_aN / Tail_bN for numbered overrides, and BifurcateN for the final shared-body segment where the split occurs.",
             LeviathanFx.Increment(LeviathanGrowth.Knobs.TurnSpeedPercent, 7.5f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.MobilityPercent, 7.5f),
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalTails, 1f),
             LeviathanFx.Flag(LeviathanGrowth.Flags.Bifurcation)
         ));
 
@@ -240,8 +241,8 @@ public static class LeviathanGrowthTree
             1,
             LeviathanReq.Rank(ExpansionId),
             2,
-            "Gain 3 body segments, 2% Mass per non-head segment, 2% Critical Damage per non-head segment, and 0.75 percentage points of status chance per non-head segment.",
-            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalBodySegments, 3f),
+            "Gain 3 body segments, 2% Mass per segment, 2% Critical Damage per segment, and 0.75 percentage points of status chance per segment.",
+            LeviathanFx.Increment(LeviathanGrowth.Knobs.AdditionalSections, 3f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.MassPerSegmentPercent, 2f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.CritDamagePerSegmentPercent, 2f),
             LeviathanFx.Increment(LeviathanGrowth.Knobs.StatusChancePerSegmentPoints, 0.75f)

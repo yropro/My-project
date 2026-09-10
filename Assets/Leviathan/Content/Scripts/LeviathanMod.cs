@@ -18,14 +18,6 @@ public class LeviathanMod : IStarVortexMod
     public const Upgrade.Category LeviathanCategory =
         (Upgrade.Category)17;
 
-    // Native Growth no longer exists. Evolution is the single native Leviathan
-    // progression gateway. This temporary source alias keeps pre-rework sibling
-    // skills compiling while making their old Growth activation checks resolve
-    // against Evolution instead of a removed key-81 skill. Remove the alias as
-    // those skills are refactored onto LeviathanGrowth.IsGrowthActive().
-    public const Upgrade.Key GrowthUpgrade =
-        (Upgrade.Key)LeviathanSpecializationCurrency.UpgradeKeyValue;
-
     public const Upgrade.Key ConstrictorUpgrade =
         (Upgrade.Key)82;
 
@@ -1360,6 +1352,7 @@ public static class LeviathanSegmentStatusProtection
         public int playerId;
         public int attackerId;
         public StatusEffect.Type statusType;
+        public bool segmentProtectionEligible;
 
         public override int GetHashCode()
         {
@@ -1369,6 +1362,8 @@ public static class LeviathanSegmentStatusProtection
                 hash = hash * 31 + playerId;
                 hash = hash * 31 + attackerId;
                 hash = hash * 31 + (int)statusType;
+                hash = hash * 31 +
+                    (segmentProtectionEligible ? 1 : 0);
                 return hash;
             }
         }
@@ -1383,7 +1378,9 @@ public static class LeviathanSegmentStatusProtection
 
             return playerId == other.playerId &&
                 attackerId == other.attackerId &&
-                statusType == other.statusType;
+                statusType == other.statusType &&
+                segmentProtectionEligible ==
+                    other.segmentProtectionEligible;
         }
     }
 
@@ -1434,7 +1431,8 @@ public static class LeviathanSegmentStatusProtection
 
     public static bool ShouldTransferDirectStatus(
         GameShip player,
-        StatusEffect statusEffect)
+        StatusEffect statusEffect,
+        bool segmentProtectionEligible)
     {
         if (player == null ||
             statusEffect == null ||
@@ -1454,20 +1452,24 @@ public static class LeviathanSegmentStatusProtection
                 ? 0
                 : statusEffect.attacker.gameObject.GetInstanceID();
         key.statusType = statusEffect.GetStatusEffectType();
+        key.segmentProtectionEligible =
+            segmentProtectionEligible;
 
-        // Direct AddStatusEffect paths such as Wildfire can otherwise put the same
-        // debuff on many segments at once. Collapse those to one head opportunity.
+        // Direct AddStatusEffect paths such as Wildfire can otherwise apply the
+        // same debuff through many physical sections in one frame. Protected
+        // segments and vulnerable Heads use separate dedupe classes so a segment
+        // discard can never suppress an additional-Head hit.
         if (!DirectSeenThisFrame.Add(key))
             return false;
 
-        return !RollDiscard(player);
+        return !segmentProtectionEligible || !RollDiscard(player);
     }
 
     private static bool RollDiscard(GameShip player)
     {
-        // Growth no longer owns a legacy rank-based debuff discard path.
-        // Segment debuff protection belongs to Behemoth unless a future Growth
-        // specialization node explicitly introduces its own resolved knob.
+        // Growth owns the chassis/Growth-tree segment debuff discard chance;
+        // Behemoth contributes its own segment-specific protection. Both apply
+        // only when the hit section is actually eligible for segment protection.
         float discardChance =
             LeviathanGrowth.GetSegmentDebuffDiscardChance(player) +
             LeviathanBehemoth.GetSegmentDebuffDiscardChance(player);
@@ -2051,7 +2053,7 @@ public static class LeviathanSegmentTransferProtection
 }
 
 [HarmonyPatch(typeof(GameShip), "AddStatusEffect")]
-public static class LeviathanSegmentAddStatusEffectPatch
+public static class LeviathanSectionAddStatusEffectPatch
 {
     public static bool Prefix(
         GameShip __instance,
@@ -2064,17 +2066,30 @@ public static class LeviathanSegmentAddStatusEffectPatch
             return true;
         }
 
-        GameShip player =
-            LeviathanMod.Controller?.GetDamageRedirectTarget(__instance);
+        GameShip player;
+        LeviathanGrowth.AnatomyRole role;
 
-        if (player == null)
+        if (!LeviathanGrowth.TryGetSectionContext(
+                __instance,
+                out player,
+                out role) ||
+            player == null ||
+            ReferenceEquals(__instance, player))
+        {
             return true;
+        }
 
-        // Negative statuses never live on a Leviathan segment. Direct status
-        // application paths get one deduped/discardable opportunity on the head.
+        bool segmentProtectionEligible =
+            role == LeviathanGrowth.AnatomyRole.Body ||
+            role == LeviathanGrowth.AnatomyRole.Tail;
+
+        // Follower sections never retain their own negative statuses. Body/Tail
+        // transfers receive segment discard protection; additional Heads transfer
+        // the status without segment protection so head hits remain dangerous.
         if (LeviathanSegmentStatusProtection.ShouldTransferDirectStatus(
                 player,
-                __0))
+                __0,
+                segmentProtectionEligible))
         {
             StatusEffect transferred = __0.Clone() as StatusEffect;
 
@@ -2175,7 +2190,7 @@ public static class LeviathanSegmentSourceTuning
 }
 
 [HarmonyPatch]
-public static class LeviathanSegmentDamagePatch
+public static class LeviathanSectionDamagePatch
 {
     public static MethodBase TargetMethod()
     {
@@ -2206,85 +2221,104 @@ public static class LeviathanSegmentDamagePatch
         bool __6,
         ref bool __result)
     {
-        GameShip player =
-            LeviathanMod.Controller?.GetDamageRedirectTarget(__instance);
+        GameShip player;
+        LeviathanGrowth.AnatomyRole role;
 
-        if (player == null)
+        if (!LeviathanGrowth.TryGetSectionContext(
+                __instance,
+                out player,
+                out role) ||
+            player == null ||
+            ReferenceEquals(__instance, player))
+        {
             return true;
-
-        if (!LeviathanSegmentDamageLimiter.AllowSegmentDamage(
-                __instance,
-                player,
-                __0,
-                __5))
-        {
-            __result = false;
-            return false;
         }
 
-        float multiplier =
-            LeviathanBehemoth.GetSegmentDamageMultiplier(player);
+        bool segmentProtectionEligible =
+            role == LeviathanGrowth.AnatomyRole.Body ||
+            role == LeviathanGrowth.AnatomyRole.Tail;
 
-        DamageData[] scaledDamage =
-            ScaleDamageData(__1, multiplier);
+        DamageData[] redirectedDamage = __1;
+        float finalMultiplier = 1f;
+        bool haloSource = false;
 
-        bool haloSource =
-            LeviathanSegmentSourceTuning.IsHaloSource(
-                __instance,
-                __5
-            );
-
-        // Final transfer check: after all normal segment scaling has already
-        // been applied, halve the resulting redirected damage if the source
-        // was a Halo. Direct head hits never pass through this path.
-        if (haloSource)
+        if (segmentProtectionEligible)
         {
-            scaledDamage = ScaleDamageData(
-                scaledDamage,
-                LeviathanSegmentSourceTuning
-                    .EnemyHaloTransferredDamageMultiplier
-            );
-        }
+            if (!LeviathanSegmentDamageLimiter.AllowSegmentDamage(
+                    __instance,
+                    player,
+                    __0,
+                    __5))
+            {
+                __result = false;
+                return false;
+            }
 
-        scaledDamage =
-            LeviathanSegmentTransferProtection.LimitDamageData(
-                player,
-                __0,
-                scaledDamage,
-                __5
+            finalMultiplier =
+                LeviathanBehemoth.GetSegmentDamageMultiplier(player);
+
+            redirectedDamage = ScaleDamageData(
+                redirectedDamage,
+                finalMultiplier
             );
 
-        LeviathanSegmentSourceTuning.LogSource(
-            __instance,
-            __5,
-            __0,
-            __1,
-            haloSource
-                ? multiplier *
+            haloSource =
+                LeviathanSegmentSourceTuning.IsHaloSource(
+                    __instance,
+                    __5
+                );
+
+            if (haloSource)
+            {
+                finalMultiplier *=
+                    LeviathanSegmentSourceTuning
+                        .EnemyHaloTransferredDamageMultiplier;
+
+                redirectedDamage = ScaleDamageData(
+                    redirectedDamage,
                     LeviathanSegmentSourceTuning
                         .EnemyHaloTransferredDamageMultiplier
-                : multiplier,
-            haloSource
-        );
+                );
+            }
 
-        float statusEffectChance =
-            LeviathanSegmentStatusProtection.FilterStatusEffectChance(
+            redirectedDamage =
+                LeviathanSegmentTransferProtection.LimitDamageData(
+                    player,
+                    __0,
+                    redirectedDamage,
+                    __5
+                );
+
+            LeviathanSegmentSourceTuning.LogSource(
+                __instance,
+                __5,
+                __0,
+                __1,
+                finalMultiplier,
+                haloSource
+            );
+        }
+
+        float statusEffectChance = segmentProtectionEligible
+            ? LeviathanSegmentStatusProtection.FilterStatusEffectChance(
                 player,
                 __0,
                 __2,
                 __4,
                 __5
-            );
+            )
+            : __2;
 
         CopyDamageAttribution(__instance, player);
 
-        float combinedHealthBefore =
-            LeviathanSegmentTransferProtection
-                .CaptureCurrentCombinedHealth(player);
+        float combinedHealthBefore = segmentProtectionEligible
+            ? LeviathanSegmentTransferProtection
+                .CaptureCurrentCombinedHealth(player)
+            : 0f;
 
         __result = player.Damage(
             __0,
-            scaledDamage,
+            redirectedDamage,
             statusEffectChance,
             __3,
             __4,
@@ -2292,35 +2326,38 @@ public static class LeviathanSegmentDamagePatch
             true
         );
 
-        LeviathanSegmentTransferProtection.RecordActualDamage(
-            player,
-            combinedHealthBefore
-        );
+        if (segmentProtectionEligible)
+        {
+            LeviathanSegmentTransferProtection.RecordActualDamage(
+                player,
+                combinedHealthBefore
+            );
+        }
 
         return false;
     }
 
     private static void CopyDamageAttribution(
-        GameShip segment,
+        GameShip section,
         GameShip player)
     {
-        if (segment == null || player == null)
+        if (section == null || player == null)
             return;
 
         player.lastDamagedByWeaponName =
-            segment.lastDamagedByWeaponName;
+            section.lastDamagedByWeaponName;
         player.lastDamagedByShipName =
-            segment.lastDamagedByShipName;
+            section.lastDamagedByShipName;
         player.lastDamagedByFaction =
-            segment.lastDamagedByFaction;
+            section.lastDamagedByFaction;
     }
 
     private static DamageData[] ScaleDamageData(
         DamageData[] source,
         float multiplier)
     {
-        if (source == null)
-            return null;
+        if (source == null || Mathf.Approximately(multiplier, 1f))
+            return source;
 
         DamageData[] scaled = new DamageData[source.Length];
 
@@ -2337,7 +2374,7 @@ public static class LeviathanSegmentDamagePatch
 }
 
 [HarmonyPatch]
-public static class LeviathanSegmentDirectDamagePatch
+public static class LeviathanSectionDirectDamagePatch
 {
     public static MethodBase TargetMethod()
     {
@@ -2360,31 +2397,45 @@ public static class LeviathanSegmentDirectDamagePatch
         bool __2,
         ref bool __result)
     {
-        GameShip player =
-            LeviathanMod.Controller?.GetDamageRedirectTarget(__instance);
+        GameShip player;
+        LeviathanGrowth.AnatomyRole role;
 
-        if (player == null)
+        if (!LeviathanGrowth.TryGetSectionContext(
+                __instance,
+                out player,
+                out role) ||
+            player == null ||
+            ReferenceEquals(__instance, player))
+        {
             return true;
+        }
 
-        float multiplier =
-            LeviathanBehemoth.GetSegmentDamageMultiplier(player);
+        bool segmentProtectionEligible =
+            role == LeviathanGrowth.AnatomyRole.Body ||
+            role == LeviathanGrowth.AnatomyRole.Tail;
 
-        float redirectedDamage =
-            __1 * multiplier;
+        float redirectedDamage = __1;
 
-        redirectedDamage =
-            LeviathanSegmentTransferProtection.LimitDirectDamage(
-                player,
-                __0,
-                redirectedDamage
-            );
+        if (segmentProtectionEligible)
+        {
+            redirectedDamage *=
+                LeviathanBehemoth.GetSegmentDamageMultiplier(player);
+
+            redirectedDamage =
+                LeviathanSegmentTransferProtection.LimitDirectDamage(
+                    player,
+                    __0,
+                    redirectedDamage
+                );
+        }
 
         player.lastDirectDamageSourceName =
             __instance.lastDirectDamageSourceName;
 
-        float combinedHealthBefore =
-            LeviathanSegmentTransferProtection
-                .CaptureCurrentCombinedHealth(player);
+        float combinedHealthBefore = segmentProtectionEligible
+            ? LeviathanSegmentTransferProtection
+                .CaptureCurrentCombinedHealth(player)
+            : 0f;
 
         __result = player.DirectDamage(
             __0,
@@ -2392,10 +2443,13 @@ public static class LeviathanSegmentDirectDamagePatch
             true
         );
 
-        LeviathanSegmentTransferProtection.RecordActualDamage(
-            player,
-            combinedHealthBefore
-        );
+        if (segmentProtectionEligible)
+        {
+            LeviathanSegmentTransferProtection.RecordActualDamage(
+                player,
+                combinedHealthBefore
+            );
+        }
 
         return false;
     }
@@ -2506,12 +2560,18 @@ public static class LeviathanAttachedAIShipPatch
     {
         __state = LeviathanAttachmentNormalizer.Begin(__instance);
 
+        GameShip anatomyOwner;
+        LeviathanGrowth.AnatomyRole anatomyRole;
+
         if (__state == null &&
             ___gameShip != null &&
-            LeviathanMod.Controller != null &&
-            LeviathanMod.Controller.GetDamageRedirectTarget(
-                ___gameShip
-            ) != null)
+            LeviathanGrowth.TryGetSectionContext(
+                ___gameShip,
+                out anatomyOwner,
+                out anatomyRole) &&
+            anatomyRole != LeviathanGrowth.AnatomyRole.Unknown &&
+            anatomyOwner != null &&
+            !ReferenceEquals(___gameShip, anatomyOwner))
         {
             __state =
                 LeviathanAttachmentNormalizer.CreateTrackingState(
@@ -2985,10 +3045,16 @@ public static class LeviathanAttachmentNormalizer
             return null;
         }
 
-        GameShip parent = ship.squadron.GetNextShipUp(ship);
+        GameShip parent;
 
-        if (parent == null)
+        if (LeviathanMod.Controller == null ||
+            !LeviathanMod.Controller.TryGetAttachmentParent(
+                ship,
+                out parent) ||
+            parent == null)
+        {
             return null;
+        }
 
         HullAnchors shipAnchors;
         HullAnchors parentAnchors;

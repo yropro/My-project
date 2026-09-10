@@ -48,11 +48,8 @@ public static class LeviathanRemoteSkillVisuals
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
 
-        if (pilot == null ||
-            pilot.GetUpgradeLevel(LeviathanMod.GrowthUpgrade) < 1)
-        {
+        if (pilot == null || !LeviathanGrowth.IsGrowthActive(player))
             return false;
-        }
 
         constrictorRank =
             pilot.GetUpgradeLevel(LeviathanMod.ConstrictorUpgrade);

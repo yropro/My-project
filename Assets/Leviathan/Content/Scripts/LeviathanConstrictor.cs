@@ -10,204 +10,178 @@ using UnityEngine;
 // Constrictor
 // =============================================================================
 //
-// While an Assault weapon (ram / scythe / blades) is being used as a Leviathan
-// skill source, its physical blades and native blade damage are suppressed.
-// Constrictor replaces passive contact damage; Predator may retain the native
-// StartAttack/Lunge lifecycle while replacing the active hit.
+// Constrictor converts the first equipped Assault into a Leviathan-wide passive
+// contact weapon. The native Assault remains the source of resolved damage,
+// damage type, DamageVsX, crit, status, on-crit, Conduit, on-kill and Gladiator
+// leech semantics; Constrictor changes how that source is manifested.
 //
-// Baseline anchor: two frigate-scale segments touching a target are equivalent
-// to two scythe blades touching it in the weapon's non-lunge state. Passive
-// scythe contact is 1/4 of a lunge tick (Assault.attackMultiplier == 4).
+// BASELINE
+// --------
+// Native passive Assault contact deals 20% of listed Damage per damage tick,
+// split across its physical blades. Constrictor treats TWO simultaneous
+// Leviathan section contacts against one target as one complete native passive
+// Assault aggregate. One contact is therefore half an aggregate.
 //
-// Per target, contacting Leviathan sections (head, bodies, tail) are ranked
-// head-first and decayed:
-//     hit 1, 2 -> 1.0
-//     hit 3    -> 0.6
-//     hit 4    -> 0.36 ...
-// The infinite series converges to 3.5 section-units, so even when the entire
-// Leviathan is wrapped around one target, output approaches 1.75x vanilla
-// scythe passive before the rank scalar. Every touching section still hits.
+// Additional simultaneous contacts have symmetric diminishing returns. There is
+// deliberately no head-first / tail-first ranking: Growth owns anatomy and
+// future branched or multi-Head structures do not have one canonical linear
+// order. For N contacts:
 //
-// Rank scales damage and the status proc fraction (0.20 -> 0.40).
-// Constrictor also improves handling through the same native modifier types
-// used by Vanguard: Acceleration, Boost, Turn Speed and Maneuverability gain
-// +5% per rank. Growth's added high-speed resistance is reduced from 10% at
-// Rank 1 to 60% at Rank 5.
+//   N <= 2: effective contact units = N
+//   N >  2: effective contact units = 2 + 2 * (N - 2) / (N + 2)
 //
-// Constrictor can also grant additive crit chance and additive crit damage via
-// rank arrays in BALANCE TUNING. These stack on top of the equipped Assault's
-// native modified crit stats; both arrays default to zero.
+// Two contacts therefore equal 1.0 native passive aggregate; an arbitrarily
+// complete wrap approaches 2.0 native passive aggregates before specialization
+// damage scaling. Every touching section still receives an actual hit packet.
 //
-// Constrictor inherits the equipped Assault's native damage type, DamageVsX,
-// status, crit, on-crit, Conduit and on-kill traits. Native knockback and
-// Gladiator hull leech are intentionally excluded for usability/balance.
+// RANKS
+// -----
+// The specialization tree exposes one paid five-rank node. Rank 1 enables the
+// conversion at native passive aggregate damage. Ranks 2-5 add +25% damage each,
+// reaching 2.0x at Rank 5. Other rank effects are resolved through Knobs rather
+// than hard-coded node checks.
 //
-// Constrictor contact detection also has a tunable radial padding around each
-// real section collider. This affects hit detection only; physical colliders and
-// visuals are never resized.
-//
-// Growth / ship-size scaling mirrors Predator's tuning model: every active
-// Leviathan section uses the MAIN SHIP's class value, with Growth Rank 1 +
-// Frigate as the no-bonus baseline. Constrictor uses a smaller default step
-// because additional touching sections already increase total contact damage.
+// MULTIPLAYER
+// -----------
+// Gameplay runs only for the local owner and damage is routed through native
+// NetCombat. Remote clients derive Constrictor ownership from synchronized
+// specialization and only suppress the source Assault's presentation/lunge.
+// There is no irreducible temporal presentation state, so SlotConstrictor is not
+// used by this implementation.
 //
 // =============================================================================
 
 public static class LeviathanConstrictor
 {
-    // ---- Skill identity -----------------------------------------------------
+    // =========================================================================
+    // SPECIALIZATION INTERFACE
+    // =========================================================================
 
-    // Registration lives in LeviathanSkillSystem alongside Growth: appending to
-    // Upgrade.upgrades is only half the job, and the UI entry comes from
-    // LeviathanSkillUI calling UpgradeClassDisplay.AddUpgrade.
-    private static Upgrade.Key ConstrictorUpgrade
+    public static class Knobs
     {
-        get { return LeviathanMod.ConstrictorUpgrade; }
+        // Semantic purchased rank. The tree contributes +1 per invested rank,
+        // so gameplay never needs to inspect a node id directly.
+        public static readonly LeviathanSpecializationKnob Rank =
+            LeviathanSpecializationKnob.Flat(
+                "constrictor.rank",
+                "Constrictor Rank"
+            );
+
+        // Additive percentage relative to the Constrictor baseline.
+        public static readonly LeviathanSpecializationKnob FinalDamagePercent =
+            LeviathanSpecializationKnob.Percent(
+                "constrictor.final_damage_percent",
+                "Constrictor Damage"
+            );
+
+        // Additive percentage points on the source Assault's fully resolved crit.
+        public static readonly LeviathanSpecializationKnob CritChancePoints =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "constrictor.crit_chance_points",
+                "Critical Chance"
+            );
+
+        // Absolute fraction of the source Assault's fully resolved status chance.
+        // 0.20 means Constrictor contact uses 20% of the source status chance.
+        public static readonly LeviathanSpecializationKnob PassiveStatusFraction =
+            LeviathanSpecializationKnob.Flat(
+                "constrictor.passive_status_fraction",
+                "Passive Status Fraction",
+                "x"
+            );
+
+        public static readonly LeviathanSpecializationKnob AccelerationPercent =
+            LeviathanSpecializationKnob.Percent(
+                "constrictor.acceleration_percent",
+                "Acceleration"
+            );
+
+        public static readonly LeviathanSpecializationKnob BoostPercent =
+            LeviathanSpecializationKnob.Percent(
+                "constrictor.boost_percent",
+                "Boost"
+            );
+
+        public static readonly LeviathanSpecializationKnob TurnSpeedPercent =
+            LeviathanSpecializationKnob.Percent(
+                "constrictor.turn_speed_percent",
+                "Turn Speed"
+            );
+
+        public static readonly LeviathanSpecializationKnob ManeuverabilityPercent =
+            LeviathanSpecializationKnob.Percent(
+                "constrictor.maneuverability_percent",
+                "Maneuverability"
+            );
+
+        // Stored as a decimal fraction through PercentagePoints:
+        // authored 10 = 0.10 = refund 10% of Growth's actual drag this call.
+        public static readonly LeviathanSpecializationKnob AirResistanceReductionPoints =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "constrictor.air_resistance_reduction_points",
+                "Leviathan Air Resistance Reduction"
+            );
     }
 
-    // =========================================================================
-    // BALANCE TUNING
-    // =========================================================================
-    // Arrays are Rank 1 -> Rank 5.
-
-    // Overall passive contact-damage multiplier.
-    private static readonly float[] DamageMultiplierByRank =
+    public sealed class ResolvedState
     {
-        3.10f, // Rank 1
-        3.40f, // Rank 2
-        3.60f, // Rank 3
-        3.76f, // Rank 4
-        3.85f  // Rank 5
-    };
+        public bool Active;
+        public int Rank;
 
-    // ADDITIVE crit chance granted by Constrictor, on top of the equipped
-    // Assault weapon's fully modified native crit chance.
-    //
-    // 0.05f = +5 percentage points crit chance.
-    // Left at 0 by default so adding these knobs does not change current balance.
-    private static readonly float[] CritChanceBonusByRank =
+        public float DamageMultiplier = 1f;
+        public float CritChanceBonus;
+        public float PassiveStatusFraction;
+
+        public float AccelerationMultiplier = 1f;
+        public float BoostMultiplier = 1f;
+        public float TurnSpeedMultiplier = 1f;
+        public float ManeuverabilityMultiplier = 1f;
+        public float AirResistanceReduction;
+    }
+
+    private sealed class ResolvedCacheEntry
     {
-        0.05f, // Rank 1
-        0.0725f, // Rank 2
-        0.10f, // Rank 3
-        0.15f, // Rank 4
-        0.17f  // Rank 5
-    };
+        public GameShip Ship;
+        public int ConfigurationRevision;
+        public int RegistryRevision;
+        public ResolvedState State;
+    }
 
-    // ADDITIVE crit damage modifier granted by Constrictor, on top of the
-    // equipped Assault weapon's fully modified native crit damage modifier.
-    //
-    // 0.10f = +10 percentage points crit damage.
-    // Left at 0 by default so adding these knobs does not change current balance.
-    private static readonly float[] CritDamageBonusByRank =
-    {
-        0.00f, // Rank 1
-        0.00f, // Rank 2
-        0.00f, // Rank 3
-        0.00f, // Rank 4
-        0.00f  // Rank 5
-    };
+    private static readonly Dictionary<Pilot, ResolvedCacheEntry> ResolvedByPilot =
+        new Dictionary<Pilot, ResolvedCacheEntry>();
 
-    // Fraction of the equipped Assault weapon's status chance used by Constrictor.
-    private static readonly float[] StatusProcFractionByRank =
-    {
-        0.20f, // Rank 1
-        0.25f, // Rank 2
-        0.30f, // Rank 3
-        0.35f, // Rank 4
-        0.40f  // Rank 5
-    };
-
-    // Fraction of Growth's added high-speed resistance removed by rank.
-    // Endpoints requested: 10% at Rank 1, 60% at Rank 5.
-    private static readonly float[] AirResistanceReductionByRank =
-    {
-        0.100f, // Rank 1
-        0.225f, // Rank 2
-        0.350f, // Rank 3
-        0.475f, // Rank 4
-        0.600f  // Rank 5
-    };
-
-    // Native Vanguard-style handling modifiers. These are deliberately separate
-    // knobs even though they currently share the same value.
-    private const float AccelerationBonusPerRank = 0.03f;
-    private const float BoostBonusPerRank = 0.035f;
-    private const float TurnSpeedBonusPerRank = 0.03f;
-    private const float ManeuverabilityBonusPerRank = 0.02f;
-
-    // Growth / ship-size damage scaling. This deliberately mirrors Predator's
-    // knob layout so both Leviathan Assault skills are easy to tune together.
-    //
-    // Every active section uses the MAIN SHIP's class value. Individual body
-    // segment classes are intentionally ignored.
-    private const float FrigateSectionValue = 1.50f;
-    private const float DestroyerSectionValue = 2.00f;
-    private const float CruiserSectionValue = 2.30f;
-    private const float BattleshipSectionValue = 2.60f;
-    private const float DreadnoughtSectionValue = 2.90f;
-
-    // Growth Rank 1 / Frigate is the no-bonus baseline.
-    private static readonly float BaselineSectionValue =
-        (LeviathanGrowth.GetBodySegmentCountForRank(1) + 2) *
-        FrigateSectionValue;
-
-    // BONUS DAMAGE FROM TOTAL LEVIATHAN SIZE / LENGTH.
-    //
-    // This is the main "bonus damage per segment-value" knob.
-    //
-    // Formula:
-    //   totalSectionValue = activeSectionCount * mainShipClassSectionValue
-    //   bonusValue        = totalSectionValue - BaselineSectionValue
-    //   damageMultiplier  = 1 + (bonusValue * DamageBonusPerSectionValue)
-    //
-    // Example: 0.20f means every 1.0 section-value above baseline adds +20%
-    // multiplicative Constrictor damage to every contact hit.
-    //
-    // This is based on ALL active Leviathan sections, not only sections currently
-    // touching the target. Touching-section scaling is handled separately by
-    // FullWeightContacts and ContactDecay below.
-    private const float DamageBonusPerSectionValue = 0.30f;
-
-    // CONTACT DETECTION PADDING.
-    //
-    // Constrictor does NOT resize the real physics colliders. Instead, each
-    // section collider is treated as though its contact radius extends this
-    // much farther for Constrictor hit detection only.
-    //
-    // 0.20f = +20% of that collider's bounding radius in every direction.
-    // This helps tolerate small multiplayer / interpolation position errors
-    // without changing visuals, physical collision, or ship spacing.
-    private const float ContactHitboxRadiusPadding = 0.10f;
-
-    // Number of full-value segment contacts before decay starts.
-    private const int FullWeightContacts = 2;
-
-    // Every contact after FullWeightContacts contributes this fraction of the
-    // previous contact.
-    private const float ContactDecay = 0.60f;
-
-    // Contacts that equal one aggregate weapon's worth of passive contact damage.
-    private const float BaselineContacts = 2.00f;
+    private static readonly ResolvedState InactiveState = new ResolvedState();
 
     // =========================================================================
-    // NATIVE / MECHANICAL CONSTANTS
+    // BALANCE / MECHANICAL CONSTANTS
     // =========================================================================
 
-    // Assault's own per-tick fraction of listed Damage. Keep at 0.2 for native
-    // Assault.GetDamageData parity.
+    // Native Assault.GetDamageData passive packet fraction.
     private const float EngineTickFraction = 0.20f;
 
-    // Base interval passed through the player's BeamTickRate modifier.
+    // Native Assault.DoDamageTick base cadence before BeamTickRate modifiers.
     private const float BaseContactTickRate = 0.20f;
 
-    // ---- Native access ------------------------------------------------------
+    // Two simultaneous Leviathan contacts equal one complete native passive
+    // Assault aggregate before specialization damage scaling.
+    private const float BaselineAggregateContacts = 2.0f;
 
-    // NetCombat has two RouteDamage overloads (a DamageData[] form and a
-    // scalar damage/dps form), so AccessTools.Method by name alone throws
-    // AmbiguousMatchException. The parameter-type array can't disambiguate
-    // either, because parameter 0 is the internal IDamageable. Match on shape
-    // instead: the array form takes 14 parameters with DamageData[] at index 2.
+    // Diminishing-return wrap ceiling. Four effective contact units / baseline
+    // two contacts = 2.0 native passive aggregates at the asymptote.
+    private const float MaxAggregateContactUnits = 4.0f;
+    private const float OverflowHalfSaturationContacts = 4.0f;
+
+    // Detection tolerance only. Real colliders, visuals and physical spacing are
+    // untouched. 0.10 = a radial tolerance equal to 10% of collider bound radius.
+    private const float ContactHitboxRadiusPadding = 0.10f;
+
+    // =========================================================================
+    // NATIVE ACCESS
+    // =========================================================================
+
+    private static readonly FieldInfo AssaultBladesField =
+        AccessTools.Field(typeof(Assault), "blades");
+
     private static readonly MethodInfo RouteDamageMethod =
         typeof(NetCombat)
             .GetMethods(
@@ -222,11 +196,6 @@ public static class LeviathanConstrictor
                         typeof(Damageable.DamageData[])
             );
 
-    private static readonly FieldInfo AssaultBladesField =
-        AccessTools.Field(typeof(Assault), "blades");
-
-    // Native Assault.GetDamageData applies these before calculating a critical
-    // hit's damage, so Constrictor invokes the same protected Activatable method.
     private static readonly MethodInfo ApplyOnCritStatusEffectsMethod =
         AccessTools.Method(
             typeof(Activatable),
@@ -234,8 +203,6 @@ public static class LeviathanConstrictor
             new Type[] { typeof(GameShip) }
         );
 
-    // Conduit.RelayHit is internal because its target parameter is the internal
-    // IDamageable interface. Resolve the DamageData[] overload by method shape.
     private static readonly MethodInfo ConduitRelayHitMethod =
         typeof(Conduit)
             .GetMethods(
@@ -250,101 +217,301 @@ public static class LeviathanConstrictor
                         typeof(Damageable.DamageData[])
             );
 
-    // ---- State --------------------------------------------------------------
+    private static readonly MethodInfo LeechGladiatorHullMethod =
+        AccessTools.Method(
+            typeof(Assault),
+            "LeechGladiatorHull",
+            new Type[] { typeof(GameShip), typeof(Vector2) }
+        );
 
-    // (segment, target) -> Time.fixedTime of last applied hit.
+    // =========================================================================
+    // CONTACT STATE
+    // =========================================================================
+
+    private struct ContactKey : IEquatable<ContactKey>
+    {
+        public readonly GameShip Section;
+        public readonly GameShip Target;
+
+        public ContactKey(GameShip section, GameShip target)
+        {
+            Section = section;
+            Target = target;
+        }
+
+        public bool Equals(ContactKey other)
+        {
+            return Section == other.Section && Target == other.Target;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is ContactKey && Equals((ContactKey)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            int a = Section == null ? 0 : Section.GetInstanceID();
+            int b = Target == null ? 0 : Target.GetInstanceID();
+            return (a * 397) ^ b;
+        }
+    }
+
+    private sealed class ContactBucket
+    {
+        public readonly List<GameShip> Sections = new List<GameShip>(4);
+        public int Generation;
+        public int LastSeenGeneration;
+    }
+
     private static readonly Dictionary<ContactKey, float> LastHits =
         new Dictionary<ContactKey, float>();
 
     private static readonly List<ContactKey> StaleHits =
         new List<ContactKey>();
 
-    // Rebuilt every tick. target -> contacting segments, head-first.
-    private static readonly Dictionary<GameShip, List<GameShip>> Contacts =
-        new Dictionary<GameShip, List<GameShip>>();
+    private static readonly Dictionary<GameShip, ContactBucket> ContactBuckets =
+        new Dictionary<GameShip, ContactBucket>();
 
     private static readonly List<GameShip> ContactTargets =
         new List<GameShip>();
 
-    // section -> every non-shield collider that contributes to its physical
-    // footprint. A section only contributes once per target even if several of
-    // these colliders overlap the same ship.
+    private static readonly List<GameShip> StaleContactTargets =
+        new List<GameShip>();
+
     private static readonly Dictionary<GameShip, Collider2D[]> ColliderCache =
         new Dictionary<GameShip, Collider2D[]>();
 
-    // Reused while gathering one section so compound colliders cannot add the
-    // same (section, target) pair more than once.
     private static readonly HashSet<GameShip> SectionTargets =
         new HashSet<GameShip>();
 
-    // Broad-phase buffer for padded contact checks. Physics2D.Distance performs
-    // the exact shape-to-shape test afterward, so this circle is only a cheap
-    // candidate search and does not define the final Constrictor hit shape.
+    // Growth-owned live anatomy is collected by semantic role. We intentionally
+    // keep separate scratch lists because the collection contract fills a caller-
+    // owned list; consumers must not infer one flat anatomy order from Squadron.
+    private static readonly List<GameShip> HeadSections = new List<GameShip>(4);
+    private static readonly List<GameShip> BodySections = new List<GameShip>(24);
+    private static readonly List<GameShip> TailSections = new List<GameShip>(8);
+
     private static readonly Collider2D[] ProximityBuffer =
         new Collider2D[256];
 
     private static readonly Damageable.DamageData[] DamageBuffer =
         new Damageable.DamageData[8];
 
-    // The Assault instance currently suppressed, so the patch stays O(1).
+    private static int contactGeneration;
+    private static int lastPrunedContactGeneration;
+
+    private static GameShip anatomyOwner;
+    private static int anatomyRevision = int.MinValue;
+
+    // =========================================================================
+    // ASSAULT SOURCE / PRESENTATION STATE
+    // =========================================================================
+
+    // Local authoritative source whose native passive blade damage is suppressed.
     private static Assault suppressed;
 
-    private struct ContactKey : IEquatable<ContactKey>
+    // Remote presentation only. Keeps track of Assaults whose blades we hid so
+    // we restore only presentation that Constrictor itself changed.
+    private static readonly HashSet<Assault> RemoteHiddenAssaults =
+        new HashSet<Assault>();
+
+    // =========================================================================
+    // RESOLUTION
+    // =========================================================================
+
+    public static ResolvedState GetResolvedState(GameShip ship)
     {
-        public readonly GameShip segment;
-        public readonly GameShip target;
+        if (ship == null)
+            return InactiveState;
 
-        public ContactKey(GameShip segment, GameShip target)
+        Pilot pilot = GameShip.GetPlayerSourcePilot(ship);
+        if (pilot == null)
+            return InactiveState;
+
+        bool local = IsCurrentPlayer(ship);
+
+        // Remote specialization is transient and belongs to the exact current
+        // replica. Until synchronized, fail closed to native presentation.
+        if (!local && ship.IsAnyPlayerShip() &&
+            !LeviathanNetwork.HasSynchronizedSpecialization(ship))
         {
-            this.segment = segment;
-            this.target = target;
+            return InactiveState;
         }
 
-        public bool Equals(ContactKey other)
+        int configurationRevision =
+            LeviathanSpecializationRuntime.ConfigurationRevision;
+
+        int registryRevision = LeviathanSpecializationRegistry.Revision;
+
+        ResolvedCacheEntry cached;
+        if (ResolvedByPilot.TryGetValue(pilot, out cached) &&
+            cached != null &&
+            cached.Ship == ship &&
+            cached.ConfigurationRevision == configurationRevision &&
+            cached.RegistryRevision == registryRevision &&
+            cached.State != null)
         {
-            return segment == other.segment && target == other.target;
+            return cached.State;
         }
 
-        public override int GetHashCode()
+        ResolvedState state = ResolveState(pilot);
+
+        if (cached == null)
         {
-            int a = segment == null ? 0 : segment.GetInstanceID();
-            int b = target == null ? 0 : target.GetInstanceID();
-            return (a * 397) ^ b;
+            cached = new ResolvedCacheEntry();
+            ResolvedByPilot[pilot] = cached;
         }
+
+        cached.Ship = ship;
+        cached.ConfigurationRevision = configurationRevision;
+        cached.RegistryRevision = registryRevision;
+        cached.State = state;
+
+        return state;
+    }
+
+    private static ResolvedState ResolveState(Pilot pilot)
+    {
+        ResolvedState state = new ResolvedState();
+
+        if (pilot == null ||
+            !LeviathanSpecializationRuntime.IsTreeUnlocked(
+                pilot,
+                LeviathanConstrictorTree.TreeId
+            ))
+        {
+            return state;
+        }
+
+        int rank = Mathf.Clamp(
+            Mathf.RoundToInt(
+                LeviathanSpecializationRuntime.GetKnobFlat(
+                    pilot,
+                    Knobs.Rank
+                )
+            ),
+            0,
+            5
+        );
+
+        if (rank < 1)
+            return state;
+
+        state.Active = true;
+        state.Rank = rank;
+
+        state.DamageMultiplier = Mathf.Max(
+            0f,
+            LeviathanSpecializationRuntime.GetKnobMultiplier(
+                pilot,
+                Knobs.FinalDamagePercent
+            )
+        );
+
+        state.CritChanceBonus =
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.CritChancePoints
+            );
+
+        state.PassiveStatusFraction = Mathf.Clamp01(
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.PassiveStatusFraction
+            )
+        );
+
+        state.AccelerationMultiplier = Mathf.Max(
+            0f,
+            LeviathanSpecializationRuntime.GetKnobMultiplier(
+                pilot,
+                Knobs.AccelerationPercent
+            )
+        );
+
+        state.BoostMultiplier = Mathf.Max(
+            0f,
+            LeviathanSpecializationRuntime.GetKnobMultiplier(
+                pilot,
+                Knobs.BoostPercent
+            )
+        );
+
+        state.TurnSpeedMultiplier = Mathf.Max(
+            0f,
+            LeviathanSpecializationRuntime.GetKnobMultiplier(
+                pilot,
+                Knobs.TurnSpeedPercent
+            )
+        );
+
+        state.ManeuverabilityMultiplier = Mathf.Max(
+            0f,
+            LeviathanSpecializationRuntime.GetKnobMultiplier(
+                pilot,
+                Knobs.ManeuverabilityPercent
+            )
+        );
+
+        state.AirResistanceReduction = Mathf.Clamp01(
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.AirResistanceReductionPoints
+            )
+        );
+
+        return state;
+    }
+
+    private static bool TryGetLocalState(
+        GameShip ship,
+        out ResolvedState state)
+    {
+        state = InactiveState;
+
+        if (!IsCurrentPlayer(ship))
+            return false;
+
+        state = GetResolvedState(ship);
+        return state != null && state.Active;
+    }
+
+    private static bool IsCurrentPlayer(GameShip ship)
+    {
+        return ship != null &&
+            WorldController.instance != null &&
+            WorldController.instance.GetCurrentPlayerShip() == ship;
     }
 
     // =========================================================================
-    // Tick entry point
+    // TICK ENTRY POINT
     // =========================================================================
 
     /// <summary>
-    /// Call once per FixedUpdate from LeviathanController with the live player.
+    /// Call once per FixedUpdate from LeviathanController for the local player.
     /// </summary>
     public static void Tick(GameShip player)
     {
-        if (player == null || player.squadron == null)
+        if (!IsCurrentPlayer(player))
         {
             ReleaseSuppression();
             return;
         }
 
-        // Assault becomes an invisible Leviathan stat source when either
-        // Constrictor or Predator is active. Only Constrictor rank controls the
-        // passive contact-damage calculation below.
-        int rank = GetRank(player);
-        int predatorRank = GetPredatorRank(player);
+        ResolvedState state = GetResolvedState(player);
 
-        if (LeviathanMod.Controller == null ||
-            LeviathanMod.Controller.GetActiveSectionCount(player) <
-                LeviathanGrowth.GetBodySegmentCountForRank(1) + 2 ||
-            (rank < 1 && predatorRank < 1))
+        // Live anatomy is authoritative. Tree intent without an instantiated
+        // Growth snapshot is not enough to run contact gameplay.
+        if (state == null ||
+            !state.Active ||
+            LeviathanGrowth.GetTotalSectionCount(player) <= 0)
         {
             ReleaseSuppression();
             return;
         }
 
         Assault src = FindEquippedAssault(player);
-
         if (src == null)
         {
             ReleaseSuppression();
@@ -353,18 +520,14 @@ public static class LeviathanConstrictor
 
         ApplySuppression(src);
 
-        // Predator-only still hides/disables the physical Assault weapon, but
-        // there is no replacement passive contact damage until Constrictor is
-        // actually ranked.
-        if (rank < 1)
-            return;
-
         if (!player.IsVisible() ||
             player.IsDisabled() ||
             player.IsWeaponsOffline())
         {
             return;
         }
+
+        RefreshAnatomyRevision(player);
 
         float tickRate = player.ApplyModifier(
             Modifier.Type.BeamTickRate,
@@ -373,150 +536,207 @@ public static class LeviathanConstrictor
             true
         );
 
+        tickRate = Mathf.Max(0.0001f, tickRate);
+
         GatherContacts(player);
-        ApplyContactDamage(player, src, rank, tickRate);
+        ApplyContactDamage(player, src, state, tickRate);
         PruneLastHits(tickRate);
     }
 
-    /// <summary>
-    /// Call from ClearPlayerShip / teardown so a suppressed weapon is restored.
-    /// </summary>
     public static void Reset()
     {
         ReleaseSuppression();
+
+        foreach (Assault assault in RemoteHiddenAssaults)
+        {
+            if (assault != null)
+                SetBladesVisible(assault, true);
+        }
+
+        RemoteHiddenAssaults.Clear();
+        ResolvedByPilot.Clear();
+
         LastHits.Clear();
-        Contacts.Clear();
+        StaleHits.Clear();
+        ContactBuckets.Clear();
+        ContactTargets.Clear();
+        StaleContactTargets.Clear();
+        ColliderCache.Clear();
+        SectionTargets.Clear();
+        HeadSections.Clear();
+        BodySections.Clear();
+        TailSections.Clear();
+
+        contactGeneration = 0;
+        lastPrunedContactGeneration = 0;
+        anatomyOwner = null;
+        anatomyRevision = int.MinValue;
+    }
+
+    // =========================================================================
+    // GROWTH-OWNED LIVE ANATOMY / CONTACT GATHERING
+    // =========================================================================
+
+    private static void RefreshAnatomyRevision(GameShip player)
+    {
+        int revision = LeviathanGrowth.GetAnatomy(player).Revision;
+
+        if (anatomyOwner == player && anatomyRevision == revision)
+            return;
+
+        anatomyOwner = player;
+        anatomyRevision = revision;
+
+        // Section objects/colliders can be replaced on rebuild even while the
+        // specialization configuration itself is unchanged.
+        LastHits.Clear();
+        ContactBuckets.Clear();
         ContactTargets.Clear();
         ColliderCache.Clear();
         SectionTargets.Clear();
     }
 
-    // =========================================================================
-    // Contact gathering
-    // =========================================================================
-
     private static void GatherContacts(GameShip player)
     {
-        Contacts.Clear();
+        unchecked
+        {
+            contactGeneration++;
+            if (contactGeneration == int.MinValue)
+                contactGeneration = 1;
+        }
+
         ContactTargets.Clear();
 
-        List<Squadron.SquadronShip> ships = player.squadron.ships;
+        HeadSections.Clear();
+        BodySections.Clear();
+        TailSections.Clear();
 
-        if (ships == null)
-            return;
+        LeviathanGrowth.CollectHeadShips(player, HeadSections);
+        LeviathanGrowth.CollectBodyShips(player, BodySections);
+        LeviathanGrowth.CollectTailShips(player, TailSections);
 
-        // Index 0 is the player head. Body segments and tail follow in chain
-        // order, giving the decay a stable head-first ranking. The head is an
-        // intentional Constrictor contact section for usability.
-        for (int i = 0; i < ships.Count; i++)
+        GatherSectionList(player, HeadSections);
+        GatherSectionList(player, BodySections);
+        GatherSectionList(player, TailSections);
+
+        PruneContactBuckets();
+    }
+
+    private static void GatherSectionList(
+        GameShip owner,
+        List<GameShip> sections)
+    {
+        for (int i = 0; i < sections.Count; i++)
         {
-            GameShip section = i == 0 ? player : ships[i].ship;
+            GameShip section = sections[i];
 
             if (section == null || !section.gameObject.activeInHierarchy)
                 continue;
 
-            Collider2D[] colliders = GetSectionColliders(section);
+            GatherSectionContacts(owner, section);
+        }
+    }
 
-            if (colliders == null || colliders.Length == 0)
-                continue;
+    private static void GatherSectionContacts(
+        GameShip owner,
+        GameShip section)
+    {
+        Collider2D[] colliders = GetSectionColliders(section);
 
-            SectionTargets.Clear();
+        if (colliders == null || colliders.Length == 0)
+            return;
 
-            for (int c = 0; c < colliders.Length; c++)
+        SectionTargets.Clear();
+
+        for (int c = 0; c < colliders.Length; c++)
+        {
+            Collider2D collider = colliders[c];
+
+            if (!collider ||
+                !collider.enabled ||
+                !collider.gameObject.activeInHierarchy)
             {
-                Collider2D collider = colliders[c];
+                continue;
+            }
 
-                if (!collider ||
-                    !collider.enabled ||
-                    !collider.gameObject.activeInHierarchy)
+            Bounds bounds = collider.bounds;
+            float colliderRadius = bounds.extents.magnitude;
+            float padding = colliderRadius * ContactHitboxRadiusPadding;
+            float queryRadius = colliderRadius + padding;
+
+            int hitCount = Physics2D.OverlapCircleNonAlloc(
+                bounds.center,
+                queryRadius,
+                ProximityBuffer
+            );
+
+            for (int h = 0; h < hitCount; h++)
+            {
+                Collider2D hit = ProximityBuffer[h];
+
+                if (!hit ||
+                    hit == collider ||
+                    !hit.enabled ||
+                    !hit.gameObject.activeInHierarchy)
                 {
                     continue;
                 }
 
-                // Preserve the real collider shape, but allow Constrictor contact
-                // slightly beyond it. bounds.extents.magnitude is the collider's
-                // bounding radius; 20% of that radius becomes uniform radial
-                // padding around the actual Collider2D shape.
-                Bounds bounds = collider.bounds;
-                float colliderRadius = bounds.extents.magnitude;
-                float padding =
-                    colliderRadius * ContactHitboxRadiusPadding;
+                ColliderDistance2D separation =
+                    Physics2D.Distance(collider, hit);
 
-                // Broad phase: find anything close enough to possibly be within
-                // the padded shape. The exact acceptance test below uses
-                // Physics2D.Distance against the real colliders.
-                float queryRadius = colliderRadius + padding;
-                int hitCount = Physics2D.OverlapCircleNonAlloc(
-                    bounds.center,
-                    queryRadius,
-                    ProximityBuffer
-                );
+                if (!separation.isValid || separation.distance > padding)
+                    continue;
 
-                for (int h = 0; h < hitCount; h++)
+                GameObject obj = hit.gameObject.CompareTag("Shield")
+                    ? hit.transform.parent.gameObject
+                    : hit.gameObject;
+
+                if (obj == null ||
+                    obj.CompareTag("Container") ||
+                    obj.CompareTag("Projectile"))
                 {
-                    Collider2D hit = ProximityBuffer[h];
-
-                    if (!hit ||
-                        hit == collider ||
-                        !hit.enabled ||
-                        !hit.gameObject.activeInHierarchy)
-                    {
-                        continue;
-                    }
-
-                    ColliderDistance2D separation =
-                        Physics2D.Distance(collider, hit);
-
-                    // distance <= 0 means the real colliders overlap already.
-                    // Otherwise allow a gap up to the configured radial padding.
-                    if (!separation.isValid ||
-                        separation.distance > padding)
-                    {
-                        continue;
-                    }
-
-                    GameObject obj = hit.gameObject.CompareTag("Shield")
-                        ? hit.transform.parent.gameObject
-                        : hit.gameObject;
-
-                    if (obj.CompareTag("Container") ||
-                        obj.CompareTag("Projectile"))
-                    {
-                        continue;
-                    }
-
-                    GameShip target;
-
-                    if (!GameShip.TryGetShip(obj, out target) || target == null)
-                        continue;
-
-                    // Faction and squadron checks inside CanBeDamagedBy reject
-                    // the player's own head and sibling Leviathan sections.
-                    if (!target.CanBeDamagedBy(section, false))
-                        continue;
-
-                    if (target.IsDodging())
-                        continue;
-
-                    // One Leviathan section may have several colliders, and a
-                    // target may expose several colliders. Either way, this
-                    // section counts exactly once against this target this tick.
-                    if (!SectionTargets.Add(target))
-                        continue;
-
-                    List<GameShip> list;
-
-                    if (!Contacts.TryGetValue(target, out list))
-                    {
-                        list = new List<GameShip>();
-                        Contacts[target] = list;
-                        ContactTargets.Add(target);
-                    }
-
-                    list.Add(section);
+                    continue;
                 }
+
+                GameShip target;
+                if (!GameShip.TryGetShip(obj, out target) || target == null)
+                    continue;
+
+                // Damage attribution is the primary owner, not the touching
+                // follower section. This mirrors a native equipped weapon.
+                if (!target.CanBeDamagedBy(owner, false) || target.IsDodging())
+                    continue;
+
+                // Compound colliders on either ship still count as one contact
+                // from this anatomical section to this target this gather.
+                if (!SectionTargets.Add(target))
+                    continue;
+
+                AddContact(target, section);
             }
         }
+    }
+
+    private static void AddContact(GameShip target, GameShip section)
+    {
+        ContactBucket bucket;
+
+        if (!ContactBuckets.TryGetValue(target, out bucket) || bucket == null)
+        {
+            bucket = new ContactBucket();
+            ContactBuckets[target] = bucket;
+        }
+
+        if (bucket.Generation != contactGeneration)
+        {
+            bucket.Generation = contactGeneration;
+            bucket.LastSeenGeneration = contactGeneration;
+            bucket.Sections.Clear();
+            ContactTargets.Add(target);
+        }
+
+        bucket.Sections.Add(section);
     }
 
     private static Collider2D[] GetSectionColliders(GameShip section)
@@ -538,8 +758,8 @@ public static class LeviathanConstrictor
             if (!collider)
                 continue;
 
-            // Shield bubbles are intentionally excluded. Constrictor should use
-            // the physical footprint of the ship section itself.
+            // Constrictor uses physical section geometry, not shield bubbles or
+            // unrelated projectile/container colliders parented beneath a ship.
             if (collider.gameObject.CompareTag("Shield") ||
                 collider.gameObject.CompareTag("Container") ||
                 collider.gameObject.CompareTag("Projectile"))
@@ -555,21 +775,39 @@ public static class LeviathanConstrictor
         return cached;
     }
 
+    private static void PruneContactBuckets()
+    {
+        // Avoid scanning the persistent target cache every physics tick.
+        if (contactGeneration - lastPrunedContactGeneration < 120)
+            return;
+
+        lastPrunedContactGeneration = contactGeneration;
+        StaleContactTargets.Clear();
+
+        foreach (KeyValuePair<GameShip, ContactBucket> pair in ContactBuckets)
+        {
+            if (!pair.Key ||
+                pair.Value == null ||
+                contactGeneration - pair.Value.LastSeenGeneration > 600)
+            {
+                StaleContactTargets.Add(pair.Key);
+            }
+        }
+
+        for (int i = 0; i < StaleContactTargets.Count; i++)
+            ContactBuckets.Remove(StaleContactTargets[i]);
+    }
+
     // =========================================================================
-    // Damage application
+    // DAMAGE
     // =========================================================================
 
     private static void ApplyContactDamage(
         GameShip player,
         Assault src,
-        int rank,
+        ResolvedState state,
         float tickRate)
     {
-        float damageScalar = GetRankValue(DamageMultiplierByRank, rank);
-        float procFraction = GetRankValue(StatusProcFractionByRank, rank);
-        float growthSizeScalar = GetGrowthSizeDamageMultiplier(player);
-        float critChanceBonus = GetRankValue(CritChanceBonusByRank, rank);
-        float critDamageBonus = GetRankValue(CritDamageBonusByRank, rank);
         string weaponName = src.GetName(false, false);
 
         for (int t = 0; t < ContactTargets.Count; t++)
@@ -579,21 +817,28 @@ public static class LeviathanConstrictor
             if (target == null)
                 continue;
 
-            List<GameShip> segmentsHere = Contacts[target];
-
-            // Every simultaneously touching Leviathan section is allowed to
-            // contribute. ContactDecay makes late sections increasingly small,
-            // so no arbitrary contact-count cutoff is needed.
-            int ranked = segmentsHere.Count;
-
-            for (int i = 0; i < ranked; i++)
+            ContactBucket bucket;
+            if (!ContactBuckets.TryGetValue(target, out bucket) ||
+                bucket == null ||
+                bucket.Generation != contactGeneration)
             {
-                GameShip segment = segmentsHere[i];
+                continue;
+            }
 
-                if (segment == null)
+            int contactCount = bucket.Sections.Count;
+            if (contactCount <= 0)
+                continue;
+
+            float aggregateUnits = GetAggregateContactUnits(contactCount);
+            float perContactWeight = aggregateUnits / contactCount;
+
+            for (int i = 0; i < contactCount; i++)
+            {
+                GameShip section = bucket.Sections[i];
+                if (section == null)
                     continue;
 
-                ContactKey key = new ContactKey(segment, target);
+                ContactKey key = new ContactKey(section, target);
                 float last;
 
                 if (LastHits.TryGetValue(key, out last) &&
@@ -604,119 +849,128 @@ public static class LeviathanConstrictor
 
                 LastHits[key] = Time.fixedTime;
 
-                float weight = i < FullWeightContacts
-                    ? 1f
-                    : Mathf.Pow(
-                        ContactDecay,
-                        i - FullWeightContacts + 1
-                    );
+                // Every physical section gets an independent native-style crit
+                // roll, but the probability is weighted by the same symmetric
+                // contact saturation as damage/status. This preserves separate
+                // contact rolls without letting a very large wrap create
+                // unbounded on-crit proc volume. At one/two contacts the weight
+                // is 1.0, exactly matching the source Assault's crit chance.
+                float critChance = Mathf.Max(
+                    0f,
+                    (src.GetCritChance() + state.CritChanceBonus) *
+                    perContactWeight
+                );
 
-                // Native Assault rolls its live crit chance separately for every
-                // blade contact. Do the same so OnCritCritChance can affect later
-                // section hits during the same Constrictor tick.
-                float critChance =
-                    src.GetCritChance() +
-                    critChanceBonus;
+                bool crit = Modifier.CritRoll(critChance, target);
 
-                bool crit =
-                    Modifier.CritRoll(
-                        critChance * weight,
-                        target
-                    );
-
-                // Native Assault.GetDamageData applies on-crit statuses BEFORE
-                // reading Damage and DPS, allowing OnCritDamageIncrease to affect
-                // the critical hit that triggered it. Preserve that ordering.
-                if (crit && player && player.health > 0f)
+                // Native Assault applies on-crit effects before reading Damage,
+                // allowing OnCritDamageIncrease to affect the triggering hit.
+                if (crit && player.health > 0f)
                     ApplyNativeOnCritEffects(src, player);
 
-                float critModifier =
-                    src.GetCritModifier() +
-                    critDamageBonus;
+                float critMultiplier = crit
+                    ? 1f + src.GetCritModifier()
+                    : 1f;
 
-                float mul = crit ? (1f + critModifier) : 1f;
+                float packetMultiplier =
+                    EngineTickFraction *
+                    state.DamageMultiplier *
+                    (perContactWeight / BaselineAggregateContacts) *
+                    critMultiplier;
 
-                mul *= EngineTickFraction;
-                mul /= BaselineContacts;
-                mul *= weight;
-                mul *= damageScalar;
-                mul *= growthSizeScalar;
+                float damage = src.Damage * packetMultiplier;
 
-                // Read live modified values after the on-crit effects above.
-                float damage = src.Damage * mul;
-                float dps =
-                    src.CalculateDPS(Activatable.Modified.Global);
+                // Preserve native Assault's resolved DPS reference. Native
+                // per-blade packets also carry the aggregate weapon DPS rather
+                // than dividing this field by blade count.
+                float dps = src.CalculateDPS(Activatable.Modified.Global);
 
-                float status =
+                // Status follows the same contact saturation weight so adding a
+                // very large wrap does not create unbounded status proc volume.
+                float statusChance = Mathf.Max(
+                    0f,
                     src.StatusEffectChance *
-                    procFraction *
-                    weight;
+                    state.PassiveStatusFraction *
+                    perContactWeight
+                );
 
                 BuildDamageData(src, damage, dps);
 
-                target.SetLastDamageDirection(
-                    ((Vector2)(
-                        target.transform.position -
-                        segment.transform.position
-                    )).normalized
-                );
+                Vector2 direction =
+                    (Vector2)(target.transform.position - section.transform.position);
 
+                if (direction.sqrMagnitude > 0.0001f)
+                    direction.Normalize();
+                else
+                    direction = section.transform.right;
+
+                target.SetLastDamageDirection(direction);
                 target.lastDamagedByWeaponName = weaponName;
                 target.lastDamagedByShipName = player.GetName();
                 target.lastDamagedByFaction = player.faction;
 
                 bool bypassDamageLimit =
-                    src.HasCustomizer(
-                        Customizer.Type.BypassDamageLimit
-                    );
+                    src.HasCustomizer(Customizer.Type.BypassDamageLimit);
 
-                // Knockback is intentionally disabled for Constrictor usability.
-                // Passing 0 also prevents network-routed player hits from getting
-                // native Assault knockback.
+                Vector2 hitPoint = target.transform.position;
+
                 bool destroyed = RouteDamage(
                     target,
                     src.damageType,
                     DamageBuffer,
-                    status,
+                    statusChance,
                     crit,
-                    target.transform.position,
+                    hitPoint,
                     player,
                     bypassDamageLimit,
-                    0f,
+                    0f, // Deliberate Constrictor divergence: no knockback.
                     src
                 );
 
-                // Native Assault relays every successful blade hit to linked
-                // Conduits using the actual host hit's DamageData.
                 RelayConduitHit(
                     src,
                     player,
                     target,
                     DamageBuffer,
-                    target.transform.position,
+                    hitPoint,
                     bypassDamageLimit
                 );
 
-                // Gladiator hull leech is deliberately NOT called here.
+                // Native Assault performs local Gladiator leech immediately and
+                // Activatable.NetConfirmDamageResult handles deferred remote
+                // damage because src is retained as slotSource.
+                if (!target.IsNetRemote())
+                    ApplyNativeGladiatorLeech(src, target, hitPoint);
 
-                // In local/single-player damage RouteDamage returns whether this
-                // hit destroyed the target. Remote network kills are confirmed
-                // through Activatable.NetConfirmDamageResult, which already runs
-                // the native death-surge path for the supplied slotSource.
-                if (destroyed &&
-                    target &&
-                    !target.IsDrone())
+                if (destroyed && target && !target.IsDrone())
                 {
                     ApplyLocalOnKillEffects(
                         src,
                         player,
                         target,
-                        target.transform.position,
+                        hitPoint,
                         dps
                     );
                 }
             }
         }
+    }
+
+    private static float GetAggregateContactUnits(int contacts)
+    {
+        if (contacts <= 0)
+            return 0f;
+
+        if (contacts <= (int)BaselineAggregateContacts)
+            return contacts;
+
+        float overflow = contacts - BaselineAggregateContacts;
+        float available =
+            MaxAggregateContactUnits - BaselineAggregateContacts;
+
+        return BaselineAggregateContacts +
+            available *
+            (overflow / (overflow + OverflowHalfSaturationContacts));
     }
 
     private static void ApplyNativeOnCritEffects(
@@ -733,6 +987,24 @@ public static class LeviathanConstrictor
         ApplyOnCritStatusEffectsMethod.Invoke(
             src,
             new object[] { player }
+        );
+    }
+
+    private static void ApplyNativeGladiatorLeech(
+        Assault src,
+        GameShip target,
+        Vector2 hitPoint)
+    {
+        if (src == null ||
+            target == null ||
+            LeechGladiatorHullMethod == null)
+        {
+            return;
+        }
+
+        LeechGladiatorHullMethod.Invoke(
+            src,
+            new object[] { target, hitPoint }
         );
     }
 
@@ -773,16 +1045,9 @@ public static class LeviathanConstrictor
         Vector2 position,
         float dps)
     {
-        if (src == null ||
-            player == null ||
-            target == null)
-        {
+        if (src == null || player == null || target == null)
             return;
-        }
 
-        // Mirrors native Assault.DoBladeDamage. Reanimate is not duplicated here:
-        // passing src as slotSource into NetCombat.RouteDamage already supplies
-        // native pending-kill / network reanimate context.
         float shedChance =
             src.ApplyModifierToPercentage(
                 Modifier.Type.OnEnemyDeathShed,
@@ -793,8 +1058,6 @@ public static class LeviathanConstrictor
         if (shedChance > 0f)
             target.ShedStatusEffects(shedChance, true, player);
 
-        // Public native helper used by projectiles and network-confirmed weapon
-        // kills. It reads all six OnEnemyDeath*Surge modifiers from src.
         Projectile.ProcessDeathSurge(
             src,
             player,
@@ -803,11 +1066,10 @@ public static class LeviathanConstrictor
         );
     }
 
-    /// <summary>
-    /// Mirrors Assault.GetDamageData: index 0 is the base hit, 1-7 are the
-    /// DamageVsX modifier deltas. Reuses one buffer, as the native code does.
-    /// </summary>
-    private static void BuildDamageData(Assault src, float damage, float dps)
+    private static void BuildDamageData(
+        Assault src,
+        float damage,
+        float dps)
     {
         DamageBuffer[0] = new Damageable.DamageData(damage, dps);
         DamageBuffer[1] = Delta(src, Modifier.Type.DamageVsHealth, damage, dps);
@@ -832,10 +1094,6 @@ public static class LeviathanConstrictor
         );
     }
 
-    // Note: NetCombat.RouteDamage's first parameter is IDamageable, which is
-    // an *internal* interface and therefore cannot be named from a mod
-    // assembly. GameShip reaches it through Damageable, and reflection binds
-    // the argument at invoke time, so taking GameShip here is equivalent.
     private static bool warnedNoRouteDamage;
 
     private static bool RouteDamage(
@@ -855,7 +1113,6 @@ public static class LeviathanConstrictor
             if (!warnedNoRouteDamage)
             {
                 warnedNoRouteDamage = true;
-
                 Debug.LogError(
                     "[Leviathan] Could not resolve NetCombat.RouteDamage; " +
                     "Constrictor will deal no damage."
@@ -865,11 +1122,6 @@ public static class LeviathanConstrictor
             return false;
         }
 
-        // NetCombat.RouteDamage is internal. It resolves authority by target
-        // ownership: the attacker computes crit and damage locally and the
-        // resulting values are sent, so nothing here needs to agree across
-        // machines. A false return means "deferred to the network", NOT
-        // "failed" -- never retry on it.
         object result = RouteDamageMethod.Invoke(
             null,
             new object[]
@@ -884,26 +1136,27 @@ public static class LeviathanConstrictor
                 bypassDamageLimit,
                 knockbackPower,
                 slotSource,
-                0f,        // impaleDps
-                0f,        // impaleDuration
-                false,     // forceAttackerLocal
-                0f         // impaleRotation
+                0f,
+                0f,
+                false,
+                0f
             }
         );
 
+        // False can mean the damage was routed to the remote target owner. It is
+        // not a failure signal and must never be retried by Constrictor.
         return result is bool && (bool)result;
     }
 
     private static void PruneLastHits(float tickRate)
     {
         float window = tickRate * 4f;
-
         StaleHits.Clear();
 
         foreach (KeyValuePair<ContactKey, float> pair in LastHits)
         {
-            if (!pair.Key.segment ||
-                !pair.Key.target ||
+            if (!pair.Key.Section ||
+                !pair.Key.Target ||
                 Time.fixedTime - pair.Value > window)
             {
                 StaleHits.Add(pair.Key);
@@ -915,12 +1168,12 @@ public static class LeviathanConstrictor
     }
 
     // =========================================================================
-    // Assault suppression
+    // ASSAULT SOURCE / VISUAL SUPPRESSION
     // =========================================================================
 
     private static Assault FindEquippedAssault(GameShip player)
     {
-        if (player.slots == null)
+        if (player == null || player.slots == null)
             return null;
 
         for (int i = 0; i < player.slots.Length; i++)
@@ -929,12 +1182,16 @@ public static class LeviathanConstrictor
                 continue;
 
             Assault assault = player.slots[i].equippable as Assault;
-
             if (assault != null)
                 return assault;
         }
 
         return null;
+    }
+
+    private static GameShip GetParentShip(Assault assault)
+    {
+        return assault == null ? null : assault.parentShip;
     }
 
     private static void ApplySuppression(Assault src)
@@ -952,15 +1209,123 @@ public static class LeviathanConstrictor
         if (suppressed == null)
             return;
 
-        SetBladesVisible(suppressed, true);
+        Assault old = suppressed;
         suppressed = null;
+
+        // A remote presentation entry should never normally overlap the local
+        // source, but only restore if no other Constrictor presentation claim
+        // remains on this exact Assault object.
+        if (!RemoteHiddenAssaults.Contains(old))
+            SetBladesVisible(old, true);
     }
 
-    /// <summary>
-    /// Assault.blades is a private List of a private nested Blade class. Each
-    /// entry owns the blade GameObject plus a SwishTrail that BuildBlade
-    /// reparents to world space, so both need hiding.
-    /// </summary>
+    public static bool IsSuppressed(Assault assault)
+    {
+        return suppressed != null && suppressed == assault;
+    }
+
+    private static bool IsConstrictorSource(Assault assault)
+    {
+        GameShip owner = GetParentShip(assault);
+        if (owner == null || !owner.IsAnyPlayerShip())
+            return false;
+
+        ResolvedState state = GetResolvedState(owner);
+        if (state == null || !state.Active)
+            return false;
+
+        return FindEquippedAssault(owner) == assault;
+    }
+
+    private static bool IsPredatorTreeActive(GameShip owner)
+    {
+        if (owner == null)
+            return false;
+
+        Pilot pilot = GameShip.GetPlayerSourcePilot(owner);
+        if (pilot == null)
+            return false;
+
+        if (!IsCurrentPlayer(owner) && owner.IsAnyPlayerShip() &&
+            !LeviathanNetwork.HasSynchronizedSpecialization(owner))
+        {
+            return false;
+        }
+
+        return LeviathanSpecializationRuntime.IsTreeUnlocked(
+            pilot,
+            LeviathanPredatorTree.TreeId
+        );
+    }
+
+    public static bool ShouldSuppressNativeAssaultStart(Assault assault)
+    {
+        if (assault == null || !IsConstrictorSource(assault))
+            return false;
+
+        // Predator intentionally reuses native StartAttack -> Lunge. Constrictor
+        // alone is passive and therefore blocks the native active lunge.
+        return !IsPredatorTreeActive(GetParentShip(assault));
+    }
+
+    public static void RefreshAssaultPresentation(Assault assault)
+    {
+        if (assault == null)
+            return;
+
+        GameShip owner = GetParentShip(assault);
+        bool remote = owner != null &&
+            owner.IsAnyPlayerShip() &&
+            !IsCurrentPlayer(owner);
+
+        bool shouldHideRemote =
+            remote &&
+            IsConstrictorSource(assault);
+
+        bool wasHiddenRemote = RemoteHiddenAssaults.Contains(assault);
+
+        if (shouldHideRemote && !wasHiddenRemote)
+        {
+            RemoteHiddenAssaults.Add(assault);
+            SetBladesVisible(assault, false);
+        }
+        else if (!shouldHideRemote && wasHiddenRemote)
+        {
+            RemoteHiddenAssaults.Remove(assault);
+
+            if (!IsSuppressed(assault))
+                SetBladesVisible(assault, true);
+        }
+    }
+
+    public static void EnsureHidden(Assault assault)
+    {
+        if (assault == null)
+            return;
+
+        if (IsSuppressed(assault) ||
+            RemoteHiddenAssaults.Contains(assault) ||
+            IsConstrictorSource(assault))
+        {
+            SetBladesVisible(assault, false);
+        }
+    }
+
+    public static void ForgetAssault(Assault assault)
+    {
+        if (assault == null)
+            return;
+
+        bool wasRemoteHidden = RemoteHiddenAssaults.Remove(assault);
+        bool wasSuppressed = suppressed == assault;
+
+        if (wasSuppressed)
+            suppressed = null;
+
+        if (wasRemoteHidden || wasSuppressed)
+            SetBladesVisible(assault, true);
+    }
+
     private static void SetBladesVisible(Assault assault, bool visible)
     {
         if (assault == null || AssaultBladesField == null)
@@ -993,245 +1358,128 @@ public static class LeviathanConstrictor
         }
     }
 
-    public static bool IsSuppressed(Assault assault)
-    {
-        return suppressed != null && suppressed == assault;
-    }
-
-    public static void EnsureHidden(Assault assault)
-    {
-        if (IsSuppressed(assault))
-            SetBladesVisible(assault, false);
-    }
-
     // =========================================================================
-    // Helpers
+    // MOVEMENT HELPERS
     // =========================================================================
 
     public static float GetAirResistanceReduction(GameShip player)
     {
-        int rank = GetRank(player);
+        ResolvedState state;
 
-        if (rank < 1)
-            return 0f;
-
-        return GetRankValue(
-            AirResistanceReductionByRank,
-            rank
-        );
-    }
-
-    public static void AddNativeHandlingModifiers(
-        List<Modifier> modifiers,
-        int rank)
-    {
-        if (modifiers == null || rank < 1)
-            return;
-
-        int effectiveRank = Mathf.Clamp(rank, 1, 5);
-
-        // Vanguard's native paths:
-        //   Thruster Power -> Accelerate / Dodge / Boost
-        //   Turn Speed     -> TurnSpeed
-        //   Optimized Frame-> ControlMultiplier
-        //
-        // Constrictor intentionally omits Dodge because its requested handling
-        // package is Acceleration, Boost, Turn Speed and Maneuverability.
-        AddGlobalPercentageModifier(
-            modifiers,
-            Modifier.Type.Accelerate,
-            effectiveRank * AccelerationBonusPerRank
-        );
-
-        AddGlobalPercentageModifier(
-            modifiers,
-            Modifier.Type.Boost,
-            effectiveRank * BoostBonusPerRank
-        );
-
-        AddGlobalPercentageModifier(
-            modifiers,
-            Modifier.Type.TurnSpeed,
-            effectiveRank * TurnSpeedBonusPerRank
-        );
-
-        AddGlobalPercentageModifier(
-            modifiers,
-            Modifier.Type.ControlMultiplier,
-            effectiveRank * ManeuverabilityBonusPerRank
-        );
-    }
-
-    private static void AddGlobalPercentageModifier(
-        List<Modifier> modifiers,
-        Modifier.Type type,
-        float value)
-    {
-        Modifier modifier = Modifier.GetModifier(type);
-
-        if (modifier == null)
-            return;
-
-        modifier.SetValue(value);
-        modifier.global = true;
-        modifiers.Add(modifier);
-    }
-
-    private static float GetGrowthSizeDamageMultiplier(GameShip player)
-    {
-        int sectionCount = LeviathanMod.Controller == null
-            ? 0
-            : LeviathanMod.Controller.GetActiveSectionCount(player);
-
-        if (sectionCount <= 0)
-        {
-            sectionCount =
-                LeviathanGrowth.GetBodySegmentCountForRank(1) + 2;
-        }
-
-        float headSectionValue = GetHeadSectionValue(player);
-        float sectionValue = sectionCount * headSectionValue;
-
-        return Mathf.Max(
-            1f,
-            1f +
-                (sectionValue - BaselineSectionValue) *
-                DamageBonusPerSectionValue
-        );
-    }
-
-    private static float GetHeadSectionValue(GameShip player)
-    {
-        if (player == null)
-            return FrigateSectionValue;
-
-        int shipClass = (int)player.GetShipClass();
-
-        switch (shipClass)
-        {
-            case 4:
-                return DestroyerSectionValue;
-            case 5:
-                return CruiserSectionValue;
-            case 6:
-                return BattleshipSectionValue;
-            case 7:
-            case 8:
-                return DreadnoughtSectionValue;
-            case 3:
-            default:
-                return FrigateSectionValue;
-        }
-    }
-
-    private static float GetRankValue(float[] values, int rank)
-    {
-        int index = Mathf.Clamp(rank, 1, values.Length) - 1;
-        return values[index];
-    }
-
-    private static int GetRank(GameShip player)
-    {
-        Pilot pilot = GameShip.GetPlayerSourcePilot(player);
-
-        return pilot == null
-            ? 0
-            : Mathf.Clamp(
-                pilot.GetUpgradeLevel(ConstrictorUpgrade),
-                0,
-                5
-            );
-    }
-
-    private static int GetPredatorRank(GameShip player)
-    {
-        Pilot pilot = GameShip.GetPlayerSourcePilot(player);
-
-        return pilot == null
-            ? 0
-            : pilot.GetUpgradeLevel(LeviathanMod.PredatorUpgrade);
-    }
-
-    public static bool ShouldSuppressNativeAssaultStart(Assault assault)
-    {
-        if (!IsSuppressed(assault))
-            return false;
-
-        // If Predator exists, the native StartAttack -> GameShip.Lunge path is
-        // deliberately retained because Predator converts that lunge. Without
-        // Predator, Constrictor owns the weapon and the native Assault lunge is
-        // disabled along with the blade damage/visuals.
-        GameShip player = WorldController.instance == null
-            ? null
-            : WorldController.instance.GetCurrentPlayerShip();
-
-        return player != null && GetPredatorRank(player) < 1;
+        return TryGetLocalState(player, out state)
+            ? state.AirResistanceReduction
+            : 0f;
     }
 }
 
 // =============================================================================
-// Patches
+// HARMONY PATCHES
 // =============================================================================
 
-/// <summary>
-/// Inject Constrictor's handling bonuses at the same layer used by native
-/// Vanguard upgrades. Pilot.GetModifiers calls Upgrade.GetModifiers and
-/// GameShip.RegenerateModifiers then merges these global modifiers normally.
-/// </summary>
-[HarmonyPatch]
-public static class LeviathanConstrictorNativeHandlingPatch
+// Constrictor movement modifiers are a specialization layer on top of the
+// already-resolved native values, matching the current Growth bridge pattern.
+
+[HarmonyPatch(typeof(GameShip), "get_TurnSpeed")]
+public static class LeviathanConstrictorTurnSpeedPatch
 {
-    public static MethodBase TargetMethod()
+    public static void Postfix(GameShip __instance, ref float __result)
     {
-        return AccessTools.Method(
-            typeof(Upgrade),
-            "GetModifiers",
-            new Type[]
-            {
-                typeof(int),
-                typeof(int),
-                typeof(Ship.Class)
-            }
-        );
-    }
+        LeviathanConstrictor.ResolvedState state =
+            LeviathanConstrictor.GetResolvedState(__instance);
 
-    public static void Postfix(
-        Upgrade __instance,
-        int __0,
-        ref List<Modifier> __result)
-    {
-        if (__instance == null ||
-            __instance.key != LeviathanMod.ConstrictorUpgrade ||
-            __0 < 1)
+        if (state == null || !state.Active)
+            return;
+
+        if (WorldController.instance == null ||
+            WorldController.instance.GetCurrentPlayerShip() != __instance)
         {
             return;
         }
 
-        if (__result == null)
-            __result = new List<Modifier>();
+        __result *= state.TurnSpeedMultiplier;
+    }
+}
 
-        LeviathanConstrictor.AddNativeHandlingModifiers(
-            __result,
-            __0
-        );
+[HarmonyPatch(typeof(Thruster), "get_AccelerationFactor")]
+public static class LeviathanConstrictorAccelerationPatch
+{
+    public static void Postfix(Thruster __instance, ref float __result)
+    {
+        GameShip ship = __instance == null ? null : __instance.parentShip;
+
+        if (ship == null ||
+            WorldController.instance == null ||
+            WorldController.instance.GetCurrentPlayerShip() != ship)
+        {
+            return;
+        }
+
+        LeviathanConstrictor.ResolvedState state =
+            LeviathanConstrictor.GetResolvedState(ship);
+
+        if (state != null && state.Active)
+            __result *= state.AccelerationMultiplier;
+    }
+}
+
+[HarmonyPatch(typeof(Thruster), "get_BoostFactor")]
+public static class LeviathanConstrictorBoostPatch
+{
+    public static void Postfix(Thruster __instance, ref float __result)
+    {
+        GameShip ship = __instance == null ? null : __instance.parentShip;
+
+        if (ship == null ||
+            WorldController.instance == null ||
+            WorldController.instance.GetCurrentPlayerShip() != ship)
+        {
+            return;
+        }
+
+        LeviathanConstrictor.ResolvedState state =
+            LeviathanConstrictor.GetResolvedState(ship);
+
+        if (state != null && state.Active)
+            __result *= state.BoostMultiplier;
+    }
+}
+
+[HarmonyPatch(typeof(Thruster), "get_ControlMultiplier")]
+public static class LeviathanConstrictorManeuverabilityPatch
+{
+    public static void Postfix(Thruster __instance, ref float __result)
+    {
+        GameShip ship = __instance == null ? null : __instance.parentShip;
+
+        if (ship == null ||
+            WorldController.instance == null ||
+            WorldController.instance.GetCurrentPlayerShip() != ship)
+        {
+            return;
+        }
+
+        LeviathanConstrictor.ResolvedState state =
+            LeviathanConstrictor.GetResolvedState(ship);
+
+        if (state != null && state.Active)
+            __result *= state.ManeuverabilityMultiplier;
     }
 }
 
 /// <summary>
-/// Reduce only the extra velocity loss applied by Growth's Leviathan cruising
-/// resistance. Capturing before/after velocity avoids duplicating Growth's
-/// resistance formula and automatically preserves its threshold, curve and
-/// Predator-lunge exception.
+/// Refund a resolved fraction of whatever Growth's current high-speed resistance
+/// actually removed. This composes with Growth's evolving curve without copying
+/// its threshold/formula into Constrictor.
 /// </summary>
 [HarmonyPatch]
 public static class LeviathanConstrictorAirResistancePatch
 {
     public struct ResistanceState
     {
-        public Rigidbody2D body;
-        public Vector2 velocityBefore;
-        public float reduction;
-        public bool valid;
+        public Rigidbody2D Body;
+        public Vector2 VelocityBefore;
+        public float Reduction;
+        public bool Valid;
     }
 
     public static MethodBase TargetMethod()
@@ -1263,38 +1511,32 @@ public static class LeviathanConstrictorAirResistancePatch
             return;
 
         Rigidbody2D body = player.GetRigidBody();
-
         if (body == null)
             return;
 
-        __state.body = body;
-        __state.velocityBefore = body.velocity;
-        __state.reduction = Mathf.Clamp01(reduction);
-        __state.valid = true;
+        __state.Body = body;
+        __state.VelocityBefore = body.velocity;
+        __state.Reduction = Mathf.Clamp01(reduction);
+        __state.Valid = true;
     }
 
     public static void Postfix(ResistanceState __state)
     {
-        if (!__state.valid || !__state.body)
+        if (!__state.Valid || !__state.Body)
             return;
 
-        Vector2 velocityAfter = __state.body.velocity;
+        Vector2 velocityAfter = __state.Body.velocity;
+        Vector2 removed = __state.VelocityBefore - velocityAfter;
 
-        // ApplyHighSpeedResistance only moves velocity toward zero. Refund the
-        // requested fraction of whatever Growth actually removed this call.
-        Vector2 removed =
-            __state.velocityBefore - velocityAfter;
-
-        __state.body.velocity =
-            velocityAfter + removed * __state.reduction;
+        __state.Body.velocity =
+            velocityAfter + removed * __state.Reduction;
     }
 }
 
 /// <summary>
-/// Keep Assault.UpdateAssault alive so Predator can reuse the native activation,
-/// cooldown and StartAttack -> GameShip.Lunge lifecycle. Only the physical
-/// blade/ram damage is suppressed here; Constrictor supplies passive contact
-/// damage and Predator supplies active lunge damage.
+/// Owner gameplay: suppress the source Assault's native blade packet. Remote
+/// replicas are intentionally not placed in the authoritative `suppressed`
+/// state; they only hide presentation through the separate visual path.
 /// </summary>
 [HarmonyPatch]
 public static class LeviathanConstrictorSuppressBladeDamagePatch
@@ -1311,9 +1553,9 @@ public static class LeviathanConstrictorSuppressBladeDamagePatch
 }
 
 /// <summary>
-/// Constrictor by itself disables the Assault's native lunge. If Predator is
-/// ranked, StartAttack is allowed through because Predator converts that same
-/// native lunge path into its Leviathan attack.
+/// Constrictor is passive and suppresses native Assault StartAttack. Predator is
+/// the exception because it deliberately converts that native StartAttack/Lunge
+/// lifecycle. The same decision is derivable on synchronized remote replicas.
 /// </summary>
 [HarmonyPatch]
 public static class LeviathanConstrictorSuppressNativeLungePatch
@@ -1330,9 +1572,29 @@ public static class LeviathanConstrictorSuppressNativeLungePatch
 
     public static void Postfix(Assault __instance)
     {
-        // Native StartAttack may touch blade/trail presentation. Reassert the
-        // Leviathan-hidden state after the native activation path has run.
         LeviathanConstrictor.EnsureHidden(__instance);
     }
 }
 
+/// <summary>
+/// Slow-changing remote Constrictor presentation is derived from synchronized
+/// specialization. No dynamic network slot is needed merely to keep the source
+/// Assault blades hidden.
+/// </summary>
+[HarmonyPatch(typeof(Assault), "FixedUpdate")]
+public static class LeviathanConstrictorAssaultPresentationPatch
+{
+    public static void Postfix(Assault __instance)
+    {
+        LeviathanConstrictor.RefreshAssaultPresentation(__instance);
+    }
+}
+
+[HarmonyPatch(typeof(Assault), "Unequip")]
+public static class LeviathanConstrictorAssaultUnequipPatch
+{
+    public static void Prefix(Assault __instance)
+    {
+        LeviathanConstrictor.ForgetAssault(__instance);
+    }
+}

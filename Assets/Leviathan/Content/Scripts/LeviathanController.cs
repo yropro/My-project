@@ -1,23 +1,84 @@
+using HarmonyLib;
+using StarVortex;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using StarVortex;
+using System.Reflection;
 using UnityEngine;
 
+/// <summary>
+/// Local Leviathan physical builder/runtime coordinator.
+///
+/// Growth owns anatomy intent, live role classification and public anatomy
+/// queries. The controller owns construction and the private attachment graph.
+/// It publishes one atomic live anatomy snapshot after a successful build and
+/// invalidates that snapshot before any topology is torn down or replaced.
+/// </summary>
 public class LeviathanController : MonoBehaviour
 {
-    // Growth balance knobs live in LeviathanGrowth.cs.
+    private const int MaxFollowerSections = 64;
 
-    private readonly HashSet<GameShip> segments =
+    private static readonly FieldInfo AttachedShipField =
+        AccessTools.Field(typeof(AttachedAIShip), "attachedShip");
+
+    private static readonly FieldInfo AttachedTimeField =
+        AccessTools.Field(typeof(AttachedAIShip), "attachedTime");
+
+    private static readonly FieldInfo InitialAttachField =
+        AccessTools.Field(typeof(AttachedAIShip), "initialAttach");
+
+    private static readonly FieldInfo HasLastThrusterField =
+        AccessTools.Field(typeof(AttachedAIShip), "hasLastThruster");
+
+    private static readonly FieldInfo SegmentLengthField =
+        AccessTools.Field(typeof(AttachedAIShip), "segmentLength");
+
+    private struct BuildSignature
+    {
+        public int HeadCount;
+        public int BodySegmentCount;
+        public int TailCount;
+        public int TotalSectionCount;
+        public bool UsesBifurcationTemplates;
+
+        public bool Matches(BuildSignature other)
+        {
+            return HeadCount == other.HeadCount &&
+                BodySegmentCount == other.BodySegmentCount &&
+                TailCount == other.TailCount &&
+                TotalSectionCount == other.TotalSectionCount &&
+                UsesBifurcationTemplates == other.UsesBifurcationTemplates;
+        }
+    }
+
+    /// <summary>
+    /// One build-time connection plan. Roles remain Growth-owned; this only
+    /// decides which Body sections form the shared trunk versus rear branches.
+    /// BranchBodyCounts has one entry per terminal Tail.
+    /// </summary>
+    private sealed class TopologyPlan
+    {
+        public int SharedBodyCount;
+        public int[] BranchBodyCounts;
+    }
+
+    // Builder-owned runtime collections. These are construction state only;
+    // public anatomy ownership/counts live exclusively in LeviathanGrowth.
+    private readonly List<GameShip> liveBodies =
+        new List<GameShip>();
+    private readonly List<GameShip> liveTails =
+        new List<GameShip>();
+    private readonly Dictionary<GameShip, GameShip> attachmentParentBySection =
+        new Dictionary<GameShip, GameShip>();
+    private readonly HashSet<GameShip> customTemplateSections =
         new HashSet<GameShip>();
 
+    // Temporary build-slot metadata. Slots do not become anatomy authority.
     private readonly List<bool> customTemplateSlots =
         new List<bool>();
 
     private GameShip currentPlayer;
     private GameShip builtForPlayer;
-    private int builtForNonHeadSegments;
-    private bool builtForBifurcation;
+    private BuildSignature builtSignature;
     private Squadron activeLeviathanSquadron;
     private Coroutine growthRefreshCoroutine;
 
@@ -34,33 +95,24 @@ public class LeviathanController : MonoBehaviour
             return;
         }
 
-        // Preserve the existing controller's "already built" fast path,
-        // but rebuild when the resolved Growth anatomy changes. Ordinary stat
-        // node changes do not reconstruct the physical chain.
-        if (player == builtForPlayer)
+        if (ReferenceEquals(player, builtForPlayer))
         {
             RequestGrowthRefreshIfNeeded(player);
             return;
         }
 
-        // From this point onward, retain the original SetPlayerShip ordering:
-        // a different player ship always clears the old Leviathan state before
-        // we attempt to resolve the new Pilot.
+        CancelPendingGrowthRefresh();
         LeviathanPredatorRuntime.Cancel();
         LeviathanConstrictor.Reset();
-        RestorePlayerMass();
+
+        if (builtForPlayer != null || activeLeviathanSquadron != null)
+            TearDownCurrentBuild(true);
+        else
+            ResetBuildState();
 
         currentPlayer = player;
-        builtForPlayer = null;
-        builtForNonHeadSegments = 0;
-        builtForBifurcation = false;
-        activeLeviathanSquadron = null;
-        segments.Clear();
-        ClearCustomTemplateSlots();
-        LeviathanAttachmentNormalizer.Reset();
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
-
         if (pilot == null)
         {
             Debug.LogWarning(
@@ -69,45 +121,80 @@ public class LeviathanController : MonoBehaviour
             return;
         }
 
-        LeviathanSpecializationCurrency.MigrateLegacyGrowth(pilot);
+        LeviathanGrowth.AnatomyIntent intent =
+            LeviathanGrowth.GetAnatomyIntent(player);
 
-
-        LeviathanGrowth.ResolvedState growth =
-            LeviathanGrowth.GetResolvedState(player);
-
-        if (growth == null || !growth.Active)
+        if (!intent.Active)
         {
-            RestorePlayerMass();
-
             Debug.Log(
                 "[Leviathan] Evolution rank is 0; Leviathan inactive."
             );
             return;
         }
 
-        Debug.Log(
-            "[Leviathan] Leviathan chassis active. Growth tree active = " +
-            growth.TreeActive +
-            ", Segment budget = " +
-            growth.NonHeadSegments
+        if (!ValidateBuildIntent(intent))
+            return;
+
+        // This pre-build resolve is used only for non-anatomy flags such as the
+        // current Bifurcation template family. Live-count-derived stats are
+        // resolved again after PublishLiveAnatomy succeeds.
+        LeviathanGrowth.ResolvedState preBuildGrowth =
+            LeviathanGrowth.GetResolvedState(player);
+
+        bool usesBifurcationTemplates =
+            preBuildGrowth != null && preBuildGrowth.Bifurcation;
+
+        BuildSignature signature = CreateBuildSignature(
+            intent,
+            usesBifurcationTemplates
         );
 
-        if (!TryCreateLeviathan(player, growth))
+        Debug.Log(
+            "[Leviathan] Building anatomy: heads=" + intent.HeadCount +
+            ", bodies=" + intent.BodySegmentCount +
+            ", tails=" + intent.TailCount +
+            ", sections=" + intent.TotalSectionCount + "."
+        );
+
+        if (!TryCreateLeviathan(
+                player,
+                intent,
+                usesBifurcationTemplates))
+        {
+            TearDownCurrentBuild(true);
+            currentPlayer = player;
             return;
+        }
+
+        LeviathanGrowth.ResolvedState growth =
+            LeviathanGrowth.GetResolvedState(player);
+
+        if (growth == null || !growth.Active)
+        {
+            Debug.LogError(
+                "[Leviathan] Growth became inactive after anatomy publication."
+            );
+            TearDownCurrentBuild(true);
+            currentPlayer = player;
+            return;
+        }
 
         ApplyPlayerMass(player, growth);
 
         builtForPlayer = player;
-        builtForNonHeadSegments = growth.NonHeadSegments;
-        builtForBifurcation = growth.Bifurcation;
+        builtSignature = signature;
+
+        LeviathanGrowth.AnatomySnapshot anatomy =
+            LeviathanGrowth.GetAnatomy(player);
 
         Debug.Log(
-            "[Leviathan] Build complete. Segments = " +
-            segments.Count +
-            ", Mass multiplier = " +
-            growth.MassMultiplier.ToString("0.00") +
-            ", Air resistance strength = " +
-            growth.AirResistanceStrength.ToString("0.000")
+            "[Leviathan] Build complete. Live heads=" + anatomy.HeadCount +
+            ", bodies=" + anatomy.BodySegmentCount +
+            ", tails=" + anatomy.TailCount +
+            ", scaling segments=" + anatomy.ScalingSegmentCount +
+            ", mass multiplier=" + growth.MassMultiplier.ToString("0.00") +
+            ", air resistance strength=" +
+            growth.AirResistanceStrength.ToString("0.000") + "."
         );
     }
 
@@ -116,44 +203,55 @@ public class LeviathanController : MonoBehaviour
         if (player == null || !IsCurrentPlayerShip(player))
             return;
 
+        LeviathanGrowth.AnatomyIntent intent =
+            LeviathanGrowth.GetAnatomyIntent(player);
+
+        if (!intent.Active)
+        {
+            if (ReferenceEquals(player, builtForPlayer))
+                RequestGrowthRefresh(player);
+            return;
+        }
+
         LeviathanGrowth.ResolvedState growth =
             LeviathanGrowth.GetResolvedState(player);
 
-        int desiredSegments =
-            growth == null || !growth.Active
-                ? 0
-                : growth.NonHeadSegments;
-
-        bool desiredBifurcation =
+        bool usesBifurcationTemplates =
             growth != null && growth.Bifurcation;
 
-        if (player != builtForPlayer ||
-            desiredSegments != builtForNonHeadSegments ||
-            desiredBifurcation != builtForBifurcation)
+        BuildSignature desired = CreateBuildSignature(
+            intent,
+            usesBifurcationTemplates
+        );
+
+        LeviathanGrowth.AnatomySnapshot anatomy =
+            LeviathanGrowth.GetAnatomy(player);
+
+        if (!ReferenceEquals(player, builtForPlayer) ||
+            !builtSignature.Matches(desired) ||
+            anatomy == null ||
+            !anatomy.PublishedByBuilder)
         {
             RequestGrowthRefresh(player);
             return;
         }
 
-        // Stat-only Growth changes (Higgs/Ancient Wyrm, etc.) do not need to
-        // destroy/rebuild the chain, but mass is a stored Rigidbody value rather
-        // than a property getter, so refresh it explicitly.
+        // Stat-only Growth changes do not reconstruct physical anatomy. Mass is
+        // a stored Rigidbody value rather than a native getter, so refresh it.
         if (growth != null && growth.Active)
             ApplyPlayerMass(player, growth);
     }
 
     /// <summary>
-    /// Rebuild the live Leviathan after Growth changes. Multiple changes in
-    /// quick succession are coalesced so only the final resolved anatomy is constructed.
+    /// Rebuild the local Leviathan after Growth changes. Multiple changes in
+    /// quick succession coalesce into one final reconstruction.
     /// </summary>
     public void RequestGrowthRefresh(GameShip player)
     {
         if (player == null || !IsCurrentPlayerShip(player))
             return;
 
-        if (growthRefreshCoroutine != null)
-            StopCoroutine(growthRefreshCoroutine);
-
+        CancelPendingGrowthRefresh();
         growthRefreshCoroutine = StartCoroutine(
             RefreshGrowthRoutine(player)
         );
@@ -161,8 +259,8 @@ public class LeviathanController : MonoBehaviour
 
     private IEnumerator RefreshGrowthRoutine(GameShip player)
     {
-        // Let the native upgrade/specialization transaction finish first.
-        // This also coalesces several rapid changes into one reconstruction.
+        // Let the native specialization transaction finish and coalesce rapid
+        // edits before touching physical topology.
         yield return null;
 
         if (!IsCurrentPlayerShip(player))
@@ -171,10 +269,13 @@ public class LeviathanController : MonoBehaviour
             yield break;
         }
 
-        TearDownLeviathanForRefresh(player);
+        LeviathanPredatorRuntime.CancelForPlayer(player);
+        LeviathanConstrictor.Reset();
+        TearDownCurrentBuild(true);
+        currentPlayer = player;
 
-        // UnityEngine.Object.Destroy is deferred. Give the old attached ship
-        // objects a frame to disappear before building the replacement chain.
+        // Unity Destroy is deferred; wait one frame before constructing the new
+        // follower set so stale objects cannot participate in the new graph.
         yield return null;
 
         if (!IsCurrentPlayerShip(player))
@@ -187,68 +288,75 @@ public class LeviathanController : MonoBehaviour
         SetPlayerShip(player);
     }
 
-    private void TearDownLeviathanForRefresh(GameShip player)
+    private static BuildSignature CreateBuildSignature(
+        LeviathanGrowth.AnatomyIntent intent,
+        bool usesBifurcationTemplates)
     {
-        LeviathanPredatorRuntime.CancelForPlayer(player);
-        LeviathanConstrictor.Reset();
+        BuildSignature signature = new BuildSignature();
+        signature.HeadCount = intent.HeadCount;
+        signature.BodySegmentCount = intent.BodySegmentCount;
+        signature.TailCount = intent.TailCount;
+        signature.TotalSectionCount = intent.TotalSectionCount;
+        signature.UsesBifurcationTemplates = usesBifurcationTemplates;
+        return signature;
+    }
 
-        List<GameShip> oldSegments = segments
-            .Where(x => x != null && x != player)
-            .ToList();
-
-        RestorePlayerMass();
-
-        // SetSquadron is a simple assignment in the native GameShip code.
-        // Detach the live head and followers from the old Squadron before the
-        // follower GameObjects are retired so no stale chain can participate
-        // in the next build.
-        if (player != null &&
-            activeLeviathanSquadron != null &&
-            player.squadron == activeLeviathanSquadron)
+    private static bool ValidateBuildIntent(
+        LeviathanGrowth.AnatomyIntent intent)
+    {
+        if (!intent.TopologyFitsBudget)
         {
-            player.SetSquadron(null);
+            Debug.LogError(
+                "[Leviathan] Refusing to build invalid Growth anatomy intent."
+            );
+            return false;
         }
 
-        for (int i = 0; i < oldSegments.Count; i++)
+        // The canonical anatomy system already supports arbitrary Head counts,
+        // but the physical builder currently has no verified forward-branch
+        // attachment solver for additional Heads. Fail explicitly instead of
+        // constructing a follower and falsely publishing it as a forward Head.
+        if (intent.HeadCount != 1)
         {
-            GameShip segment = oldSegments[i];
-
-            if (segment == null)
-                continue;
-
-            if (segment.squadron == activeLeviathanSquadron)
-                segment.SetSquadron(null);
+            Debug.LogError(
+                "[Leviathan] The current physical builder supports exactly one " +
+                "Head. Growth requested " + intent.HeadCount +
+                ". Add a verified multi-Head topology builder before enabling " +
+                "this morphology."
+            );
+            return false;
         }
 
-        activeLeviathanSquadron = null;
-        segments.Clear();
-        ClearCustomTemplateSlots();
-        LeviathanAttachmentNormalizer.Reset();
-
-        currentPlayer = player;
-        builtForPlayer = null;
-        builtForNonHeadSegments = 0;
-        builtForBifurcation = false;
-
-        for (int i = 0; i < oldSegments.Count; i++)
+        if (intent.TailCount < 1)
         {
-            GameShip segment = oldSegments[i];
-
-            if (segment == null || segment.gameObject == null)
-                continue;
-
-            // Hide/collide no further immediately; actual destruction occurs
-            // at the normal Unity end-of-frame boundary.
-            segment.gameObject.SetActive(false);
-            UnityEngine.Object.Destroy(segment.gameObject);
+            Debug.LogError(
+                "[Leviathan] The current physical builder requires at least one Tail."
+            );
+            return false;
         }
+
+        int followerCount = intent.TotalSectionCount - intent.HeadCount;
+        if (followerCount < 1 || followerCount > MaxFollowerSections)
+        {
+            Debug.LogError(
+                "[Leviathan] Requested follower count " + followerCount +
+                " is outside the supported build range 1-" +
+                MaxFollowerSections + "."
+            );
+            return false;
+        }
+
+        return true;
     }
 
     private static bool IsCurrentPlayerShip(GameShip player)
     {
         return player != null &&
             WorldController.instance != null &&
-            WorldController.instance.GetCurrentPlayerShip() == player;
+            ReferenceEquals(
+                WorldController.instance.GetCurrentPlayerShip(),
+                player
+            );
     }
 
     private void FixedUpdate()
@@ -263,37 +371,35 @@ public class LeviathanController : MonoBehaviour
     {
         LeviathanPredatorRuntime.Cancel();
         LeviathanConstrictor.Reset();
-
-        if (growthRefreshCoroutine != null)
-        {
-            StopCoroutine(growthRefreshCoroutine);
-            growthRefreshCoroutine = null;
-        }
-
-        RestorePlayerMass();
-
+        CancelPendingGrowthRefresh();
+        TearDownCurrentBuild(true);
         currentPlayer = null;
-        builtForPlayer = null;
-        builtForNonHeadSegments = 0;
-        builtForBifurcation = false;
-        activeLeviathanSquadron = null;
-        segments.Clear();
-        ClearCustomTemplateSlots();
-        LeviathanAttachmentNormalizer.Reset();
     }
 
-    public GameShip GetDamageRedirectTarget(GameShip target)
+    private void CancelPendingGrowthRefresh()
     {
-        if (currentPlayer == null)
-            return null;
+        if (growthRefreshCoroutine == null)
+            return;
 
-        if (!segments.Contains(target))
-            return null;
-
-        return currentPlayer;
+        StopCoroutine(growthRefreshCoroutine);
+        growthRefreshCoroutine = null;
     }
 
-    public bool ShouldNormalizeAttachment(GameShip ship)
+    /// <summary>
+    /// Private build-graph query used by attachment normalization. This is not an
+    /// anatomy-count API; role/membership consumers must query LeviathanGrowth.
+    /// </summary>
+    internal bool TryGetAttachmentParent(
+        GameShip section,
+        out GameShip parent)
+    {
+        parent = null;
+        return section != null &&
+            attachmentParentBySection.TryGetValue(section, out parent) &&
+            parent != null;
+    }
+
+    internal bool ShouldNormalizeAttachment(GameShip ship)
     {
         if (ship == null || activeLeviathanSquadron == null)
             return false;
@@ -301,40 +407,20 @@ public class LeviathanController : MonoBehaviour
         if (ship.squadron != activeLeviathanSquadron)
             return false;
 
-        List<Squadron.SquadronShip> ships =
-            activeLeviathanSquadron.ships;
-
-        if (ships == null)
+        GameShip parent;
+        if (!attachmentParentBySection.TryGetValue(ship, out parent))
             return false;
 
-        int index = -1;
-
-        for (int i = 1; i < ships.Count; i++)
-        {
-            if (ships[i].ship == ship)
-            {
-                index = i;
-                break;
-            }
-        }
-
-        if (index < 1 || index >= customTemplateSlots.Count)
-            return false;
-
-        if (customTemplateSlots[index])
-            return true;
-
-        return index > 1 && customTemplateSlots[index - 1];
+        return customTemplateSections.Contains(ship) ||
+            (parent != null && customTemplateSections.Contains(parent));
     }
 
     private bool TryCreateLeviathan(
         GameShip player,
-        LeviathanGrowth.ResolvedState growth)
+        LeviathanGrowth.AnatomyIntent intent,
+        bool usesBifurcationTemplates)
     {
-        SquadronBase leviathanBase =
-            Resources.FindObjectsOfTypeAll<SquadronBase>()
-                .FirstOrDefault(x => x.name == "LeviathanTest");
-
+        SquadronBase leviathanBase = FindLeviathanBase();
         if (leviathanBase == null)
         {
             Debug.LogError(
@@ -343,12 +429,7 @@ public class LeviathanController : MonoBehaviour
             return false;
         }
 
-        // LeviathanTest is the authored seed pool: head + 15 body
-        // definitions + tail. Runtime anatomy is resolved entirely from Growth;
-        // extra body definitions are cloned when the specialization exceeds it.
-        Squadron squadron =
-            leviathanBase.GetSquadron(1);
-
+        Squadron squadron = leviathanBase.GetSquadron(1);
         if (squadron == null)
         {
             Debug.LogError(
@@ -357,99 +438,148 @@ public class LeviathanController : MonoBehaviour
             return false;
         }
 
-        List<Squadron.SquadronShip> ships =
-            squadron.ships;
-
-        if (ships == null || ships.Count < 5)
-        {
-            Debug.LogError(
-                "[Leviathan] Unexpected squadron ship count: " +
-                (ships == null ? -1 : ships.Count)
-            );
-            return false;
-        }
-
-        if (!PrepareSquadronForSegmentBudget(ships, growth.NonHeadSegments))
+        List<Squadron.SquadronShip> ships = squadron.ships;
+        if (!PrepareSquadronForAnatomy(ships, intent))
             return false;
 
-        if (growth.Bifurcation)
+        if (usesBifurcationTemplates)
             LeviathanSegmentTemplates.EnsureBifurcationDefaults();
 
-        ApplySegmentTemplates(ships);
+        Dictionary<string, string> templates =
+            LeviathanSegmentTemplates.LoadSerializedBodies();
 
-        Squadron.SquadronShip headSlot =
-            ships[0];
+        TopologyPlan topology = CreateTopologyPlan(
+            intent,
+            usesBifurcationTemplates,
+            templates
+        );
 
+        ApplySegmentTemplates(
+            ships,
+            intent,
+            usesBifurcationTemplates,
+            topology,
+            templates
+        );
+
+        Squadron.SquadronShip headSlot = ships[0];
         headSlot.ship = player;
         headSlot.spawned = true;
         headSlot.temporary = false;
 
         activeLeviathanSquadron = squadron;
         LeviathanAttachmentNormalizer.Reset();
-
         player.SetSquadron(squadron);
 
         squadron.InvalidateShipCaches();
         squadron.Build(true);
 
-        segments.Clear();
+        ClearRuntimeBuildCollections();
+
+        int bodyStartIndex = 1;
+        int tailStartIndex = bodyStartIndex + intent.BodySegmentCount;
+
+        // Validate the entire spawned follower set before publishing anything.
+        for (int i = 1; i < ships.Count; i++)
+        {
+            Squadron.SquadronShip slot = ships[i];
+            GameShip section = slot == null ? null : slot.ship;
+
+            if (section == null)
+            {
+                Debug.LogError(
+                    "[Leviathan] Section failed to spawn at slot " + i + "."
+                );
+                return false;
+            }
+        }
 
         for (int i = 1; i < ships.Count; i++)
         {
-            GameShip segment = ships[i].ship;
+            GameShip section = ships[i].ship;
+            ConfigureFollowerForPlayer(section, player);
 
-            if (segment == null)
-            {
-                Debug.LogError(
-                    "[Leviathan] Segment failed to spawn at slot " +
-                    i
-                );
+            if (i < customTemplateSlots.Count && customTemplateSlots[i])
+                customTemplateSections.Add(section);
 
-                activeLeviathanSquadron = null;
-                segments.Clear();
-                return false;
-            }
+            if (i < tailStartIndex)
+                liveBodies.Add(section);
+            else
+                liveTails.Add(section);
+        }
 
-            segment.faction = player.faction;
+        if (!BuildAttachmentGraph(player, topology))
+        {
+            Debug.LogError(
+                "[Leviathan] Could not build the requested attachment graph."
+            );
+            return false;
+        }
 
-            // Leviathan followers are structural sections, not independent
-            // NPCs. Hide their floating NPC name/health minibars locally and
-            // persist the flag in the Ship payload so remote replicas hide
-            // them too.
-            segment.disableMinibars = true;
+        if (!ApplyNativeAttachmentGraph())
+        {
+            Debug.LogError(
+                "[Leviathan] Could not apply the requested attachment topology."
+            );
+            return false;
+        }
 
-            if (segment.originalShip != null)
-                segment.originalShip.disableMinibars = true;
+        if (!LeviathanGrowth.PublishLiveAnatomy(
+                player,
+                null,
+                liveBodies,
+                liveTails))
+        {
+            Debug.LogError(
+                "[Leviathan] Growth rejected the completed live anatomy."
+            );
+            return false;
+        }
 
-            segment.CheckAttachMinibars();
+        LeviathanGrowth.AnatomySnapshot anatomy =
+            LeviathanGrowth.GetAnatomy(player);
 
-            // Squadron.SpawnShip creates these as star-owned entities. In a
-            // multiplayer session the Leviathan chain is actually owned by the
-            // local player, so hand each segment to Star Vortex's native
-            // player-entity replication path. NetWorldBridge will allocate a
-            // player-owned netId, announce the full Ship JSON, and stream the
-            // segment transform to every other peer.
-            if (NetSession.InSession)
-            {
-                segment.netStarEntity = false;
-                segment.netPlayerEntity = true;
-            }
-
-            segments.Add(segment);
+        if (anatomy.HeadCount != intent.HeadCount ||
+            anatomy.BodySegmentCount != intent.BodySegmentCount ||
+            anatomy.TailCount != intent.TailCount ||
+            anatomy.TotalSectionCount != intent.TotalSectionCount)
+        {
+            Debug.LogError(
+                "[Leviathan] Published live anatomy does not match the completed " +
+                "build intent. Intended H/B/T=" + intent.HeadCount + "/" +
+                intent.BodySegmentCount + "/" + intent.TailCount +
+                ", live=" + anatomy.HeadCount + "/" +
+                anatomy.BodySegmentCount + "/" + anatomy.TailCount + "."
+            );
+            LeviathanGrowth.InvalidateLiveAnatomy(player);
+            return false;
         }
 
         return true;
     }
 
-    private bool PrepareSquadronForSegmentBudget(
+    private static SquadronBase FindLeviathanBase()
+    {
+        SquadronBase[] bases =
+            Resources.FindObjectsOfTypeAll<SquadronBase>();
+
+        for (int i = 0; i < bases.Length; i++)
+        {
+            SquadronBase candidate = bases[i];
+            if (candidate != null && candidate.name == "LeviathanTest")
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private bool PrepareSquadronForAnatomy(
         List<Squadron.SquadronShip> ships,
-        int desiredNonHeadSegments)
+        LeviathanGrowth.AnatomyIntent intent)
     {
         if (ships == null)
             return false;
 
-        // LeviathanTest remains the authored seed pool:
-        // [head, body1 ... body15, tail].
         const int authoredBodyCount =
             LeviathanGrowth.Tuning.AuthoredSeedBodySlots;
         const int expectedShipCount =
@@ -461,64 +591,89 @@ public class LeviathanController : MonoBehaviour
                 "[Leviathan] LeviathanTest must contain exactly " +
                 expectedShipCount +
                 " authored ships (head + 15 body + tail). Found " +
-                ships.Count +
-                "."
+                ships.Count + "."
             );
             return false;
         }
 
-        int desiredSegments = Mathf.Clamp(
-            desiredNonHeadSegments,
-            2,
-            64
-        );
+        Squadron.SquadronShip headSlot = ships[0];
+        Squadron.SquadronShip tailPrototype = ships[ships.Count - 1];
 
-        int desiredBodyCount = desiredSegments - 1;
+        List<Squadron.SquadronShip> authoredBodies =
+            new List<Squadron.SquadronShip>(authoredBodyCount);
 
-        if (desiredBodyCount < authoredBodyCount)
+        for (int i = 0; i < authoredBodyCount; i++)
+            authoredBodies.Add(ships[i + 1]);
+
+        Squadron.SquadronShip bodyPrototype =
+            authoredBodies[authoredBodies.Count - 1];
+
+        ships.Clear();
+        ships.Add(headSlot);
+
+        for (int bodyIndex = 0;
+            bodyIndex < intent.BodySegmentCount;
+            bodyIndex++)
         {
-            ships.RemoveRange(
-                1 + desiredBodyCount,
-                authoredBodyCount - desiredBodyCount
-            );
-        }
-        else if (desiredBodyCount > authoredBodyCount)
-        {
-            Squadron.SquadronShip prototype = ships[authoredBodyCount];
+            Squadron.SquadronShip bodySlot;
 
-            for (int bodyNumber = authoredBodyCount + 1;
-                bodyNumber <= desiredBodyCount;
-                bodyNumber++)
+            if (bodyIndex < authoredBodies.Count)
             {
-                Squadron.SquadronShip clone =
-                    CloneBodySlotDefinition(prototype);
-
-                if (clone == null)
+                bodySlot = authoredBodies[bodyIndex];
+            }
+            else
+            {
+                bodySlot = CloneSlotDefinition(bodyPrototype);
+                if (bodySlot == null)
                 {
                     Debug.LogError(
-                        "[Leviathan] Could not clone a body definition for " +
-                        "segment " + bodyNumber + "."
+                        "[Leviathan] Could not clone body slot " +
+                        (bodyIndex + 1) + "."
                     );
                     return false;
                 }
-
-                // Keep the authored tail as the final list item.
-                ships.Insert(ships.Count - 1, clone);
             }
+
+            ships.Add(bodySlot);
         }
 
-        Debug.Log(
-            "[Leviathan] Using " +
-            desiredBodyCount +
-            " body segments + tail (" +
-            desiredSegments +
-            " non-head pieces)."
-        );
+        for (int tailIndex = 0;
+            tailIndex < intent.TailCount;
+            tailIndex++)
+        {
+            Squadron.SquadronShip tailSlot =
+                tailIndex == 0
+                    ? tailPrototype
+                    : CloneSlotDefinition(tailPrototype);
+
+            if (tailSlot == null)
+            {
+                Debug.LogError(
+                    "[Leviathan] Could not clone tail slot " +
+                    (tailIndex + 1) + "."
+                );
+                return false;
+            }
+
+            ships.Add(tailSlot);
+        }
+
+        int expectedResolvedCount =
+            1 + intent.BodySegmentCount + intent.TailCount;
+
+        if (ships.Count != expectedResolvedCount)
+        {
+            Debug.LogError(
+                "[Leviathan] Internal anatomy slot build mismatch. Expected " +
+                expectedResolvedCount + ", built " + ships.Count + "."
+            );
+            return false;
+        }
 
         return true;
     }
 
-    private static Squadron.SquadronShip CloneBodySlotDefinition(
+    private static Squadron.SquadronShip CloneSlotDefinition(
         Squadron.SquadronShip source)
     {
         if (source == null)
@@ -526,27 +681,22 @@ public class LeviathanController : MonoBehaviour
 
         Squadron.SquadronShip result =
             source.Clone() as Squadron.SquadronShip;
-
         if (result == null)
             return null;
 
-        // SquadronShip.Clone intentionally shares its NPC reference. Extra
-        // Growth slots need independent Ship definitions so Tail/Body numbered
-        // template overrides cannot mutate another slot that shares the NPC.
+        // SquadronShip.Clone intentionally shares its NPC reference. Every
+        // runtime-added slot needs an independent Ship definition so template
+        // overrides cannot mutate a sibling slot through shared NPC state.
         NPC sourceNpc = source.npc as NPC;
-
         if (sourceNpc == null)
             return null;
 
         NPCBase npcBase = sourceNpc.GetNPCBase();
-
         if (npcBase == null)
             return null;
 
         int level = 1;
-
-        if (sourceNpc.ship != null &&
-            sourceNpc.ship.pilot != null)
+        if (sourceNpc.ship != null && sourceNpc.ship.pilot != null)
         {
             level = Mathf.Max(
                 1,
@@ -555,7 +705,6 @@ public class LeviathanController : MonoBehaviour
         }
 
         result.npc = npcBase.GetNPC(level);
-
         if (result.npc == null)
             return null;
 
@@ -565,84 +714,494 @@ public class LeviathanController : MonoBehaviour
         return result;
     }
 
+    private static TopologyPlan CreateTopologyPlan(
+        LeviathanGrowth.AnatomyIntent intent,
+        bool usesBifurcationTemplates,
+        Dictionary<string, string> templates)
+    {
+        TopologyPlan plan = new TopologyPlan();
+        int tailCount = Mathf.Max(1, intent.TailCount);
+        plan.BranchBodyCounts = new int[tailCount];
+        plan.SharedBodyCount = intent.BodySegmentCount;
+
+        // BifurcateN names the final shared Body before rear branches diverge.
+        // No BifurcateN means all Bodies remain in the shared trunk and the
+        // terminal Tails fan directly from its end.
+        if (usesBifurcationTemplates &&
+            intent.TailCount > 1 &&
+            intent.BodySegmentCount > 0 &&
+            templates != null)
+        {
+            int selected = 0;
+
+            for (int i = 1; i <= 64; i++)
+            {
+                string serialized;
+                if (!templates.TryGetValue(
+                        "Bifurcate" + i,
+                        out serialized) ||
+                    string.IsNullOrEmpty(serialized))
+                {
+                    continue;
+                }
+
+                if (i <= intent.BodySegmentCount)
+                {
+                    if (selected == 0)
+                        selected = i;
+                    else
+                    {
+                        Debug.LogWarning(
+                            "[Leviathan] Multiple BifurcateN templates exist; " +
+                            "using Bifurcate" + selected + "."
+                        );
+                        break;
+                    }
+                }
+            }
+
+            if (selected > 0)
+                plan.SharedBodyCount = selected;
+        }
+
+        int branchBodies = Mathf.Max(
+            0,
+            intent.BodySegmentCount - plan.SharedBodyCount
+        );
+
+        if (plan.BranchBodyCounts.Length > 0 && branchBodies > 0)
+        {
+            int even = branchBodies / plan.BranchBodyCounts.Length;
+            int remainder = branchBodies % plan.BranchBodyCounts.Length;
+
+            for (int i = 0; i < plan.BranchBodyCounts.Length; i++)
+            {
+                plan.BranchBodyCounts[i] =
+                    even + (i < remainder ? 1 : 0);
+            }
+        }
+
+        return plan;
+    }
+
     private void ApplySegmentTemplates(
-        List<Squadron.SquadronShip> ships)
+        List<Squadron.SquadronShip> ships,
+        LeviathanGrowth.AnatomyIntent intent,
+        bool usesBifurcationTemplates,
+        TopologyPlan topology,
+        Dictionary<string, string> templates)
     {
         ResizeCustomTemplateSlots(ships == null ? 0 : ships.Count);
 
-        if (ships == null || ships.Count < 2)
+        if (ships == null || ships.Count < 2 || topology == null)
             return;
 
-        Dictionary<string, string> templates =
-            LeviathanSegmentTemplates.LoadSerializedBodies();
-
-        string body;
-        templates.TryGetValue("Body", out body);
-
-        int tailIndex = ships.Count - 1;
-
-        for (int i = 1; i < tailIndex; i++)
+        if (templates == null)
         {
-            // Numbered templates map one-to-one to resolved physical
-            // body positions; Body remains the generic fallback.
-            int templateNumber = i;
+            templates = new Dictionary<string, string>(
+                System.StringComparer.OrdinalIgnoreCase
+            );
+        }
 
-            string serialized;
-            bool hasNumbered =
+        string genericBody;
+        templates.TryGetValue("Body", out genericBody);
+
+        // Shared trunk Bodies retain the historical numbered Body overrides.
+        for (int bodyOrdinal = 1;
+            bodyOrdinal <= topology.SharedBodyCount;
+            bodyOrdinal++)
+        {
+            string serialized = null;
+
+            if (usesBifurcationTemplates &&
+                intent.TailCount > 1 &&
+                bodyOrdinal == topology.SharedBodyCount)
+            {
                 templates.TryGetValue(
-                    templateNumber.ToString(),
+                    "Bifurcate" + bodyOrdinal,
                     out serialized
                 );
-
-            if (!hasNumbered)
-                serialized = body;
-
-            if (string.IsNullOrEmpty(serialized) ||
-                ships[i] == null ||
-                ships[i].npc == null)
-            {
-                continue;
             }
 
-            Ship shipDefinition = ships[i].npc.GetShip();
-
-            if (shipDefinition != null)
+            if (string.IsNullOrEmpty(serialized))
             {
-                shipDefinition.serializedBody = serialized;
-                customTemplateSlots[i] = true;
+                templates.TryGetValue(
+                    bodyOrdinal.ToString(),
+                    out serialized
+                );
             }
+
+            if (string.IsNullOrEmpty(serialized))
+                serialized = genericBody;
+
+            ApplySerializedTemplate(
+                ships,
+                bodyOrdinal,
+                serialized
+            );
         }
 
-        string tail;
+        // Branch Body sections are still anatomically Body. Tail_aN/Tail_bN
+        // describe branch position, not Tail role; only the terminal section in
+        // each branch is classified as Tail by Growth.
+        int bodyCursor = topology.SharedBodyCount;
 
-        if (templates.TryGetValue("Tail", out tail) &&
-            !string.IsNullOrEmpty(tail) &&
-            ships[tailIndex] != null &&
-            ships[tailIndex].npc != null)
+        for (int branch = 0;
+            branch < topology.BranchBodyCounts.Length;
+            branch++)
         {
-            Ship tailDefinition = ships[tailIndex].npc.GetShip();
+            int branchBodyCount = topology.BranchBodyCounts[branch];
+            string branchPrefix = GetBranchTemplatePrefix(
+                branch,
+                usesBifurcationTemplates
+            );
 
-            if (tailDefinition != null)
+            for (int position = 1;
+                position <= branchBodyCount;
+                position++)
             {
-                tailDefinition.serializedBody = tail;
-                customTemplateSlots[tailIndex] = true;
+                bodyCursor++;
+                string serialized = ResolveBranchTemplate(
+                    templates,
+                    branchPrefix,
+                    position,
+                    false,
+                    bodyCursor,
+                    genericBody,
+                    null
+                );
+
+                ApplySerializedTemplate(
+                    ships,
+                    bodyCursor,
+                    serialized
+                );
             }
         }
+
+        int tailStart = 1 + intent.BodySegmentCount;
+        string genericTail;
+        templates.TryGetValue("Tail", out genericTail);
+
+        for (int branch = 0; branch < intent.TailCount; branch++)
+        {
+            int branchBodyCount =
+                branch < topology.BranchBodyCounts.Length
+                    ? topology.BranchBodyCounts[branch]
+                    : 0;
+
+            string branchPrefix = GetBranchTemplatePrefix(
+                branch,
+                usesBifurcationTemplates
+            );
+
+            int terminalPosition = branchBodyCount + 1;
+            string serialized = ResolveBranchTemplate(
+                templates,
+                branchPrefix,
+                terminalPosition,
+                true,
+                0,
+                null,
+                genericTail
+            );
+
+            ApplySerializedTemplate(
+                ships,
+                tailStart + branch,
+                serialized
+            );
+        }
+    }
+
+    private static string GetBranchTemplatePrefix(
+        int branch,
+        bool usesBifurcationTemplates)
+    {
+        if (!usesBifurcationTemplates)
+            return null;
+
+        if (branch == 0)
+            return "Tail_a";
+
+        if (branch == 1)
+            return "Tail_b";
+
+        // Current saved-template grammar intentionally defines only a/b.
+        // Additional future Tail branches remain mechanically valid and use
+        // ordinary Body/Tail fallbacks until their UI naming contract is added.
+        return null;
+    }
+
+    private static string ResolveBranchTemplate(
+        Dictionary<string, string> templates,
+        string branchPrefix,
+        int branchPosition,
+        bool terminalTail,
+        int globalBodyOrdinal,
+        string genericBody,
+        string genericTail)
+    {
+        string serialized = null;
+
+        if (!string.IsNullOrEmpty(branchPrefix))
+        {
+            templates.TryGetValue(
+                branchPrefix + branchPosition,
+                out serialized
+            );
+
+            if (string.IsNullOrEmpty(serialized))
+                templates.TryGetValue(branchPrefix, out serialized);
+        }
+
+        if (!terminalTail &&
+            string.IsNullOrEmpty(serialized) &&
+            globalBodyOrdinal > 0)
+        {
+            templates.TryGetValue(
+                globalBodyOrdinal.ToString(),
+                out serialized
+            );
+        }
+
+        if (string.IsNullOrEmpty(serialized))
+            serialized = terminalTail ? genericTail : genericBody;
+
+        return serialized;
+    }
+
+    private void ApplySerializedTemplate(
+        List<Squadron.SquadronShip> ships,
+        int slotIndex,
+        string serialized)
+    {
+        if (ships == null ||
+            slotIndex < 0 ||
+            slotIndex >= ships.Count ||
+            string.IsNullOrEmpty(serialized) ||
+            ships[slotIndex] == null ||
+            ships[slotIndex].npc == null)
+        {
+            return;
+        }
+
+        Ship definition = ships[slotIndex].npc.GetShip();
+        if (definition == null)
+            return;
+
+        definition.serializedBody = serialized;
+        customTemplateSlots[slotIndex] = true;
+    }
+
+    private static void ConfigureFollowerForPlayer(
+        GameShip section,
+        GameShip player)
+    {
+        section.faction = player.faction;
+        section.disableMinibars = true;
+
+        if (section.originalShip != null)
+            section.originalShip.disableMinibars = true;
+
+        section.CheckAttachMinibars();
+
+        // Squadron.SpawnShip creates star-owned entities. Leviathan followers
+        // belong to the local player and use the game's native player-entity
+        // replication path so every peer receives their complete Ship JSON and
+        // transform stream.
+        if (NetSession.InSession)
+        {
+            section.netStarEntity = false;
+            section.netPlayerEntity = true;
+        }
+    }
+
+    private bool BuildAttachmentGraph(
+        GameShip primaryHead,
+        TopologyPlan topology)
+    {
+        attachmentParentBySection.Clear();
+
+        if (primaryHead == null ||
+            topology == null ||
+            topology.BranchBodyCounts == null ||
+            topology.BranchBodyCounts.Length != liveTails.Count ||
+            topology.SharedBodyCount < 0 ||
+            topology.SharedBodyCount > liveBodies.Count)
+        {
+            return false;
+        }
+
+        int bodyCursor = 0;
+        GameShip parent = primaryHead;
+
+        for (int i = 0; i < topology.SharedBodyCount; i++)
+        {
+            GameShip body = liveBodies[bodyCursor++];
+            if (body == null)
+                return false;
+
+            attachmentParentBySection[body] = parent;
+            parent = body;
+        }
+
+        GameShip fork = parent;
+
+        for (int branch = 0;
+            branch < topology.BranchBodyCounts.Length;
+            branch++)
+        {
+            GameShip branchParent = fork;
+            int branchBodyCount = topology.BranchBodyCounts[branch];
+
+            for (int i = 0; i < branchBodyCount; i++)
+            {
+                if (bodyCursor >= liveBodies.Count)
+                    return false;
+
+                GameShip body = liveBodies[bodyCursor++];
+                if (body == null)
+                    return false;
+
+                attachmentParentBySection[body] = branchParent;
+                branchParent = body;
+            }
+
+            GameShip tail = liveTails[branch];
+            if (tail == null)
+                return false;
+
+            attachmentParentBySection[tail] = branchParent;
+        }
+
+        return bodyCursor == liveBodies.Count &&
+            attachmentParentBySection.Count ==
+                liveBodies.Count + liveTails.Count;
+    }
+
+    private bool ApplyNativeAttachmentGraph()
+    {
+        if (attachmentParentBySection.Count == 0)
+            return true;
+
+        if (AIController.instance == null ||
+            AttachedShipField == null ||
+            AttachedTimeField == null ||
+            InitialAttachField == null ||
+            HasLastThrusterField == null ||
+            SegmentLengthField == null)
+        {
+            Debug.LogError(
+                "[Leviathan] Could not resolve the verified native " +
+                "AttachedAIShip attachment-state fields."
+            );
+            return false;
+        }
+
+        foreach (KeyValuePair<GameShip, GameShip> pair in
+            attachmentParentBySection)
+        {
+            GameShip section = pair.Key;
+            GameShip parent = pair.Value;
+
+            if (section == null || parent == null)
+                return false;
+
+            AttachedAIShip attached =
+                AIController.instance.GetAIShip(section) as AttachedAIShip;
+
+            if (attached == null)
+                return false;
+
+            // Reparent as a fresh native attachment. These are the same
+            // parent-dependent caches native resets when it discovers a new
+            // predecessor: no stale rear point/segment length may survive from
+            // the temporary flat Squadron order built earlier this frame.
+            AttachedShipField.SetValue(attached, parent);
+
+            AttachedTimeField.SetValue(attached, 0f);
+            InitialAttachField.SetValue(attached, true);
+            HasLastThrusterField.SetValue(attached, false);
+            SegmentLengthField.SetValue(attached, -1f);
+        }
+
+        return true;
+    }
+
+    private void TearDownCurrentBuild(bool destroyFollowers)
+    {
+        GameShip owner = builtForPlayer != null
+            ? builtForPlayer
+            : currentPlayer;
+
+        if (owner != null)
+            LeviathanGrowth.InvalidateLiveAnatomy(owner);
+
+        RestorePlayerMass();
+
+        Squadron oldSquadron = activeLeviathanSquadron;
+
+        if (owner != null &&
+            oldSquadron != null &&
+            ReferenceEquals(owner.squadron, oldSquadron))
+        {
+            owner.SetSquadron(null);
+        }
+
+        List<Squadron.SquadronShip> oldSlots =
+            oldSquadron == null ? null : oldSquadron.ships;
+
+        if (oldSlots != null)
+        {
+            for (int i = 0; i < oldSlots.Count; i++)
+            {
+                Squadron.SquadronShip slot = oldSlots[i];
+                GameShip section = slot == null ? null : slot.ship;
+
+                if (section == null || ReferenceEquals(section, owner))
+                    continue;
+
+                if (ReferenceEquals(section.squadron, oldSquadron))
+                    section.SetSquadron(null);
+
+                if (!destroyFollowers || section.gameObject == null)
+                    continue;
+
+                section.gameObject.SetActive(false);
+                UnityEngine.Object.Destroy(section.gameObject);
+            }
+        }
+
+        ResetBuildState();
+    }
+
+    private void ResetBuildState()
+    {
+        builtForPlayer = null;
+        builtSignature = default(BuildSignature);
+        activeLeviathanSquadron = null;
+        ClearRuntimeBuildCollections();
+        ClearCustomTemplateSlots();
+        LeviathanAttachmentNormalizer.Reset();
+    }
+
+    private void ClearRuntimeBuildCollections()
+    {
+        liveBodies.Clear();
+        liveTails.Clear();
+        attachmentParentBySection.Clear();
+        customTemplateSections.Clear();
     }
 
     private void ApplyPlayerMass(
         GameShip player,
         LeviathanGrowth.ResolvedState growth)
     {
-        if (player == null ||
-            growth == null ||
-            !growth.Active)
-        {
+        if (player == null || growth == null || !growth.Active)
             return;
-        }
 
         Rigidbody2D body = player.GetRigidBody();
-
         if (body == null)
         {
             Debug.LogWarning(
@@ -651,8 +1210,8 @@ public class LeviathanController : MonoBehaviour
             return;
         }
 
-        if (massAdjustedPlayer != player ||
-            massAdjustedBody != body ||
+        if (!ReferenceEquals(massAdjustedPlayer, player) ||
+            !ReferenceEquals(massAdjustedBody, body) ||
             !hasOriginalPlayerMass)
         {
             RestorePlayerMass();
@@ -663,7 +1222,8 @@ public class LeviathanController : MonoBehaviour
             hasOriginalPlayerMass = true;
         }
 
-        body.mass = originalPlayerMass * Mathf.Max(0.01f, growth.MassMultiplier);
+        body.mass =
+            originalPlayerMass * Mathf.Max(0.01f, growth.MassMultiplier);
     }
 
     private void RestorePlayerMass()
@@ -677,12 +1237,13 @@ public class LeviathanController : MonoBehaviour
         hasOriginalPlayerMass = false;
     }
 
-
     private void ApplyHighSpeedResistance()
     {
-        // This is intentionally player-only and Leviathan-only.
-        if (currentPlayer == null || builtForPlayer != currentPlayer)
+        if (currentPlayer == null ||
+            !ReferenceEquals(builtForPlayer, currentPlayer))
+        {
             return;
+        }
 
         LeviathanGrowth.ResolvedState growth =
             LeviathanGrowth.GetResolvedState(currentPlayer);
@@ -694,24 +1255,23 @@ public class LeviathanController : MonoBehaviour
             return;
         }
 
-        // Native weapon lunges should not be damped by the Leviathan cruising
-        // resistance curve. Predator explicitly uses GameShip.Lunge.
+        // Native weapon lunges should not be damped by Leviathan cruising
+        // resistance. Predator explicitly uses GameShip.Lunge.
         if (LeviathanPredatorRuntime.IsPredatorLunging(currentPlayer))
             return;
 
         Rigidbody2D body = currentPlayer.GetRigidBody();
-
         if (body == null)
             return;
 
         float maxSpeed = currentPlayer.MaxSpeed;
-
         if (maxSpeed <= 0.001f)
             return;
 
         Vector2 velocity = body.velocity;
         float speed = velocity.magnitude;
-        float resistanceStart = maxSpeed * LeviathanGrowth.Tuning.AirResistanceStartFraction;
+        float resistanceStart =
+            maxSpeed * LeviathanGrowth.Tuning.AirResistanceStartFraction;
 
         if (speed <= resistanceStart)
             return;
@@ -722,8 +1282,6 @@ public class LeviathanController : MonoBehaviour
             speed
         );
 
-        // Quadratic curve: very light near the start, increasingly severe
-        // as actual speed approaches the ship's theoretical MaxSpeed.
         float resistanceFactor = t * t;
         float decelerationPerSecond =
             maxSpeed * growth.AirResistanceStrength * resistanceFactor;
@@ -734,50 +1292,6 @@ public class LeviathanController : MonoBehaviour
             decelerationPerSecond * Time.fixedDeltaTime
         );
     }
-
-    public bool IsLeviathanSegment(GameShip ship)
-    {
-        return ship != null && segments.Contains(ship);
-    }
-
-    public int GetActiveSectionCount(GameShip player)
-    {
-        if (player == null ||
-            player != currentPlayer ||
-            builtForPlayer != player)
-        {
-            return 0;
-        }
-
-        // Head/player + every active body segment + tail.
-        return 1 + segments.Count;
-    }
-
-    public int GetActiveLeviathanSegmentCount(GameShip player)
-    {
-        if (player == null ||
-            player != currentPlayer ||
-            builtForPlayer != player)
-        {
-            return 0;
-        }
-
-        // Every attached Leviathan section after the head: bodies + tail.
-        return segments.Count;
-    }
-
-    public int GetActiveBodySegmentCount(GameShip player)
-    {
-        int segmentCount = GetActiveLeviathanSegmentCount(player);
-
-        // Until forked Bifurcation topology is physically instantiated, the
-        // active squadron contains one terminal tail. Report the live physical
-        // body count rather than the future logical branch allocation.
-        return segmentCount > 0
-            ? segmentCount - 1
-            : 0;
-    }
-
 
     private void ResizeCustomTemplateSlots(int count)
     {
