@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using StarVortex;
 using System;
 using System.Collections.Generic;
@@ -28,12 +28,17 @@ public static class LeviathanStellarConverterTuning
 
     // Baseline charge presentation.
     public const float ChargeOrbStartingSizeFraction = 0.05f;
-    public const float ChargeOrbOpacityMultiplier = 0.70f;
+    public const float ChargeOrbOpacityMultiplier = 1.00f;
 
     // Structure presentation only. Mechanical per-body/per-tail values are
     // ordinary specialization knobs authored by the tree.
-    public const float ConvergenceFeederWidthFraction = 0.20f;
-    public const float ConvergenceFeederOpacityMultiplier = 0.70f;
+    //
+    // Feeder width is expressed as a fraction of the resolved main Converter
+    // beam width. Feeders ramp from Min -> Max across the actual charge-up and
+    // are fully grown when charging completes.
+    public const float ConvergenceFeederMinWidthFraction = 0.08f;
+    public const float ConvergenceFeederMaxWidthFraction = 0.50f;
+    public const float ConvergenceFeederOpacityMultiplier = 1.00f;
 
     // Existing Converter presentation/crit behavior retained by the new baseline.
     public const float BaselineCritChanceMultiplier = 1.10f;
@@ -161,6 +166,39 @@ public static class LeviathanStellarConverter
                 "stellar_converter.random_basic_status_chance",
                 "Random Basic Status Chance");
 
+        public static readonly LeviathanSpecializationKnob OffElementRandomStatusChance =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "stellar_converter.off_element_random_status_chance",
+                "Off-Element Random Status Chance");
+
+        public static readonly LeviathanSpecializationKnob DebuffSpreadOnKillChance =
+            LeviathanSpecializationKnob.PercentagePoints(
+                "stellar_converter.debuff_spread_on_kill_chance",
+                "Spread Debuffs on Kill");
+
+        public static readonly LeviathanSpecializationKnob ForkTargets =
+            LeviathanSpecializationKnob.Flat(
+                "stellar_converter.fork_targets",
+                "Fork Targets");
+
+        public static readonly LeviathanSpecializationKnob ForkDamage =
+            LeviathanSpecializationKnob.Flat(
+                "stellar_converter.fork_damage",
+                "Fork Damage",
+                "x");
+
+        public static readonly LeviathanSpecializationKnob ForkChainFraction =
+            LeviathanSpecializationKnob.Flat(
+                "stellar_converter.fork_chain_fraction",
+                "Fork Chain Fraction",
+                "x");
+
+        public static readonly LeviathanSpecializationKnob ForkConeDegrees =
+            LeviathanSpecializationKnob.Flat(
+                "stellar_converter.fork_cone_degrees",
+                "Fork Cone",
+                "deg");
+
         public static readonly LeviathanSpecializationKnob BodySegmentDamagePercent =
             LeviathanSpecializationKnob.PercentagePoints(
                 "stellar_converter.body_segment_damage_percent",
@@ -280,6 +318,11 @@ public static class LeviathanStellarConverter
             LeviathanSpecializationFlag.Create(
                 "stellar_converter.mode.continuous", "Continuous Conversion");
 
+        public static readonly LeviathanSpecializationFlag SpectrumSaturation =
+            LeviathanSpecializationFlag.Create(
+                "stellar_converter.mode.spectrum_saturation",
+                "Spectrum Saturation");
+
         public static readonly LeviathanSpecializationFlag ArcCascade =
             LeviathanSpecializationFlag.Create(
                 "stellar_converter.mode.arc_cascade", "Arc Cascade");
@@ -287,6 +330,10 @@ public static class LeviathanStellarConverter
         public static readonly LeviathanSpecializationFlag FractalCascade =
             LeviathanSpecializationFlag.Create(
                 "stellar_converter.mode.fractal_cascade", "Fractal Cascade");
+
+        public static readonly LeviathanSpecializationFlag Forking =
+            LeviathanSpecializationFlag.Create(
+                "stellar_converter.mode.forking", "Forking");
 
         public static readonly LeviathanSpecializationFlag Singularity =
             LeviathanSpecializationFlag.Create(
@@ -344,6 +391,18 @@ public static class LeviathanStellarConverter
 
     private static readonly FieldInfo BeamBasePiercingField =
         AccessTools.Field(typeof(Beam), "basePiercing");
+
+    private static readonly FieldInfo BeamChangeRateField =
+        AccessTools.Field(typeof(Beam), "changeRate");
+
+    private static readonly FieldInfo BeamHitObstructionsField =
+        AccessTools.Field(typeof(Beam), "hitObstructions");
+
+    private static readonly FieldInfo BeamDelayDamageTickField =
+        AccessTools.Field(typeof(Beam), "delayDamageTick");
+
+    private static readonly FieldInfo BeamGlobalLastHitField =
+        AccessTools.Field(typeof(Beam), "globalLastHit");
 
     private static readonly MethodInfo NativePhysicsRaycastMethod =
         AccessTools.Method(
@@ -419,6 +478,11 @@ public static class LeviathanStellarConverter
         public readonly List<GameShip> tailScratch =
             new List<GameShip>();
 
+        // Presentation-only ramp. This belongs to each local/remote presentation
+        // instance so co-op observers smooth their own visuals without affecting
+        // authoritative gameplay state.
+        public float feederGrowthProgress;
+
         public GameObject eventHorizonTipVisual;
         public Vector3 eventHorizonTipVisualBaseScale = Vector3.one;
     }
@@ -435,9 +499,58 @@ public static class LeviathanStellarConverter
         public float detonationScale = 1f;
         public float explosionProgress;
         public GravityProjectileShot remoteVisualShot;
+        public ForkShot forkShot;
         public readonly ConverterPresentationState presentation =
             new ConverterPresentationState();
     }
+
+    private sealed class ForkShot
+    {
+        public Laser source;
+        public GameShip owner;
+        public Beam sourceBeam;
+        public GameShip rootTarget;
+        public Vector2 rootHitPosition;
+        public readonly HashSet<GameShip> visitedTargets =
+            new HashSet<GameShip>();
+        public readonly List<ForkBranch> branches =
+            new List<ForkBranch>();
+        public bool repeatLocked;
+    }
+
+    private sealed class ForkBranch
+    {
+        public GameShip currentTarget;
+        public readonly List<ForkSegment> segments =
+            new List<ForkSegment>();
+    }
+
+    private sealed class ForkSegment
+    {
+        public Beam beam;
+        public GameShip fromTarget;
+        public GameShip target;
+        public bool rootFork;
+    }
+
+    private sealed class ForkBeamState
+    {
+        public ForkShot shot;
+        public ForkSegment segment;
+        public readonly PhysicsController.Hit forcedHit =
+            new PhysicsController.Hit();
+    }
+
+    private static ForkShot LocalForkShot;
+
+    private static readonly Dictionary<Beam, ForkBeamState> ForkBeamStates =
+        new Dictionary<Beam, ForkBeamState>();
+
+    private static readonly List<GameShip> ForkCandidateScratch =
+        new List<GameShip>();
+
+    private static readonly HashSet<GameShip> ForkCandidateSeenScratch =
+        new HashSet<GameShip>();
 
     private static readonly Dictionary<Laser, RemoteState> RemoteStates =
         new Dictionary<Laser, RemoteState>();
@@ -529,6 +642,14 @@ public static class LeviathanStellarConverter
         public bool Conduction;
         public bool Convergence;
         public float RandomBasicStatusChance;
+        public float OffElementRandomStatusChance;
+        public float DebuffSpreadOnKillChance;
+        public bool SpectrumSaturation;
+        public bool Forking;
+        public int ForkTargets;
+        public float ForkDamageFraction;
+        public float ForkChainFraction;
+        public float ForkConeDegrees;
         public float ManifestationCooldownSeconds;
         public float GravityVelocityScaling;
 
@@ -616,6 +737,9 @@ public static class LeviathanStellarConverter
 
     private static readonly FieldInfo BeamWeaponBeamScriptField =
         AccessTools.Field(typeof(BeamWeapon), "beamScript");
+
+    private static readonly FieldInfo BeamWeaponChainTargetsField =
+        AccessTools.Field(typeof(BeamWeapon), "chainTargets");
 
     private static readonly FieldInfo MirrorGameObjectField =
         AccessTools.Field(typeof(Equippable), "mirrorGameObject");
@@ -950,6 +1074,35 @@ public static class LeviathanStellarConverter
             LeviathanSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.RandomBasicStatusChance));
+        state.OffElementRandomStatusChance = Mathf.Clamp01(
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.OffElementRandomStatusChance));
+        state.DebuffSpreadOnKillChance = Mathf.Clamp01(
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.DebuffSpreadOnKillChance));
+        state.ForkTargets = Mathf.Max(
+            0,
+            Mathf.RoundToInt(LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.ForkTargets)));
+        state.ForkDamageFraction = Mathf.Max(
+            0f,
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.ForkDamage));
+        state.ForkChainFraction = Mathf.Max(
+            0f,
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.ForkChainFraction));
+        state.ForkConeDegrees = Mathf.Clamp(
+            LeviathanSpecializationRuntime.GetKnobFlat(
+                pilot,
+                Knobs.ForkConeDegrees),
+            0f,
+            360f);
         state.BrightnessMultiplier =
             LeviathanStellarConverterTuning.BaselineBrightnessMultiplier;
         state.ExtraChainTargets = Mathf.Max(
@@ -961,12 +1114,18 @@ public static class LeviathanStellarConverter
         state.Continuous = LeviathanSpecializationRuntime.HasFlag(
             pilot,
             Flags.Continuous);
+        state.SpectrumSaturation = LeviathanSpecializationRuntime.HasFlag(
+            pilot,
+            Flags.SpectrumSaturation);
         bool arcCascade = LeviathanSpecializationRuntime.HasFlag(
             pilot,
             Flags.ArcCascade);
         bool fractalCascade = LeviathanSpecializationRuntime.HasFlag(
             pilot,
             Flags.FractalCascade);
+        state.Forking = LeviathanSpecializationRuntime.HasFlag(
+            pilot,
+            Flags.Forking);
         state.Singularity = LeviathanSpecializationRuntime.HasFlag(
             pilot,
             Flags.Singularity);
@@ -1772,6 +1931,12 @@ public static class LeviathanStellarConverter
         {
             AdvanceLocalState(laser);
             ResolvedState resolved = GetResolvedState(player);
+            UpdateForking(
+                ref LocalForkShot,
+                laser,
+                player,
+                resolved,
+                phase);
             PublishNetworkState(resolved);
             UpdateConverterPresentation(
                 LocalPresentation,
@@ -1790,6 +1955,12 @@ public static class LeviathanStellarConverter
                 return;
 
             ResolvedState resolved = GetResolvedState(player);
+            UpdateForking(
+                ref state.forkShot,
+                laser,
+                player,
+                resolved,
+                state.phase);
             UpdateConverterPresentation(
                 state.presentation,
                 laser,
@@ -1933,6 +2104,7 @@ public static class LeviathanStellarConverter
         DestroyGravityProjectileShot();
         DestroyEventHorizonTipVisual(LocalPresentation);
         DestroyConverterPresentation(LocalPresentation);
+        DestroyForkShot(ref LocalForkShot);
 
         if (sourceLaser != null)
             SetNativeActive(sourceLaser, false);
@@ -1964,6 +2136,7 @@ public static class LeviathanStellarConverter
         DestroyGravityProjectileShot();
         DestroyEventHorizonTipVisual(LocalPresentation);
         DestroyConverterPresentation(LocalPresentation);
+        DestroyForkShot(ref LocalForkShot);
 
         if (sourceLaser != null)
             SetNativeActive(sourceLaser, false);
@@ -1987,6 +2160,7 @@ public static class LeviathanStellarConverter
         {
             DestroyRemoteGravityVisual(state);
             DestroyConverterPresentation(state.presentation);
+            DestroyForkShot(ref state.forkShot);
         }
 
         GameShip remoteShip = laser.parentShip;
@@ -2045,8 +2219,10 @@ public static class LeviathanStellarConverter
 
         foreach (KeyValuePair<Laser, RemoteState> pair in RemoteStates)
         {
-            DestroyRemoteGravityVisual(pair.Value);
-            DestroyConverterPresentation(pair.Value.presentation);
+            RemoteState remote = pair.Value;
+            DestroyRemoteGravityVisual(remote);
+            DestroyConverterPresentation(remote.presentation);
+            DestroyForkShot(ref remote.forkShot);
 
             if (pair.Key != null)
                 SetNativeActive(pair.Key, false);
@@ -2262,8 +2438,10 @@ public static class LeviathanStellarConverter
         for (int i = 0; i < damageData.Length; i++)
         {
             DamageData datum = damageData[i];
+            // Native chain beams reduce per-tick damage but intentionally keep
+            // their source DPS metadata for status-effect strength. Preserve
+            // that behavior and correct only the actual damage amount.
             datum.damage *= multiplier;
-            datum.dps *= multiplier;
             scaled[i] = datum;
         }
 
@@ -2378,8 +2556,88 @@ public static class LeviathanStellarConverter
             return;
 
         ResolvedState resolved = GetResolvedState(laser);
-        if (resolved.ExtraChainTargets > 0)
-            value = resolved.ExtraChainTargets;
+
+        // Forking replaces the native one-child chain graph with three managed
+        // native DamageBeam roots. Each root owns its reduced chain budget.
+        if (resolved.Forking)
+        {
+            value = 0;
+            return;
+        }
+
+        // Converter tree chain count is additive to the source laser's native
+        // resolved chain count. This preserves chain-capable source weapons
+        // instead of replacing their native ChainCount progression.
+        if (resolved.ExtraChainTargets != 0)
+        {
+            value = Mathf.Max(
+                0,
+                value + resolved.ExtraChainTargets);
+        }
+    }
+
+    private static int GetNativeResolvedChainTargets(Laser laser)
+    {
+        if (laser == null || !laser.chainable)
+            return 0;
+
+        // Verified against the current Star Vortex BeamWeapon implementation.
+        // Fail closed rather than inventing a second approximation if that
+        // native contract changes in a future game build.
+        if (BeamWeaponChainTargetsField == null)
+            return 0;
+
+        object raw = BeamWeaponChainTargetsField.GetValue(laser);
+        if (!(raw is int))
+            return 0;
+
+        int baseChainTargets = (int)raw;
+
+        return Mathf.Max(
+            0,
+            laser.ApplyModifier(
+                Modifier.Type.ChainCount,
+                baseChainTargets,
+                false,
+                true));
+    }
+
+    private static int GetFinalResolvedChainTargets(
+        Laser laser,
+        ResolvedState resolved)
+    {
+        if (resolved == null)
+            return GetNativeResolvedChainTargets(laser);
+
+        return Mathf.Max(
+            0,
+            GetNativeResolvedChainTargets(laser) +
+            resolved.ExtraChainTargets);
+    }
+
+    public static void ScaleDebuffSpreadOnKill(
+        Equippable equippable,
+        Modifier.Type modifierType,
+        bool includeParentShip,
+        ref float value)
+    {
+        if (modifierType != Modifier.Type.OnEnemyDeathShed ||
+            !includeParentShip)
+        {
+            return;
+        }
+
+        Laser laser = equippable as Laser;
+        GameShip player;
+        if (laser == null || !TryGetContext(laser, out player))
+            return;
+
+        ResolvedState resolved = GetResolvedState(player);
+        if (resolved.DebuffSpreadOnKillChance <= 0f)
+            return;
+
+        value = Mathf.Clamp01(
+            value + resolved.DebuffSpreadOnKillChance);
     }
 
     // Native Striker range is injected through Equippable.ApplyModifier(MaxRange).
@@ -2408,6 +2666,710 @@ public static class LeviathanStellarConverter
             return;
 
         value *= GetResolvedState(laser).RangeMultiplier;
+    }
+
+    // =========================================================================
+    // FORKING
+    // =========================================================================
+
+    private static void UpdateForking(
+        ref ForkShot shot,
+        Laser laser,
+        GameShip owner,
+        ResolvedState resolved,
+        Phase currentPhase)
+    {
+        if (laser == null ||
+            owner == null ||
+            resolved == null ||
+            !resolved.Forking ||
+            currentPhase != Phase.Firing ||
+            resolved.ForkTargets <= 0 ||
+            resolved.ForkDamageFraction <= 0f)
+        {
+            DestroyForkShot(ref shot);
+            return;
+        }
+
+        Beam sourceBeam = BeamWeaponBeamScriptField == null
+            ? null
+            : BeamWeaponBeamScriptField.GetValue(laser) as Beam;
+        if (sourceBeam == null)
+        {
+            DestroyForkShot(ref shot);
+            return;
+        }
+
+        PhysicsController.Hit rootHit = sourceBeam.GetCachedRaycastHit();
+        GameShip rootTarget;
+        if (!TryGetShipFromBeamHit(rootHit, out rootTarget) ||
+            !IsValidForkTarget(owner, rootTarget))
+        {
+            DestroyForkShot(ref shot);
+            return;
+        }
+
+        if (shot == null ||
+            !ReferenceEquals(shot.source, laser) ||
+            !ReferenceEquals(shot.sourceBeam, sourceBeam) ||
+            !ReferenceEquals(shot.rootTarget, rootTarget))
+        {
+            DestroyForkShot(ref shot);
+            shot = BuildForkShot(
+                laser,
+                owner,
+                sourceBeam,
+                rootTarget,
+                rootHit.point,
+                resolved);
+        }
+        else
+        {
+            shot.rootHitPosition = rootHit.point;
+        }
+
+        TickForkShot(shot);
+    }
+
+    private static ForkShot BuildForkShot(
+        Laser laser,
+        GameShip owner,
+        Beam sourceBeam,
+        GameShip rootTarget,
+        Vector2 rootHitPosition,
+        ResolvedState resolved)
+    {
+        ForkShot shot = new ForkShot
+        {
+            source = laser,
+            owner = owner,
+            sourceBeam = sourceBeam,
+            rootTarget = rootTarget,
+            rootHitPosition = rootHitPosition
+        };
+
+        shot.visitedTargets.Add(rootTarget);
+
+        Vector2 forward = sourceBeam.transform == null
+            ? Vector2.right
+            : (Vector2)sourceBeam.transform.right;
+        if (forward.sqrMagnitude <= 0.0001f)
+            forward = Vector2.right;
+        forward.Normalize();
+
+        int rootCount = Mathf.Max(0, resolved.ForkTargets);
+        float chainRange = Mathf.Max(
+            0f,
+            laser.MaxRange * laser.ChainRange);
+
+        for (int i = 0; i < rootCount; i++)
+        {
+            GameShip target = SelectForkTarget(
+                shot,
+                rootHitPosition,
+                forward,
+                resolved.ForkConeDegrees,
+                chainRange,
+                true,
+                rootTarget);
+
+            if (target == null)
+                break;
+
+            shot.visitedTargets.Add(target);
+            shot.repeatLocked = false;
+
+            ForkBranch branch = new ForkBranch
+            {
+                currentTarget = target
+            };
+
+            ForkSegment rootSegment = CreateForkSegment(
+                shot,
+                sourceBeam,
+                null,
+                target,
+                true);
+
+            if (rootSegment == null)
+                continue;
+
+            branch.segments.Add(rootSegment);
+            shot.branches.Add(branch);
+        }
+
+        int resolvedChainTargets =
+            GetFinalResolvedChainTargets(laser, resolved);
+
+        int chainBudget = Mathf.Max(
+            0,
+            Mathf.CeilToInt(
+                resolvedChainTargets *
+                resolved.ForkChainFraction));
+
+        // Build by chain depth across all branches. This prevents branch zero
+        // from consuming every fresh target before its sibling forks expand.
+        for (int depth = 0; depth < chainBudget; depth++)
+        {
+            bool createdAny = false;
+
+            for (int i = 0; i < shot.branches.Count; i++)
+            {
+                ForkBranch branch = shot.branches[i];
+                if (branch == null || branch.currentTarget == null)
+                    continue;
+
+                Vector2 origin =
+                    GetForkOriginPoint(
+                        branch.currentTarget,
+                        (Vector2)branch.currentTarget.transform.position);
+
+                GameShip next = SelectForkTarget(
+                    shot,
+                    origin,
+                    Vector2.right,
+                    360f,
+                    chainRange,
+                    false,
+                    branch.currentTarget);
+
+                if (next == null)
+                    continue;
+
+                bool repeat = shot.visitedTargets.Contains(next);
+                if (repeat)
+                {
+                    if (shot.repeatLocked)
+                        continue;
+
+                    shot.repeatLocked = true;
+                }
+                else
+                {
+                    shot.visitedTargets.Add(next);
+                    shot.repeatLocked = false;
+                }
+
+                ForkSegment segment = CreateForkSegment(
+                    shot,
+                    sourceBeam,
+                    branch.currentTarget,
+                    next,
+                    false);
+
+                if (segment == null)
+                    continue;
+
+                branch.segments.Add(segment);
+                branch.currentTarget = next;
+                createdAny = true;
+            }
+
+            if (!createdAny)
+                break;
+        }
+
+        if (shot.branches.Count == 0)
+        {
+            DestroyForkShot(ref shot);
+            return null;
+        }
+
+        return shot;
+    }
+
+    private static GameShip SelectForkTarget(
+        ForkShot shot,
+        Vector2 origin,
+        Vector2 forward,
+        float coneDegrees,
+        float range,
+        bool requireNew,
+        GameShip fromTarget)
+    {
+        if (shot == null ||
+            shot.owner == null ||
+            PhysicsController.instance == null ||
+            range <= 0f)
+        {
+            return null;
+        }
+
+        ForkCandidateScratch.Clear();
+        ForkCandidateSeenScratch.Clear();
+
+        Collider2D[] colliders =
+            PhysicsController.instance.OverlapCircle(origin, range);
+        if (colliders == null)
+            return null;
+
+        float halfCone = Mathf.Clamp(coneDegrees, 0f, 360f) * 0.5f;
+        bool useCone = coneDegrees < 359.9f;
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider2D collider = colliders[i];
+            if (collider == null)
+                continue;
+
+            GameObject obj = collider.gameObject;
+            if (obj != null &&
+                obj.CompareTag("Shield") &&
+                obj.transform.parent != null)
+            {
+                obj = obj.transform.parent.gameObject;
+            }
+
+            GameShip candidate;
+            if (obj == null ||
+                !GameShip.TryGetShip(obj, out candidate) ||
+                candidate == null ||
+                ReferenceEquals(candidate, fromTarget) ||
+                !IsValidForkTarget(shot.owner, candidate) ||
+                !ForkCandidateSeenScratch.Add(candidate))
+            {
+                continue;
+            }
+
+            Vector2 delta =
+                (Vector2)candidate.transform.position - origin;
+            if (delta.sqrMagnitude <= 0.0001f)
+                continue;
+
+            if (useCone &&
+                Vector2.Angle(forward, delta) > halfCone)
+            {
+                continue;
+            }
+
+            ForkCandidateScratch.Add(candidate);
+        }
+
+        GameShip bestNew = null;
+        float bestNewDistance = float.PositiveInfinity;
+        GameShip bestRepeat = null;
+        float bestRepeatDistance = float.PositiveInfinity;
+
+        for (int i = 0; i < ForkCandidateScratch.Count; i++)
+        {
+            GameShip candidate = ForkCandidateScratch[i];
+            float distance =
+                ((Vector2)candidate.transform.position - origin)
+                .sqrMagnitude;
+
+            if (!shot.visitedTargets.Contains(candidate))
+            {
+                if (distance < bestNewDistance)
+                {
+                    bestNew = candidate;
+                    bestNewDistance = distance;
+                }
+            }
+            else if (!requireNew &&
+                !shot.repeatLocked &&
+                distance < bestRepeatDistance)
+            {
+                bestRepeat = candidate;
+                bestRepeatDistance = distance;
+            }
+        }
+
+        if (requireNew || shot.repeatLocked)
+            return bestNew;
+
+        // When repeats are unlocked, preserve the aggressive native-style
+        // nearest-target feel. A repeat may win over a fresh target, but doing
+        // so globally locks every branch out of another repeat until any branch
+        // reaches a target never hit anywhere in this Forking graph.
+        if (bestNew == null)
+            return bestRepeat;
+        if (bestRepeat == null)
+            return bestNew;
+
+        return bestRepeatDistance < bestNewDistance
+            ? bestRepeat
+            : bestNew;
+    }
+
+    private static bool IsValidForkTarget(
+        GameShip owner,
+        GameShip target)
+    {
+        if (owner == null ||
+            target == null ||
+            target.health <= 0f ||
+            target.IsDrone() ||
+            target.IsDodging())
+        {
+            return false;
+        }
+
+        GameShip ownerRoot = owner.GetAbsoluteParent();
+        GameShip targetRoot = target.GetAbsoluteParent();
+        if (ReferenceEquals(ownerRoot, targetRoot))
+            return false;
+
+        return Faction.IsHostile(owner.faction, target.faction) &&
+            target.CanBeDamagedBy(ownerRoot, false);
+    }
+
+    private static bool TryGetShipFromBeamHit(
+        PhysicsController.Hit hit,
+        out GameShip ship)
+    {
+        ship = null;
+        if (hit == null || hit.transform == null)
+            return false;
+
+        GameObject obj = hit.transform.gameObject;
+        if (obj != null &&
+            obj.CompareTag("Shield") &&
+            obj.transform.parent != null)
+        {
+            obj = obj.transform.parent.gameObject;
+        }
+
+        return obj != null &&
+            GameShip.TryGetShip(obj, out ship) &&
+            ship != null;
+    }
+
+    private static ForkSegment CreateForkSegment(
+        ForkShot shot,
+        Beam sourceBeam,
+        GameShip fromTarget,
+        GameShip target,
+        bool rootFork)
+    {
+        if (shot == null ||
+            shot.source == null ||
+            shot.owner == null ||
+            sourceBeam == null ||
+            target == null ||
+            PoolController.instance == null)
+        {
+            return null;
+        }
+
+        GameObject prefab = shot.source.GetBeamPrefab();
+        if (prefab == null)
+            return null;
+
+        Vector2 origin = fromTarget == null
+            ? shot.rootHitPosition
+            : GetForkOriginPoint(
+                fromTarget,
+                (Vector2)target.transform.position);
+
+        GameObject obj = PoolController.instance.GetObject(
+            prefab,
+            origin,
+            Quaternion.identity,
+            false);
+        if (obj == null)
+            return null;
+
+        Beam beam;
+        if (!obj.TryGetComponent<Beam>(out beam) || beam == null)
+        {
+            CustomObject.Destroy(obj);
+            return null;
+        }
+
+        float changeRate = GetFloat(
+            BeamChangeRateField,
+            sourceBeam);
+        bool snapChange = GetBool(
+            BeamSnapChangeField,
+            sourceBeam);
+        bool hitObstructions = GetBool(
+            BeamHitObstructionsField,
+            sourceBeam);
+        bool delayDamageTick = GetBool(
+            BeamDelayDamageTickField,
+            sourceBeam);
+        bool globalLastHit = GetBool(
+            BeamGlobalLastHitField,
+            sourceBeam);
+
+        beam.Init(
+            shot.source,
+            shot.owner,
+            false,
+            0f,
+            0,
+            changeRate,
+            snapChange,
+            hitObstructions,
+            false,
+            delayDamageTick,
+            globalLastHit,
+            prefab);
+        beam.enabled = false;
+        beam.Activate();
+
+        ForkSegment segment = new ForkSegment
+        {
+            beam = beam,
+            fromTarget = fromTarget,
+            target = target,
+            rootFork = rootFork
+        };
+
+        ForkBeamStates[beam] = new ForkBeamState
+        {
+            shot = shot,
+            segment = segment
+        };
+
+        return segment;
+    }
+
+    private static void TickForkShot(ForkShot shot)
+    {
+        if (shot == null)
+            return;
+
+        for (int i = 0; i < shot.branches.Count; i++)
+        {
+            ForkBranch branch = shot.branches[i];
+            if (branch == null)
+                continue;
+
+            for (int j = 0; j < branch.segments.Count; j++)
+            {
+                ForkSegment segment = branch.segments[j];
+                if (segment == null ||
+                    segment.beam == null ||
+                    segment.target == null ||
+                    segment.target.health <= 0f)
+                {
+                    continue;
+                }
+
+                Vector2 origin = segment.fromTarget == null
+                    ? shot.rootHitPosition
+                    : GetForkOriginPoint(
+                        segment.fromTarget,
+                        (Vector2)segment.target.transform.position);
+                Vector2 targetPoint =
+                    GetForkTargetPoint(segment.target, origin);
+                Vector2 direction = targetPoint - origin;
+                if (direction.sqrMagnitude <= 0.0001f)
+                    continue;
+
+                segment.beam.transform.position = origin;
+                segment.beam.transform.rotation =
+                    Quaternion.Euler(
+                        0f,
+                        0f,
+                        Mathf.Atan2(direction.y, direction.x) *
+                            Mathf.Rad2Deg);
+
+                segment.beam.ClearRaycastHit();
+                segment.beam.DoDamageTick();
+                segment.beam.UpdatePosition();
+                segment.beam.UpdateState();
+            }
+        }
+    }
+
+    public static void DrawForking(Laser laser)
+    {
+        if (laser == null)
+            return;
+
+        ForkShot shot = null;
+
+        if (ReferenceEquals(sourceLaser, laser))
+        {
+            shot = LocalForkShot;
+        }
+        else
+        {
+            RemoteState remote;
+            if (RemoteStates.TryGetValue(laser, out remote))
+                shot = remote.forkShot;
+        }
+
+        if (shot == null)
+            return;
+
+        for (int i = 0; i < shot.branches.Count; i++)
+        {
+            ForkBranch branch = shot.branches[i];
+            if (branch == null)
+                continue;
+
+            for (int j = 0; j < branch.segments.Count; j++)
+            {
+                ForkSegment segment = branch.segments[j];
+                if (segment != null && segment.beam != null)
+                    segment.beam.DrawBeam();
+            }
+        }
+    }
+
+    public static bool TryOverrideForkBeamHit(
+        Beam beam,
+        ref PhysicsController.Hit result)
+    {
+        ForkBeamState state;
+        if (beam == null ||
+            !ForkBeamStates.TryGetValue(beam, out state) ||
+            state == null ||
+            state.segment == null)
+        {
+            return false;
+        }
+
+        ForkSegment segment = state.segment;
+        GameShip target = segment.target;
+        state.forcedHit.Free();
+
+        if (target == null ||
+            target.health <= 0f ||
+            target.transform == null)
+        {
+            result = state.forcedHit;
+            return true;
+        }
+
+        Vector2 origin = (Vector2)beam.transform.position;
+        Vector2 point = GetForkTargetPoint(target, origin);
+        Collider2D collider = null;
+        target.TryGetComponent<Collider2D>(out collider);
+
+        state.forcedHit.Set(
+            point,
+            Vector2.Distance(origin, point),
+            collider,
+            target.transform);
+        result = state.forcedHit;
+        return true;
+    }
+
+    public static void ScaleForkDamagePacket(
+        DamageBeam beam,
+        bool crit,
+        ref DamageData[] damage)
+    {
+        ForkBeamState state;
+        if (beam == null ||
+            !ForkBeamStates.TryGetValue(beam, out state) ||
+            state == null ||
+            state.segment == null ||
+            !state.segment.rootFork ||
+            state.shot == null ||
+            state.shot.source == null)
+        {
+            return;
+        }
+
+        ResolvedState resolved = GetResolvedState(state.shot.owner);
+        if (resolved == null)
+            return;
+
+        // Root forks are 70% (or the configured ForkDamage knob) of the fully
+        // resolved MAIN Converter packet, independent of the source weapon's
+        // native ChainDamage. Descendants remain normal non-primary DamageBeams
+        // and therefore inherit the source weapon's native ChainDamage.
+        DamageData[] mainPacket =
+            state.shot.source.GetDamageData(crit, false);
+        if (mainPacket == null)
+            return;
+
+        DamageData[] scaled = new DamageData[mainPacket.Length];
+        for (int i = 0; i < mainPacket.Length; i++)
+        {
+            DamageData datum = mainPacket[i];
+            datum.damage *= resolved.ForkDamageFraction;
+
+            // Match native chaining semantics: status-effect DPS metadata is
+            // inherited from the resolved source and is not reduced by chain
+            // damage/fork damage.
+            scaled[i] = datum;
+        }
+
+        damage = scaled;
+    }
+
+    private static Vector2 GetForkOriginPoint(
+        GameShip fromTarget,
+        Vector2 toward)
+    {
+        if (fromTarget == null || fromTarget.transform == null)
+            return toward;
+
+        Vector2 center = (Vector2)fromTarget.transform.position;
+        Collider2D collider;
+        if (fromTarget.TryGetComponent<Collider2D>(out collider) &&
+            collider != null)
+        {
+            return collider.ClosestPoint(toward);
+        }
+
+        return center;
+    }
+
+    private static Vector2 GetForkTargetPoint(
+        GameShip target,
+        Vector2 origin)
+    {
+        if (target == null || target.transform == null)
+            return origin;
+
+        Collider2D collider;
+        if (target.TryGetComponent<Collider2D>(out collider) &&
+            collider != null)
+        {
+            return collider.ClosestPoint(origin);
+        }
+
+        return (Vector2)target.transform.position;
+    }
+
+    private static bool GetBool(
+        FieldInfo field,
+        object target)
+    {
+        if (field == null || target == null)
+            return false;
+
+        object value = field.GetValue(target);
+        return value is bool && (bool)value;
+    }
+
+    private static void DestroyForkShot(ref ForkShot shot)
+    {
+        if (shot == null)
+            return;
+
+        for (int i = 0; i < shot.branches.Count; i++)
+        {
+            ForkBranch branch = shot.branches[i];
+            if (branch == null)
+                continue;
+
+            for (int j = 0; j < branch.segments.Count; j++)
+            {
+                ForkSegment segment = branch.segments[j];
+                if (segment == null || segment.beam == null)
+                    continue;
+
+                ForkBeamStates.Remove(segment.beam);
+                segment.beam.ForceDeactivate();
+                if (segment.beam.gameObject != null)
+                    CustomObject.Destroy(segment.beam.gameObject);
+                segment.beam = null;
+            }
+
+            branch.segments.Clear();
+        }
+
+        shot.branches.Clear();
+        shot.visitedTargets.Clear();
+        shot = null;
     }
 
     // =========================================================================
@@ -2761,13 +3723,40 @@ public static class LeviathanStellarConverter
                 presentation.tailScratch.Count,
                 sourceLine);
 
-            float feederWidth =
-                Mathf.Max(
-                    0.0001f,
-                    mainWidth *
-                    Mathf.Max(
-                        0f,
-                        LeviathanStellarConverterTuning.ConvergenceFeederWidthFraction));
+            // Tie feeder growth directly to Converter charge progress so they
+            // reach full width exactly when charge-up completes. Once firing
+            // begins they remain fully grown for the output phase.
+            if (presentationPhase == Phase.Charging)
+            {
+                presentation.feederGrowthProgress =
+                    Mathf.Clamp01(phaseProgress);
+            }
+            else if (presentationPhase == Phase.Firing)
+            {
+                presentation.feederGrowthProgress = 1f;
+            }
+
+            float feederGrowth = Mathf.SmoothStep(
+                0f,
+                1f,
+                presentation.feederGrowthProgress);
+
+            float minWidthFraction = Mathf.Max(
+                0f,
+                LeviathanStellarConverterTuning.ConvergenceFeederMinWidthFraction);
+
+            float maxWidthFraction = Mathf.Max(
+                minWidthFraction,
+                LeviathanStellarConverterTuning.ConvergenceFeederMaxWidthFraction);
+
+            float feederWidthFraction = Mathf.Lerp(
+                minWidthFraction,
+                maxWidthFraction,
+                feederGrowth);
+
+            float feederWidth = Mathf.Max(
+                0.0001f,
+                mainWidth * feederWidthFraction);
 
             for (int i = 0; i < presentation.feederRenderers.Count; i++)
             {
@@ -2969,6 +3958,7 @@ public static class LeviathanStellarConverter
         }
 
         presentation.tailScratch.Clear();
+        presentation.feederGrowthProgress = 0f;
     }
 
     private static void HideConverterPresentation(
@@ -3948,7 +4938,7 @@ public static class LeviathanStellarConverter
         target.lastDamagedByShipName = owner.GetName();
         target.lastDamagedByFaction = owner.faction;
 
-        RouteDamageMethod.Invoke(
+        object routeResult = RouteDamageMethod.Invoke(
             null,
             new object[]
             {
@@ -3967,6 +4957,23 @@ public static class LeviathanStellarConverter
                 false,
                 0f
             });
+
+        bool killed =
+            routeResult is bool &&
+            (bool)routeResult;
+
+        if (killed && !target.IsDrone())
+        {
+            // Use the native modifier boundary so Contagion stacks additively
+            // with any vanilla OnEnemyDeathShed already present on the weapon
+            // or ship. The Converter patch contributes its normal tree knob.
+            float shedChance = source.ApplyModifierToPercentage(
+                Modifier.Type.OnEnemyDeathShed,
+                0f,
+                true);
+            if (shedChance > 0f)
+                target.ShedStatusEffects(shedChance, true, owner);
+        }
 
         if (ConduitRelayHitMethod != null)
         {
@@ -4797,9 +5804,9 @@ public static class LeviathanStellarConverter
         gravityProjectileShot = null;
     }
 
-    // Continuous Conversion's extra random status remains local-authority-only.
+    // Continuous Conversion's custom random statuses remain local-authority-only.
     // Remote Converter presentation never rolls gameplay, and remote-owned targets
-    // are rejected below rather than mutating a non-authoritative replica.
+    // are rejected rather than mutating a non-authoritative replica.
     public static void TryApplyContinuousRandomStatus(
         GameShip target,
         BeamWeapon sourceWeapon,
@@ -4814,41 +5821,82 @@ public static class LeviathanStellarConverter
             return;
 
         ResolvedState resolved = GetResolvedState(player);
-        if (!resolved.Continuous || resolved.RandomBasicStatusChance <= 0f ||
-            target.IsDrone() || target.health <= 0f)
+        if (!resolved.Continuous ||
+            target.IsDrone() ||
+            target.health <= 0f)
         {
             return;
         }
+
+        if (!CanApplyCustomStatus(target))
+            return;
+
+        float dps = damageData == null
+            ? laser.CalculateDPS(Activatable.Modified.Global)
+            : DamageData.GetDamageData(Modifier.Type.Damage, damageData).dps;
+
+        TryRollRandomBasicStatus(
+            target,
+            laser,
+            player,
+            dps,
+            resolved.RandomBasicStatusChance,
+            false);
+
+        if (resolved.SpectrumSaturation)
+        {
+            TryRollRandomBasicStatus(
+                target,
+                laser,
+                player,
+                dps,
+                resolved.OffElementRandomStatusChance,
+                true);
+        }
+    }
+
+    private static bool CanApplyCustomStatus(GameShip target)
+    {
+        if (target == null)
+            return false;
 
         if (DebuffAndDirectImmuneField != null)
         {
             object rawImmune = DebuffAndDirectImmuneField.GetValue(target);
             if (rawImmune is bool && (bool)rawImmune)
-                return;
+                return false;
         }
 
-        if (target.shield != null && target.shield.IsWardActive())
-            return;
+        return target.shield == null || !target.shield.IsWardActive();
+    }
 
-        float chance = resolved.RandomBasicStatusChance;
-        if (player.pilot != null && target.pilot != null)
+    private static void TryRollRandomBasicStatus(
+        GameShip target,
+        Laser laser,
+        GameShip player,
+        float dps,
+        float baseChance,
+        bool excludeSourceDamageType)
+    {
+        float chance = GetLevelAdjustedStatusChance(
+            player,
+            target,
+            baseChance);
+        if (chance <= 0f ||
+            UnityEngine.Random.Range(0f, 1f) > chance)
         {
-            int levelDelta = player.pilot.GetLevel(0) - target.pilot.GetLevel(0);
-            if (levelDelta < -9)
-                chance *= 0.25f;
-            else if (levelDelta < -4)
-                chance *= 0.50f;
-            else if (levelDelta < -3)
-                chance *= 0.75f;
+            return;
         }
 
-        if (UnityEngine.Random.Range(0f, 1f) > chance)
+        Damageable.DamageType type;
+        if (!TryChooseRandomBasicStatusType(
+            laser,
+            excludeSourceDamageType,
+            out type))
+        {
             return;
+        }
 
-        Damageable.DamageType type = RandomBasicStatusTypes[
-            UnityEngine.Random.Range(0, RandomBasicStatusTypes.Length)];
-
-        // Match the same basic shield/hull gating used by GameShip.Damage.
         if (target.shield != null && target.shield.damageType == type &&
             !GameShip.PlayerSourceHasUpgrade(
                 player,
@@ -4863,9 +5911,6 @@ public static class LeviathanStellarConverter
             return;
         }
 
-        float dps = damageData == null
-            ? laser.CalculateDPS(Activatable.Modified.Global)
-            : DamageData.GetDamageData(Modifier.Type.Damage, damageData).dps;
         StatusEffect effect = StatusEffect.GetEffectForDamageType(
             type,
             dps,
@@ -4874,6 +5919,64 @@ public static class LeviathanStellarConverter
         if (effect != null)
             target.AddStatusEffect(effect);
     }
+
+    private static float GetLevelAdjustedStatusChance(
+        GameShip player,
+        GameShip target,
+        float chance)
+    {
+        chance = Mathf.Clamp01(chance);
+        if (chance <= 0f ||
+            player == null ||
+            target == null ||
+            player.pilot == null ||
+            target.pilot == null)
+        {
+            return chance;
+        }
+
+        int levelDelta = player.pilot.GetLevel(0) - target.pilot.GetLevel(0);
+        if (levelDelta < -9)
+            chance *= 0.25f;
+        else if (levelDelta < -4)
+            chance *= 0.50f;
+        else if (levelDelta < -3)
+            chance *= 0.75f;
+
+        return chance;
+    }
+
+    private static bool TryChooseRandomBasicStatusType(
+        Laser laser,
+        bool excludeSourceDamageType,
+        out Damageable.DamageType type)
+    {
+        type = default(Damageable.DamageType);
+        if (RandomBasicStatusTypes.Length == 0)
+            return false;
+
+        int start = UnityEngine.Random.Range(
+            0,
+            RandomBasicStatusTypes.Length);
+
+        for (int i = 0; i < RandomBasicStatusTypes.Length; i++)
+        {
+            Damageable.DamageType candidate =
+                RandomBasicStatusTypes[
+                    (start + i) % RandomBasicStatusTypes.Length];
+
+            if (!excludeSourceDamageType ||
+                laser == null ||
+                candidate != laser.damageType)
+            {
+                type = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
 }
 
@@ -5054,6 +6157,17 @@ public static class LeviathanStellarConverterBeamWeaponFixedUpdatePatch
     }
 }
 
+[HarmonyPatch(typeof(BeamWeapon), "LateUpdate")]
+public static class LeviathanStellarConverterForkLateUpdatePatch
+{
+    public static void Postfix(BeamWeapon __instance)
+    {
+        Laser laser = __instance as Laser;
+        if (laser != null)
+            LeviathanStellarConverter.DrawForking(laser);
+    }
+}
+
 [HarmonyPatch(typeof(BeamWeapon), "Unequip")]
 public static class LeviathanStellarConverterBeamWeaponUnequipPatch
 {
@@ -5165,6 +6279,59 @@ public static class LeviathanStellarConverterChainTargetsPatch
     public static void Postfix(BeamWeapon __instance, ref int __result)
     {
         LeviathanStellarConverter.ScaleChainTargets(__instance, ref __result);
+    }
+}
+
+[HarmonyPatch(
+    typeof(Equippable),
+    "ApplyModifierToPercentage",
+    new Type[]
+    {
+        typeof(Modifier.Type),
+        typeof(float),
+        typeof(bool)
+    })]
+public static class LeviathanStellarConverterDebuffSpreadPatch
+{
+    public static void Postfix(
+        Equippable __instance,
+        Modifier.Type __0,
+        bool __2,
+        ref float __result)
+    {
+        LeviathanStellarConverter.ScaleDebuffSpreadOnKill(
+            __instance,
+            __0,
+            __2,
+            ref __result);
+    }
+}
+
+[HarmonyPatch(typeof(Beam), "GetCachedRaycastHit")]
+public static class LeviathanStellarConverterForkTargetPatch
+{
+    public static bool Prefix(
+        Beam __instance,
+        ref PhysicsController.Hit __result)
+    {
+        return !LeviathanStellarConverter.TryOverrideForkBeamHit(
+            __instance,
+            ref __result);
+    }
+}
+
+[HarmonyPatch(typeof(DamageBeam), "GetDamageData")]
+public static class LeviathanStellarConverterForkDamagePatch
+{
+    public static void Postfix(
+        DamageBeam __instance,
+        ref bool crit,
+        ref DamageData[] __result)
+    {
+        LeviathanStellarConverter.ScaleForkDamagePacket(
+            __instance,
+            crit,
+            ref __result);
     }
 }
 

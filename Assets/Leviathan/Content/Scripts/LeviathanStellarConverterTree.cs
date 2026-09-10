@@ -61,6 +61,18 @@ public static class LeviathanStellarConverterTree
             Enable(Converter.Flags.Continuous)
         ));
 
+        tree.Add(Node(
+            "Spectrum Saturation",
+            1,
+            Requires("Continuous Conversion"),
+            "Raises Continuous Conversion's random basic-status roll to about 35% per second at the native 5 Hz tick rate, and adds a separate 2.5% per-tick roll for a random basic status other than the firing laser's damage type.",
+            // 8.254944% per tick produces 35% chance of at least one proc across
+            // five independent native beam ticks: 1 - (1 - p)^5 = 0.35.
+            Increment(Converter.Knobs.RandomBasicStatusChance, 3.254944f),
+            Increment(Converter.Knobs.OffElementRandomStatusChance, 2.5f),
+            Enable(Converter.Flags.SpectrumSaturation)
+        ));
+
         // =====================================================================
         // CHAINING
         // =====================================================================
@@ -70,7 +82,7 @@ public static class LeviathanStellarConverterTree
             Requires("Stellar Converter"),
             ManifestationPath,
             "Trades piercing and some damage for native chain behavior.",
-            Increment(Converter.Knobs.FinalDamagePercent, -30f),
+            Increment(Converter.Knobs.FinalDamagePercent, -25f),
             Ranks(Converter.Knobs.ChainTargets, 2f),
             Enable(Converter.Flags.ArcCascade)
         ));
@@ -78,9 +90,20 @@ public static class LeviathanStellarConverterTree
         tree.Add(Major(
             "Fractal Cascade",
             Requires("Arc Cascade"),
-            Increment(Converter.Knobs.FinalDamagePercent, -10f),
+            Increment(Converter.Knobs.FinalDamagePercent, -5f),
             Ranks(Converter.Knobs.ChainTargets, 1f),
             Enable(Converter.Flags.FractalCascade)
+        ));
+
+        tree.Add(Keystone(
+            "Forking",
+            Requires("Fractal Cascade"),
+            "Replaces the single native chain with three 70% fork beams in a cone. Each fork receives half the final resolved chain count rounded up. Across the whole fork graph, a previously hit target may be revisited once; then a globally new target must be hit before any branch may revisit again.",
+            Increment(Converter.Knobs.ForkTargets, 3f),
+            Increment(Converter.Knobs.ForkDamage, 0.70f),
+            Increment(Converter.Knobs.ForkChainFraction, 0.5f),
+            Increment(Converter.Knobs.ForkConeDegrees, 90f),
+            Enable(Converter.Flags.Forking)
         ));
 
         // =====================================================================
@@ -128,6 +151,14 @@ public static class LeviathanStellarConverterTree
             Requires("Ionized Focusing", 1),
             Increment(Converter.Knobs.FinalRangePercent, 5f),
             Increment(Converter.Knobs.StatusChance, 2.5f)
+        ));
+
+        tree.Add(Node(
+            "Contagion",
+            1,
+            Requires("Ionized Reach"),
+            "Converter kills gain +10 percentage points of native negative-status shedding, spreading transferable debuffs to nearby allies of the slain target.",
+            Increment(Converter.Knobs.DebuffSpreadOnKillChance, 10f)
         ));
 
         // =====================================================================
@@ -241,9 +272,11 @@ public static class LeviathanStellarConverterTree
 
         SetPosition(layout, "accelerated_conversion", 250f, -495f);
         SetPosition(layout, "continuous_conversion", 510f, -570f);
+        SetPosition(layout, "spectrum_saturation", 760f, -570f);
 
         SetPosition(layout, "arc_cascade", 250f, -330f);
         SetPosition(layout, "fractal_cascade", 500f, -412f);
+        SetPosition(layout, "forking", 750f, -412f);
 
         SetPosition(layout, "conduction", 250f, -170f);
         SetPosition(layout, "internal_heat_sinks", 500f, -247f);
@@ -251,6 +284,7 @@ public static class LeviathanStellarConverterTree
 
         SetPosition(layout, "ionized_focusing", 250f, 0f);
         SetPosition(layout, "ionized_reach", 500f, -82f);
+        SetPosition(layout, "contagion", 750f, -82f);
 
         SetPosition(layout, "long_focus_lens", 250f, 165f);
         SetPosition(layout, "focal_compression", 500f, 83f);

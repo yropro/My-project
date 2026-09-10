@@ -2,9 +2,11 @@ using static LeviathanTreeDsl;
 using Predator = LeviathanPredatorRuntime;
 
 /// <summary>
-/// Temporary Predator specialization config while the skill mechanics are being
-/// redesigned. One investable node, five ranks; gameplay implementation will
-/// consume Predator.Knobs later.
+/// Predator tree placeholder while the full 30-40 node topology is designed.
+///
+/// Predator.cs already exposes the intended long-term knobs/flags. This tree
+/// deliberately remains one simple five-rank node so today's scaffolding does
+/// not prematurely lock in branch layout, exclusivity, or crossover placement.
 /// </summary>
 public static class LeviathanPredatorTree
 {
@@ -26,13 +28,16 @@ public static class LeviathanPredatorTree
             "Granted automatically when Predator is unlocked in Evolution."
         ));
 
+        // Temporary progression only. The agreed Predator baseline lives in
+        // Predator.Tuning; these increments exist so the current five-rank tree
+        // remains testable until the full topology replaces it.
         tree.Add(Node(
             "Predatory Instinct",
             5,
             Requires("Predator"),
             Increment(Predator.Knobs.Damage, 10f),
             Increment(Predator.Knobs.LungeDistance, 5f),
-            Increment(Predator.Knobs.LungeDuration, -5f),
+            Increment(Predator.Knobs.LungeSpeed, 5f),
             Increment(Predator.Knobs.Cooldown, -5f),
             Increment(Predator.Knobs.CritChance, 2f)
         ));
