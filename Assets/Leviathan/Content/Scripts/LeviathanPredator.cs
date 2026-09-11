@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using HarmonyLib;
-using System.Runtime.CompilerServices;
 
 /// <summary>
 /// Owner-side Predator lunge, Prey, Hunt Streak and Thrill runtime.
@@ -805,8 +804,9 @@ public static class LeviathanPredatorRuntime
 
     private sealed class RuntimeState
     {
-        public readonly Dictionary<GameShip, float> PreyExpiry =
-            new Dictionary<GameShip, float>();
+        public LeviathanCombat.CombatEntityKey OwnerKey;
+        public ulong CombatEventCursor;
+        public float RuntimeStartedAt;
         public int HuntStacks;
         public float HuntExpiry;
         public int PreyKillSequence;
@@ -826,10 +826,6 @@ public static class LeviathanPredatorRuntime
         public int HullRevision = -1;
         public readonly List<GameShip> Sections = new List<GameShip>();
         public readonly List<Collider2D> Hulls = new List<Collider2D>();
-        public readonly Dictionary<uint, PendingHit> Pending = new Dictionary<uint, PendingHit>();
-        public readonly Dictionary<uint, float> NetPrey = new Dictionary<uint, float>();
-        public readonly Dictionary<uint, NetDeath> NetDeaths = new Dictionary<uint, NetDeath>();
-        public readonly List<uint> StaleIds = new List<uint>();
     }
 
     public struct PreyKillResult
@@ -844,11 +840,11 @@ public static class LeviathanPredatorRuntime
     private static readonly Dictionary<GameShip, RuntimeState> RuntimeByOwner =
         new Dictionary<GameShip, RuntimeState>();
     private static readonly List<GameShip> OwnerScratch = new List<GameShip>();
-    private static readonly List<GameShip> PreyScratch = new List<GameShip>();
 
     /// <summary>
-    /// Direct damage temporarily marks before routing so that a lethal first hit
-    /// qualifies. The damage scope restores the old mark if damage is rejected.
+    /// Explicitly applies Predator's source-qualified OwnerTarget Prey state.
+    /// Direct lunges normally call this only after an authoritative qualifying
+    /// outcome, so rejected/immune contacts never create or refresh Prey.
     /// </summary>
     public static bool MarkPrey(GameShip owner, GameShip target)
     {
@@ -859,37 +855,37 @@ public static class LeviathanPredatorRuntime
         if (s == null || s.PreyDurationSeconds <= 0f)
             return false;
 
-        GetRuntime(owner).PreyExpiry[target] = Time.time + s.PreyDurationSeconds;
-        return true;
+        GetRuntime(owner);
+        return LeviathanCombatState.Apply(
+            owner,
+            target,
+            LeviathanCombat.Semantics.PredatorPrey,
+            LeviathanCombatState.Scope.OwnerTarget,
+            s.PreyDurationSeconds);
     }
 
     public static bool IsPrey(GameShip owner, GameShip target)
     {
-        RuntimeState state;
-        float expiry;
-        if (owner == null || target == null ||
-            !RuntimeByOwner.TryGetValue(owner, out state) || state == null ||
-            (!state.PreyExpiry.TryGetValue(target, out expiry) &&
-             (target.netId == 0 || !state.NetPrey.TryGetValue(target.netId, out expiry))))
-        {
+        if (owner == null || target == null)
             return false;
-        }
 
-        if (Time.time < expiry)
-            return true;
-
-        state.PreyExpiry.Remove(target);
-        return false;
+        return LeviathanCombatState.Has(
+            owner,
+            target,
+            LeviathanCombat.Semantics.PredatorPrey,
+            LeviathanCombatState.Scope.OwnerTarget);
     }
 
     public static float GetPreyRemainingSeconds(GameShip owner, GameShip target)
     {
-        if (!IsPrey(owner, target))
+        if (owner == null || target == null)
             return 0f;
-        RuntimeState state = RuntimeByOwner[owner];
-        float expiry;
-        if (!state.PreyExpiry.TryGetValue(target, out expiry)) state.NetPrey.TryGetValue(target.netId, out expiry);
-        return Mathf.Max(0f, expiry - Time.time);
+
+        return LeviathanCombatState.GetRemainingSeconds(
+            owner,
+            target,
+            LeviathanCombat.Semantics.PredatorPrey,
+            LeviathanCombatState.Scope.OwnerTarget);
     }
 
     /// <summary>
@@ -906,18 +902,198 @@ public static class LeviathanPredatorRuntime
         if (!IsOwnerActive(owner))
             return false;
 
-        bool preyKill = IsPrey(owner, target);
-        if (!preyKill && !lungeKill) return false;
+        ResolvedState s = GetResolvedState(owner);
+        LeviathanCombat.CombatEntityKey targetKey;
+        if (s == null || target == null ||
+            !LeviathanCombat.TryGetEntityKey(target, out targetKey))
+        {
+            return false;
+        }
+
+        RuntimeState runtime = GetRuntime(owner);
+        if (runtime == null || !runtime.OwnerKey.IsValid)
+            return false;
+
+        bool preyKill = LeviathanCombatState.Has(
+            runtime.OwnerKey,
+            targetKey,
+            LeviathanCombat.Semantics.PredatorPrey,
+            LeviathanCombatState.Scope.OwnerTarget);
+
+        if (!preyKill && !lungeKill)
+            return false;
+
+        return RegisterSemanticKill(
+            runtime,
+            s,
+            targetKey,
+            preyKill,
+            lungeKill,
+            Time.time,
+            out result);
+    }
+
+    private static bool RegisterSemanticKill(
+        RuntimeState runtime,
+        ResolvedState s,
+        LeviathanCombat.CombatEntityKey targetKey,
+        bool preyKill,
+        bool lungeKill,
+        float occurredAt,
+        out PreyKillResult result)
+    {
+        result = default(PreyKillResult);
+        if (runtime == null || s == null || !runtime.OwnerKey.IsValid || !targetKey.IsValid)
+            return false;
+
+        bool newPreyKill = preyKill &&
+            !LeviathanCombatHistory.WasObservedSince(
+                runtime.OwnerKey,
+                targetKey,
+                LeviathanCombat.Semantics.PredatorPreyKill,
+                runtime.RuntimeStartedAt);
+
+        bool newLungeKill = lungeKill &&
+            !LeviathanCombatHistory.WasObservedSince(
+                runtime.OwnerKey,
+                targetKey,
+                LeviathanCombat.Semantics.PredatorLungeKill,
+                runtime.RuntimeStartedAt);
+
+        if (!newPreyKill && !newLungeKill)
+            return false;
+
+        if (newPreyKill)
+        {
+            LeviathanCombatHistory.RecordSemanticMarker(
+                runtime.OwnerKey,
+                targetKey,
+                LeviathanCombat.Semantics.PredatorPreyKill,
+                occurredAt,
+                true);
+        }
+
+        if (newLungeKill)
+        {
+            LeviathanCombatHistory.RecordSemanticMarker(
+                runtime.OwnerKey,
+                targetKey,
+                LeviathanCombat.Semantics.PredatorLungeKill,
+                occurredAt,
+                true);
+        }
+
+        if (newPreyKill)
+        {
+            LeviathanCombatState.Remove(
+                runtime.OwnerKey,
+                targetKey,
+                LeviathanCombat.Semantics.PredatorPrey,
+                LeviathanCombatState.Scope.OwnerTarget);
+        }
+
+        result = RegisterKill(runtime, s, newPreyKill, newLungeKill);
+        return true;
+    }
+
+    private static void ProcessCombatEvents(GameShip owner, RuntimeState runtime)
+    {
+        if (owner == null || runtime == null || !runtime.OwnerKey.IsValid)
+            return;
+
+        LeviathanCombatHistory.MeaningfulEvent evt;
+        while (LeviathanCombatHistory.TryReadNextMeaningfulEvent(
+            runtime.OwnerKey,
+            ref runtime.CombatEventCursor,
+            out evt))
+        {
+            if (evt.Kind != LeviathanCombatHistory.MeaningfulEventKind.CombatOutcome ||
+                !evt.Semantic.Equals(LeviathanCombat.Semantics.PredatorDirectLunge) ||
+                evt.OccurredAt < runtime.RuntimeStartedAt)
+            {
+                continue;
+            }
+
+            HandleDirectLungeOutcome(owner, runtime, evt);
+        }
+    }
+
+    private static void HandleDirectLungeOutcome(
+        GameShip owner,
+        RuntimeState runtime,
+        LeviathanCombatHistory.MeaningfulEvent evt)
+    {
+        bool damaged =
+            (evt.Outcomes & LeviathanCombat.OutcomeFlags.Damaged) != 0;
+        bool destroyed =
+            (evt.Outcomes & LeviathanCombat.OutcomeFlags.Destroyed) != 0;
+
+        // Preserve current Predator semantics: status-only/rejected outcomes do
+        // not create Prey. GuaranteedOutcome is still deferred, so a remote
+        // zero-damage rejection simply expires from shared pending correlation.
+        if (!damaged && !destroyed)
+            return;
 
         ResolvedState s = GetResolvedState(owner);
         if (s == null)
-            return false;
+            return;
 
-        RuntimeState runtime = GetRuntime(owner);
-        runtime.PreyExpiry.Remove(target);
-        if (target.netId != 0) runtime.NetPrey.Remove(target.netId);
-        result = RegisterKill(runtime, s, preyKill, lungeKill);
-        return true;
+        bool hadPrey = LeviathanCombatState.Has(
+            runtime.OwnerKey,
+            evt.Target,
+            LeviathanCombat.Semantics.PredatorPrey,
+            LeviathanCombatState.Scope.OwnerTarget);
+
+        if (destroyed)
+        {
+            // A valid lethal first direct lunge qualifies as a Prey Kill even
+            // though the target was intentionally not Prey during damage math.
+            PreyKillResult ignored;
+            RegisterSemanticKill(
+                runtime,
+                s,
+                evt.Target,
+                hadPrey || s.PreyDurationSeconds > 0f,
+                true,
+                evt.OccurredAt,
+                out ignored);
+            return;
+        }
+
+        if (s.PreyDurationSeconds <= 0f)
+            return;
+
+        LeviathanCombatState.ApplyAt(
+            runtime.OwnerKey,
+            evt.Target,
+            LeviathanCombat.Semantics.PredatorPrey,
+            LeviathanCombatState.Scope.OwnerTarget,
+            evt.OccurredAt,
+            evt.EventId,
+            s.PreyDurationSeconds);
+
+        // The target can die after authority processed this lunge but before
+        // the result returns to the source owner. Reconcile against the shared
+        // semantic death observation using authored occurrence time, not result
+        // arrival time.
+        float deathAt = LeviathanCombatHistory.GetLastObservationTime(
+            runtime.OwnerKey,
+            evt.Target,
+            LeviathanCombat.Semantics.PredatorTargetDeathObserved);
+
+        if (deathAt >= evt.OccurredAt &&
+            deathAt < evt.OccurredAt + s.PreyDurationSeconds)
+        {
+            PreyKillResult ignored;
+            RegisterSemanticKill(
+                runtime,
+                s,
+                evt.Target,
+                true,
+                false,
+                deathAt,
+                out ignored);
+        }
     }
 
     private static PreyKillResult RegisterKill(RuntimeState runtime, ResolvedState s, bool preyKill, bool lungeKill)
@@ -1255,8 +1431,8 @@ public static class LeviathanPredatorRuntime
         if (!runtime.Lunging || !IsOwnerActive(owner) || !ValidEnemy(owner, target) ||
             target.IsDodging() || !runtime.HitTargets.Add(target)) return;
         Assault source = runtime.Source;
-        // Snapshot VS Prey before BeginDamage provisionally marks the target.
-        // A first hit receives no VS Prey bonus, but a lethal first hit counts.
+        // Snapshot Vs Prey before this DirectLunge transaction is authored.
+        // Prey is applied only after a qualifying authoritative outcome.
         EffectiveStats stats = ResolveEffectiveStats(owner, GetCombatContext(owner, target));
         bool crit = Modifier.CritRoll(Mathf.Max(0f, source.GetCritChance() + stats.CritChanceBonus), target);
         if (crit) ApplyNativeCrit(source, owner);
@@ -1276,11 +1452,22 @@ public static class LeviathanPredatorRuntime
         target.lastDamagedByShipName = owner.GetName();
         target.lastDamagedByFaction = owner.faction;
         bool bypass = source.HasCustomizer(Customizer.Type.BypassDamageLimit);
-        PendingHit previousSend = SendingHit;
-        SendingHit = target.IsNetRemote() && target.netId != 0 ? new PendingHit {
-            Owner = owner, Source = source, TargetId = target.netId, SentAt = Time.time,
-            PreyDuration = GetResolvedState(owner).PreyDurationSeconds
-        } : null;
+        LeviathanCombat.AcknowledgementMode acknowledgement =
+            LeviathanCombat.SupportsGuaranteedOutcome
+                ? LeviathanCombat.AcknowledgementMode.GuaranteedOutcome
+                : LeviathanCombat.AcknowledgementMode.NativeResult;
+
+        LeviathanCombat.DamageScope combatScope = LeviathanCombat.BeginDamage(
+            owner,
+            target,
+            LeviathanCombat.Semantics.PredatorDirectLunge,
+            default(LeviathanCombat.ContributorKey),
+            acknowledgement,
+            LeviathanCombat.TrackingFlags.Summary |
+                LeviathanCombat.TrackingFlags.MeaningfulOutcome,
+            0,
+            owner);
+
         bool killed;
         try
         {
@@ -1288,7 +1475,14 @@ public static class LeviathanPredatorRuntime
                 Mathf.Max(0f, source.StatusEffectChance + stats.StatusChanceBonus), crit,
                 point, owner, bypass, 0f, source, 0f, 0f, false, 0f);
         }
-        finally { SendingHit = previousSend; }
+        finally
+        {
+            LeviathanCombat.EndDamage(combatScope);
+        }
+
+        // Local-authority outcomes have committed by the time RouteDamage
+        // returns. Remote-authority outcomes are consumed on a later FixedTick.
+        ProcessCombatEvents(owner, runtime);
         NativeRelay(source, owner, target, runtime.DamagePacket, point, bypass);
         if (target != null && !target.IsNetRemote()) NativeLeech(source, target, point);
         if (killed && target != null && !target.IsDrone())
@@ -1299,81 +1493,49 @@ public static class LeviathanPredatorRuntime
         }
     }
 
-    // Attribution is scoped to the exact direct packet. Nested reflected damage,
-    // conduit and on-crit procs must never inherit a Lunge Kill merely because
-    // they execute while Predator is resolving its contact.
-    internal struct DamageScope
-    {
-        public GameShip PreviousOwner;
-        public GameShip PreviousTarget;
-        public bool PreviousDeath;
-        public GameShip Owner;
-        public bool HadMark;
-        public float PreviousExpiry;
-    }
-    private static GameShip DirectOwner;
-    private static GameShip DirectTarget;
-    private static bool DirectDeath;
-
-    internal static DamageScope BeginDamage(GameShip target, GameShip fromShip,
-        Damageable.DamageData[] packet)
-    {
-        DamageScope scope = new DamageScope { PreviousOwner = DirectOwner,
-            PreviousTarget = DirectTarget, PreviousDeath = DirectDeath };
-        DirectOwner = null;
-        DirectTarget = null;
-        DirectDeath = false;
-        RuntimeState runtime;
-        // The victim authority reconstructs the native packet. Consume only the
-        // first matching direct Damage call; nested proc packets cannot match.
-        if (ReceivingHit != null && !ReceivingHit.Consumed && target.netId == ReceivingHit.Event.targetNetId &&
-            ReferenceEquals(fromShip, ReceivingHit.Attacker))
-        {
-            ReceivingHit.Consumed = true;
-            DirectOwner = fromShip;
-            DirectTarget = target;
-        }
-        if (IsOwnerActive(fromShip) && RuntimeByOwner.TryGetValue(fromShip, out runtime) &&
-            ReferenceEquals(packet, runtime.DamagePacket) && target.health > 0f)
-        {
-            scope.Owner = fromShip;
-            scope.HadMark = runtime.PreyExpiry.TryGetValue(target, out scope.PreviousExpiry);
-            MarkPrey(fromShip, target);
-            DirectOwner = fromShip;
-            DirectTarget = target;
-            target.lastHealthDamage = 0f;
-            target.lastShieldDamage = 0f;
-        }
-        return scope;
-    }
-
-    internal static void EndDamage(GameShip target, DamageScope scope)
-    {
-        bool died = DirectDeath;
-        DirectOwner = scope.PreviousOwner;
-        DirectTarget = scope.PreviousTarget;
-        DirectDeath = scope.PreviousDeath;
-        RuntimeState runtime;
-        if (died || scope.Owner == null || target == null || target.health <= 0f ||
-            target.lastHealthDamage > 0f || target.lastShieldDamage > 0f ||
-            !RuntimeByOwner.TryGetValue(scope.Owner, out runtime)) return;
-        // Rejected/immune hits neither create nor refresh Prey.
-        if (scope.HadMark) runtime.PreyExpiry[target] = scope.PreviousExpiry;
-        else runtime.PreyExpiry.Remove(target);
-    }
-
     internal static void TargetDied(GameShip target, bool voluntary)
     {
-        if (voluntary || target.isBeingDestroyed || target.health > 0f || WorldController.instance == null) return;
-        if (ReceivingHit != null && ReferenceEquals(DirectOwner, ReceivingHit.Attacker) &&
-            ReferenceEquals(DirectTarget, target)) ReceivingHit.DirectKill = true;
+        if (voluntary || target.isBeingDestroyed || target.health > 0f || WorldController.instance == null)
+            return;
+
         GameShip owner = WorldController.instance.GetCurrentPlayerShip();
-        if (!IsOwnerActive(owner)) return;
-        PreyKillResult result;
-        bool direct = ReferenceEquals(DirectOwner, owner) && ReferenceEquals(DirectTarget, target);
-        bool lungeKill = direct && !DirectDeath;
-        if (direct) DirectDeath = true;
-        TryRegisterPreyKill(owner, target, lungeKill, out result);
+        RuntimeState runtime;
+        LeviathanCombat.CombatEntityKey targetKey;
+        if (!IsOwnerActive(owner) ||
+            !RuntimeByOwner.TryGetValue(owner, out runtime) || runtime == null ||
+            !runtime.OwnerKey.IsValid ||
+            !LeviathanCombat.TryGetEntityKey(target, out targetKey))
+        {
+            return;
+        }
+
+        bool prey = LeviathanCombatState.Has(
+            runtime.OwnerKey,
+            targetKey,
+            LeviathanCombat.Semantics.PredatorPrey,
+            LeviathanCombatState.Scope.OwnerTarget);
+        bool pendingDirect = LeviathanCombat.HasPendingEvent(
+            runtime.OwnerKey,
+            targetKey,
+            LeviathanCombat.Semantics.PredatorDirectLunge);
+
+        if (!prey && !pendingDirect)
+            return;
+
+        float now = Time.time;
+        LeviathanCombatHistory.RecordSemanticMarker(
+            runtime.OwnerKey,
+            targetKey,
+            LeviathanCombat.Semantics.PredatorTargetDeathObserved,
+            now,
+            false);
+
+        if (prey)
+        {
+            PreyKillResult ignored;
+            RegisterSemanticKill(runtime, GetResolvedState(owner), targetKey,
+                true, false, now, out ignored);
+        }
     }
 
     public static void GetKillSequences(GameShip owner, out int preyKills, out int lungeKills)
@@ -1400,19 +1562,20 @@ public static class LeviathanPredatorRuntime
     public static void Cancel()
     {
         foreach (KeyValuePair<GameShip, RuntimeState> pair in RuntimeByOwner)
+        {
             EndLunge(pair.Key, pair.Value);
+            if (pair.Value != null && pair.Value.OwnerKey.IsValid)
+            {
+                LeviathanCombat.ResetOwnerSkillRuntime(
+                    pair.Value.OwnerKey,
+                    LeviathanCombat.SkillIds.Predator);
+            }
+        }
         RuntimeByOwner.Clear();
         ResolvedStateCache.Clear();
         OwnerScratch.Clear();
-        PreyScratch.Clear();
         Array.Clear(Overlaps, 0, Overlaps.Length);
         Array.Clear(SweepHits, 0, SweepHits.Length);
-        DirectOwner = null;
-        DirectTarget = null;
-        DirectDeath = false;
-        SendingHit = null;
-        ReceivingHit = null;
-        DamageTags = new ConditionalWeakTable<object, DamageTag>();
     }
 
     public static void CancelForPlayer(GameShip player)
@@ -1420,7 +1583,16 @@ public static class LeviathanPredatorRuntime
         if (player == null)
             return;
         RuntimeState runtime;
-        if (RuntimeByOwner.TryGetValue(player, out runtime)) EndLunge(player, runtime);
+        if (RuntimeByOwner.TryGetValue(player, out runtime) && runtime != null)
+        {
+            EndLunge(player, runtime);
+            if (runtime.OwnerKey.IsValid)
+            {
+                LeviathanCombat.ResetOwnerSkillRuntime(
+                    runtime.OwnerKey,
+                    LeviathanCombat.SkillIds.Predator);
+            }
+        }
         RuntimeByOwner.Remove(player);
         Pilot pilot = GameShip.GetPlayerSourcePilot(player);
         if (pilot != null) ResolvedStateCache.Remove(pilot);
@@ -1445,29 +1617,29 @@ public static class LeviathanPredatorRuntime
             if (!RuntimeByOwner.TryGetValue(owner, out state)) continue;
             if (!IsOwnerActive(owner) || state == null)
             {
-                if (state != null) EndLunge(owner, state);
+                if (state != null)
+                {
+                    EndLunge(owner, state);
+                    if (state.OwnerKey.IsValid)
+                    {
+                        LeviathanCombat.ResetOwnerSkillRuntime(
+                            state.OwnerKey,
+                            LeviathanCombat.SkillIds.Predator);
+                    }
+                }
                 RuntimeByOwner.Remove(owner);
                 continue;
             }
-
-            PreyScratch.Clear();
-            foreach (KeyValuePair<GameShip, float> preyPair in state.PreyExpiry)
-            {
-                if (preyPair.Key == null || now >= preyPair.Value)
-                    PreyScratch.Add(preyPair.Key);
-            }
-            for (int i = 0; i < PreyScratch.Count; i++)
-                state.PreyExpiry.Remove(PreyScratch[i]);
 
             if (state.HuntStacks > 0 && now >= state.HuntExpiry)
             {
                 state.HuntStacks = 0;
                 state.HuntExpiry = 0f;
             }
+            ProcessCombatEvents(owner, state);
             // Warm conditional state before contact collection uses its buffers.
             GetCombatContext(owner);
             TickLunge(owner, state);
-            PruneNetworkState(state);
             // Slot 3: lunge-active only. Native replication already carries motion.
             LeviathanNetwork.SlotWriter writer = LeviathanNetwork.BeginSlot(LeviathanNetwork.SlotPredator);
             writer.Bool(state.Lunging);
@@ -1495,166 +1667,52 @@ public static class LeviathanPredatorRuntime
     // SMALL HELPERS
     // =========================================================================
 
-    // Reliable native damage messages need a correlation token: the same Assault
-    // slot also emits Constrictor/Conduit damage. Never infer Lunge Kill from slot
-    // identity or from a lossy presentation packet. Identical mod builds append
-    // a 9-byte versioned trailer to tagged events/results; native validation and
-    // routing stay in charge. Slot 3 is reserved for presentation, not kill RPCs.
-    internal sealed class DamageTag
-    {
-        public uint Token;
-        public bool DirectKill;
-    }
-    private sealed class PendingHit
-    {
-        public GameShip Owner;
-        public Assault Source;
-        public uint TargetId;
-        public float SentAt;
-        public float PreyDuration;
-    }
-    private sealed class NetDeath
-    {
-        public float At;
-        public bool PreyAwarded;
-        public bool LungeAwarded;
-    }
-    internal sealed class ReceivedHit
-    {
-        public MsgDamageEvent Event;
-        public GameShip Attacker;
-        public DamageTag Tag;
-        public bool Consumed;
-        public bool DirectKill;
-    }
-    private static PendingHit SendingHit;
-    private static ReceivedHit ReceivingHit;
-    private static uint NextHitToken;
-    private const uint DamageTrailerV1 = 0x3152504C; // LPR1
-    private const float ConfirmationTimeout = 30f;
-    private static ConditionalWeakTable<object, DamageTag> DamageTags = new ConditionalWeakTable<object, DamageTag>();
-
-    internal static void TagOutgoing(MsgDamageEvent message)
-    {
-        PendingHit hit = SendingHit;
-        if (hit == null || message.isHeal || message.targetNetId != hit.TargetId ||
-            message.sourceSlot != hit.Source.GetSlotIndex()) return;
-        uint token = ++NextHitToken;
-        if (token == 0) token = ++NextHitToken;
-        DamageTags.GetOrCreateValue(message).Token = token;
-        GetRuntime(hit.Owner).Pending[token] = hit;
-    }
-
-    internal static ReceivedHit BeginReceived(MsgDamageEvent message, GameShip attacker)
-    {
-        ReceivedHit previous = ReceivingHit;
-        DamageTag tag;
-        ReceivingHit = DamageTags.TryGetValue(message, out tag)
-            ? new ReceivedHit { Event = message, Attacker = attacker, Tag = tag } : null;
-        return previous;
-    }
-    internal static void EndReceived(ReceivedHit previous) { ReceivingHit = previous; }
-
-    internal static void TagResult(MsgDamageResult result)
-    {
-        ReceivedHit hit = ReceivingHit;
-        if (hit == null || result.targetNetId != hit.Event.targetNetId ||
-            result.attackerPlayerId != hit.Event.attackerPlayerId ||
-            result.attackerNetId != hit.Event.attackerNetId || result.sourceSlot != hit.Event.sourceSlot) return;
-        DamageTag tag = DamageTags.GetOrCreateValue(result);
-        tag.Token = hit.Tag.Token;
-        tag.DirectKill = hit.DirectKill;
-    }
-
-    internal static void WriteDamageTag(NetSerializer serializer, object message)
-    {
-        DamageTag tag;
-        if (!DamageTags.TryGetValue(message, out tag)) return;
-        serializer.writer.Write(DamageTrailerV1);
-        serializer.writer.Write(tag.Token);
-        serializer.writer.Write(tag.DirectKill);
-    }
-
-    internal static void ReadDamageTag(byte[] buffer, int length, int nativeLength, object message)
-    {
-        // Exact native boundary, not a scan for arbitrary magic in damage bytes.
-        if (message == null || buffer == null || length != nativeLength + 9 || length > buffer.Length ||
-            BitConverter.ToUInt32(buffer, nativeLength) != DamageTrailerV1) return;
-        uint token = BitConverter.ToUInt32(buffer, nativeLength + 4);
-        if (token == 0) return;
-        DamageTag tag = DamageTags.GetOrCreateValue(message);
-        tag.Token = token;
-        tag.DirectKill = buffer[nativeLength + 8] != 0;
-    }
-
-    internal static void ConfirmHit(MsgDamageResult message)
-    {
-        GameShip owner = WorldController.instance == null ? null : WorldController.instance.GetCurrentPlayerShip();
-        DamageTag tag;
-        RuntimeState runtime;
-        PendingHit pending;
-        if (!IsOwnerActive(owner) || !DamageTags.TryGetValue(message, out tag) ||
-            !RuntimeByOwner.TryGetValue(owner, out runtime) || !runtime.Pending.TryGetValue(tag.Token, out pending) ||
-            pending.Owner != owner || pending.TargetId != message.targetNetId ||
-            pending.Source != FindSource(owner) || pending.Source.GetSlotIndex() != message.sourceSlot ||
-            (message.attackerNetId != 0 && message.attackerNetId != owner.netId)) return;
-        runtime.Pending.Remove(tag.Token); // consume once, including rejected hits
-        if (!message.destroyed && !(message.healthDamage > 0f || message.shieldDamage > 0f)) return;
-        float expiry = pending.SentAt + pending.PreyDuration;
-        float oldExpiry;
-        if (pending.PreyDuration > 0f &&
-            (!runtime.NetPrey.TryGetValue(pending.TargetId, out oldExpiry) || expiry > oldExpiry))
-            runtime.NetPrey[pending.TargetId] = expiry;
-        NetDeath death;
-        if (message.destroyed || runtime.NetDeaths.TryGetValue(pending.TargetId, out death))
-            RegisterNetDeath(owner, runtime, pending.TargetId, tag.DirectKill && message.destroyed,
-                message.destroyed && pending.PreyDuration > 0f);
-    }
-
-    private static void RegisterNetDeath(GameShip owner, RuntimeState runtime, uint id, bool direct, bool lethalFirstHit)
-    {
-        NetDeath death;
-        if (!runtime.NetDeaths.TryGetValue(id, out death))
-        { death = new NetDeath { At = Time.time }; runtime.NetDeaths[id] = death; }
-        float expiry;
-        bool prey = !death.PreyAwarded && (lethalFirstHit ||
-            (runtime.NetPrey.TryGetValue(id, out expiry) && death.At < expiry));
-        bool lunge = direct && !death.LungeAwarded;
-        if (prey || lunge) RegisterKill(runtime, GetResolvedState(owner), prey, lunge);
-        death.PreyAwarded |= prey;
-        death.LungeAwarded |= lunge;
-        runtime.NetPrey.Remove(id);
-    }
-
     internal static void RemoteTargetDied(NetWorldBridge bridge, MsgEntityDeath death)
     {
-        if (death.voluntary || death.starId != bridge.starId) return;
-        GameShip owner = WorldController.instance == null ? null : WorldController.instance.GetCurrentPlayerShip();
-        RuntimeState runtime;
-        if (!IsOwnerActive(owner) || !RuntimeByOwner.TryGetValue(owner, out runtime)) return;
-        // Keep a death only if this hunter has a mark or an in-flight hit on it.
-        bool relevant = runtime.NetPrey.ContainsKey(death.netId);
-        if (!relevant)
-            foreach (PendingHit pending in runtime.Pending.Values)
-                if (pending.TargetId == death.netId) { relevant = true; break; }
-        if (relevant) RegisterNetDeath(owner, runtime, death.netId, false, false);
-    }
+        if (death.voluntary || death.starId != bridge.starId)
+            return;
 
-    private static void PruneNetworkState(RuntimeState runtime)
-    {
-        runtime.StaleIds.Clear();
-        foreach (var pair in runtime.Pending)
-            if (Time.time - pair.Value.SentAt > ConfirmationTimeout) runtime.StaleIds.Add(pair.Key);
-        foreach (uint id in runtime.StaleIds) runtime.Pending.Remove(id);
-        runtime.StaleIds.Clear();
-        foreach (var pair in runtime.NetPrey)
-            if (Time.time >= pair.Value) runtime.StaleIds.Add(pair.Key);
-        foreach (uint id in runtime.StaleIds) runtime.NetPrey.Remove(id);
-        runtime.StaleIds.Clear();
-        foreach (var pair in runtime.NetDeaths)
-            if (Time.time - pair.Value.At > ConfirmationTimeout) runtime.StaleIds.Add(pair.Key);
-        foreach (uint id in runtime.StaleIds) runtime.NetDeaths.Remove(id);
-        runtime.StaleIds.Clear();
+        GameShip owner = WorldController.instance == null
+            ? null
+            : WorldController.instance.GetCurrentPlayerShip();
+        RuntimeState runtime;
+        if (!IsOwnerActive(owner) ||
+            !RuntimeByOwner.TryGetValue(owner, out runtime) || runtime == null ||
+            !runtime.OwnerKey.IsValid || death.netId == 0)
+        {
+            return;
+        }
+
+        LeviathanCombat.CombatEntityKey targetKey =
+            LeviathanCombat.ForNetworkEntity(death.netId);
+
+        bool prey = LeviathanCombatState.Has(
+            runtime.OwnerKey,
+            targetKey,
+            LeviathanCombat.Semantics.PredatorPrey,
+            LeviathanCombatState.Scope.OwnerTarget);
+        bool pendingDirect = LeviathanCombat.HasPendingEvent(
+            runtime.OwnerKey,
+            targetKey,
+            LeviathanCombat.Semantics.PredatorDirectLunge);
+
+        if (!prey && !pendingDirect)
+            return;
+
+        float now = Time.time;
+        LeviathanCombatHistory.RecordSemanticMarker(
+            runtime.OwnerKey,
+            targetKey,
+            LeviathanCombat.Semantics.PredatorTargetDeathObserved,
+            now,
+            false);
+
+        if (prey)
+        {
+            PreyKillResult ignored;
+            RegisterSemanticKill(runtime, GetResolvedState(owner), targetKey,
+                true, false, now, out ignored);
+        }
     }
 
     private static RuntimeState GetRuntime(GameShip owner)
@@ -1663,6 +1721,23 @@ public static class LeviathanPredatorRuntime
         if (!RuntimeByOwner.TryGetValue(owner, out s) || s == null)
         {
             s = new RuntimeState();
+            s.RuntimeStartedAt = Time.time;
+            LeviathanCombat.TryGetEntityKey(owner, out s.OwnerKey);
+
+            // The meaningful ring is bounded owner history, not skill runtime
+            // state. A replacement Predator runtime starts at the current tail
+            // so pre-reset outcomes/markers cannot be replayed into it.
+            if (s.OwnerKey.IsValid)
+            {
+                LeviathanCombatHistory.MeaningfulEvent ignored;
+                while (LeviathanCombatHistory.TryReadNextMeaningfulEvent(
+                    s.OwnerKey,
+                    ref s.CombatEventCursor,
+                    out ignored))
+                {
+                }
+            }
+
             RuntimeByOwner[owner] = s;
         }
         return s;
@@ -1727,40 +1802,11 @@ internal static class LeviathanPredatorCooldownPatch
     public static void Prefix(Activatable __instance) => LeviathanPredatorRuntime.UpdateCooldown(__instance);
 }
 
-[HarmonyPatch(typeof(GameShip), "Damage")]
-internal static class LeviathanPredatorDamagePatch
-{
-    public static void Prefix(GameShip __instance, GameShip fromShip,
-        Damageable.DamageData[] damageData, out LeviathanPredatorRuntime.DamageScope __state)
-    {
-        __state = LeviathanPredatorRuntime.BeginDamage(__instance, fromShip, damageData);
-    }
-    public static void Finalizer(GameShip __instance, LeviathanPredatorRuntime.DamageScope __state)
-    {
-        LeviathanPredatorRuntime.EndDamage(__instance, __state);
-    }
-}
-
 [HarmonyPatch(typeof(GameShip), "Destroyed")]
 internal static class LeviathanPredatorDeathPatch
 {
     public static void Prefix(GameShip __instance, bool voluntary) =>
         LeviathanPredatorRuntime.TargetDied(__instance, voluntary);
-}
-
-// DirectDamage bypasses the normal packet route (for example scripted damage).
-// Suspend a surrounding lunge scope so nested direct effects cannot steal credit.
-[HarmonyPatch(typeof(GameShip), "DirectDamage")]
-internal static class LeviathanPredatorDirectDamagePatch
-{
-    public static void Prefix(GameShip __instance, out LeviathanPredatorRuntime.DamageScope __state)
-    {
-        __state = LeviathanPredatorRuntime.BeginDamage(__instance, null, null);
-    }
-    public static void Finalizer(GameShip __instance, LeviathanPredatorRuntime.DamageScope __state)
-    {
-        LeviathanPredatorRuntime.EndDamage(__instance, __state);
-    }
 }
 
 [HarmonyPatch(typeof(GameShip), "get_MaxSpeed")]
@@ -1782,62 +1828,6 @@ internal static class LeviathanPredatorAccelerationPatch
 {
     public static void Postfix(Thruster __instance, ref float __result) =>
         __result *= LeviathanPredatorRuntime.GetCurrentStats(__instance.parentShip).AccelerationMultiplier;
-}
-
-[HarmonyPatch(typeof(NetSession), "SendDamageEvent")]
-internal static class LeviathanPredatorSendHitPatch
-{
-    public static void Prefix(MsgDamageEvent damageEvent) => LeviathanPredatorRuntime.TagOutgoing(damageEvent);
-}
-
-[HarmonyPatch(typeof(NetSession), "SendDamageResult")]
-internal static class LeviathanPredatorSendResultPatch
-{
-    public static void Prefix(MsgDamageResult result) => LeviathanPredatorRuntime.TagResult(result);
-}
-
-[HarmonyPatch(typeof(NetCombat), "ApplyDamageEvent")]
-internal static class LeviathanPredatorReceiveHitPatch
-{
-    public static void Prefix(MsgDamageEvent damageEvent, GameShip attacker,
-        out LeviathanPredatorRuntime.ReceivedHit __state)
-        => __state = LeviathanPredatorRuntime.BeginReceived(damageEvent, attacker);
-    public static void Finalizer(LeviathanPredatorRuntime.ReceivedHit __state)
-        => LeviathanPredatorRuntime.EndReceived(__state);
-}
-
-[HarmonyPatch(typeof(NetDamageCodec), "Write", new[] { typeof(NetSerializer), typeof(MsgDamageEvent) })]
-internal static class LeviathanPredatorWriteHitPatch
-{
-    public static void Postfix(NetSerializer serializer, MsgDamageEvent damageEvent)
-        => LeviathanPredatorRuntime.WriteDamageTag(serializer, damageEvent);
-}
-
-[HarmonyPatch(typeof(NetDamageCodec), "Write", new[] { typeof(NetSerializer), typeof(MsgDamageResult) })]
-internal static class LeviathanPredatorWriteResultPatch
-{
-    public static void Postfix(NetSerializer serializer, MsgDamageResult result)
-        => LeviathanPredatorRuntime.WriteDamageTag(serializer, result);
-}
-
-[HarmonyPatch(typeof(NetDamageCodec), "ReadDamageEvent")]
-internal static class LeviathanPredatorReadHitPatch
-{
-    public static void Postfix(byte[] buffer, int length, MsgDamageEvent __result)
-        => LeviathanPredatorRuntime.ReadDamageTag(buffer, length, 87 + 12 * __result.damage.Length, __result);
-}
-
-[HarmonyPatch(typeof(NetDamageCodec), "ReadDamageResult")]
-internal static class LeviathanPredatorReadResultPatch
-{
-    public static void Postfix(byte[] buffer, int length, MsgDamageResult __result)
-        => LeviathanPredatorRuntime.ReadDamageTag(buffer, length, 34, __result);
-}
-
-[HarmonyPatch(typeof(NetWorldBridge), "OnDamageResult")]
-internal static class LeviathanPredatorConfirmHitPatch
-{
-    public static void Postfix(MsgDamageResult result) => LeviathanPredatorRuntime.ConfirmHit(result);
 }
 
 [HarmonyPatch(typeof(NetWorldBridge), "OnEntityDeath")]
