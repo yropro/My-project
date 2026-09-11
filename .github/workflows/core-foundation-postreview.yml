@@ -176,16 +176,12 @@ jobs:
                       }''',
           'validation class isolation')
 
-          one(
-          '''                reason = "Refund points from " + tree.Name +
-                          " before removing its Evolution unlock.";''',
-          '''                string progressionName =
-                              string.IsNullOrEmpty(policy.ProgressionName)
-                                  ? "class progression"
-                                  : policy.ProgressionName;
-                          reason = "Refund points from " + tree.Name +
-                              " before removing its " + progressionName + " unlock.";''',
-          'generic progression message')
+          if 'before removing its Evolution unlock.' not in t:
+              raise RuntimeError('missing anchor: generic progression message')
+          t = t.replace(
+              'before removing its Evolution unlock.',
+              'before removing its class unlock.',
+              1)
 
           p.write_text(t, encoding='utf-8')
           PY
@@ -194,7 +190,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re, subprocess
+          import subprocess
 
           s = Path('Assets/Leviathan/Content/Scripts')
           framework = (s / 'CoreSpecializationFramework.cs').read_text(encoding='utf-8-sig')
@@ -218,6 +214,7 @@ jobs:
               'does not belong to the active class',
               'sourceTree.Id) != targetOwner',
               'GetOwnerClass(trees[i].Id)',
+              'before removing its class unlock',
           ]
           for value in required:
               if value not in framework:
