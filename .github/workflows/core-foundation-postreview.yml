@@ -1,0 +1,242 @@
+name: Core Foundation Post Review
+
+on:
+  push:
+    branches:
+      - chatgpt/core-foundation-v2
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply class-domain review fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('Assets/Leviathan/Content/Scripts/CoreSpecializationFramework.cs')
+          t = p.read_text(encoding='utf-8-sig')
+
+          def one(old, new, label):
+              global t
+              if old not in t:
+                  raise RuntimeError('missing anchor: ' + label)
+              t = t.replace(old, new, 1)
+
+          one(
+          '''    private static void SynchronizeAllAutoGrantedNodes(Pilot pilot)
+              {
+                  IList<CoreSpecializationTree> trees =
+                      CoreSpecializationRegistry.All();
+
+                  for (int i = 0; i < trees.Count; i++)
+                  {
+                      CoreSpecializationState state = GetRawState(pilot, trees[i].Id);
+                      SynchronizeAutoGrantedNodes(pilot, trees[i], state);
+                  }
+              }''',
+          '''    private static void SynchronizeAllAutoGrantedNodes(Pilot pilot)
+              {
+                  ICoreSpecializationPolicy policy =
+                      CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+                  if (policy == null)
+                      return;
+
+                  CoreClassId ownerClass = policy.ClassId;
+                  IList<CoreSpecializationTree> trees =
+                      CoreSpecializationRegistry.All();
+
+                  for (int i = 0; i < trees.Count; i++)
+                  {
+                      if (CoreSpecializationPolicies.GetOwnerClass(trees[i].Id) !=
+                          ownerClass)
+                      {
+                          continue;
+                      }
+
+                      CoreSpecializationState state = GetRawState(pilot, trees[i].Id);
+                      SynchronizeAutoGrantedNodes(pilot, trees[i], state);
+                  }
+              }''',
+          'auto-grant class isolation')
+
+          one(
+          '''        bool result = false;
+
+                  try
+                  {
+                      if (tree.UnlockKind == CoreTreeUnlockKind.Always)''',
+          '''        CoreClassId targetOwner =
+                      CoreSpecializationPolicies.GetOwnerClass(tree.Id);
+                  if (targetOwner == CoreClassId.None)
+                      return false;
+
+                  bool result = false;
+
+                  try
+                  {
+                      if (tree.UnlockKind == CoreTreeUnlockKind.Always)''',
+          'target tree owner')
+
+          one(
+          '''                    CoreSpecializationTree sourceTree = all[i];
+                              if (sourceTree.Id == tree.Id ||
+                                  !EvaluateTreeUnlocked(''',
+          '''                    CoreSpecializationTree sourceTree = all[i];
+                              if (sourceTree.Id == tree.Id ||
+                                  CoreSpecializationPolicies.GetOwnerClass(
+                                      sourceTree.Id) != targetOwner ||
+                                  !EvaluateTreeUnlocked(''',
+          'cross-class unlock isolation')
+
+          one(
+          '''        if (!IsTreeUnlockedRaw(pilot, tree))
+                  {
+                      reason = tree.Name + " is locked.";
+                      return false;
+                  }
+
+                  if (!CanSafelySpend(pilot, out reason))''',
+          '''        ICoreSpecializationPolicy policy =
+                      CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+                  if (policy == null ||
+                      CoreSpecializationPolicies.GetOwnerClass(tree.Id) !=
+                          policy.ClassId)
+                  {
+                      reason = tree.Name + " does not belong to the active class.";
+                      return false;
+                  }
+
+                  if (!IsTreeUnlockedRaw(pilot, tree))
+                  {
+                      reason = tree.Name + " is locked.";
+                      return false;
+                  }
+
+                  if (!CanSafelySpend(pilot, out reason))''',
+          'invest class ownership')
+
+          one(
+          '''        if (!CanSafelySpend(pilot, out reason))
+                      return false;
+
+                  if (!state.CanRefund(tree, nodeId, out reason))''',
+          '''        ICoreSpecializationPolicy policy =
+                      CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+                  if (policy == null ||
+                      CoreSpecializationPolicies.GetOwnerClass(tree.Id) !=
+                          policy.ClassId)
+                  {
+                      reason = tree.Name + " does not belong to the active class.";
+                      return false;
+                  }
+
+                  if (!CanSafelySpend(pilot, out reason))
+                      return false;
+
+                  if (!state.CanRefund(tree, nodeId, out reason))''',
+          'refund class ownership')
+
+          one(
+          '''        reason = string.Empty;
+                  IList<CoreSpecializationTree> trees =
+                      CoreSpecializationRegistry.All();
+
+                  for (int i = 0; i < trees.Count; i++)
+                  {
+                      CoreSpecializationTree tree = trees[i];''',
+          '''        reason = string.Empty;
+                  ICoreSpecializationPolicy policy =
+                      CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+                  if (policy == null)
+                  {
+                      reason = "No specialization policy is available for this Pilot.";
+                      return false;
+                  }
+
+                  CoreClassId ownerClass = policy.ClassId;
+                  IList<CoreSpecializationTree> trees =
+                      CoreSpecializationRegistry.All();
+
+                  for (int i = 0; i < trees.Count; i++)
+                  {
+                      CoreSpecializationTree tree = trees[i];
+                      if (CoreSpecializationPolicies.GetOwnerClass(tree.Id) !=
+                          ownerClass)
+                      {
+                          continue;
+                      }''',
+          'validation class isolation')
+
+          one(
+          '''                reason = "Refund points from " + tree.Name +
+                          " before removing its Evolution unlock.";''',
+          '''                string progressionName =
+                              string.IsNullOrEmpty(policy.ProgressionName)
+                                  ? "class progression"
+                                  : policy.ProgressionName;
+                          reason = "Refund points from " + tree.Name +
+                              " before removing its " + progressionName + " unlock.";''',
+          'generic progression message')
+
+          p.write_text(t, encoding='utf-8')
+          PY
+
+      - name: Audit reviewed foundation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+
+          s = Path('Assets/Leviathan/Content/Scripts')
+          framework = (s / 'CoreSpecializationFramework.cs').read_text(encoding='utf-8-sig')
+          policy = (s / 'CoreSpecializationPolicy.cs').read_text(encoding='utf-8-sig')
+          network = (s / 'CoreNetwork.cs').read_text(encoding='utf-8-sig')
+
+          forbidden_framework = [
+              'LeviathanEvolutionPointBank',
+              'LeviathanSpecializationPersistence',
+              'LeviathanSpecializationCatalog',
+              'ICoreSpecializationPointBank',
+              'GetEvolutionRank',
+              'before removing its Evolution unlock',
+          ]
+          for value in forbidden_framework:
+              if value in framework:
+                  raise RuntimeError('Core framework still contains: ' + value)
+
+          required = [
+              'GetSpentPointsForClass',
+              'does not belong to the active class',
+              'sourceTree.Id) != targetOwner',
+              'GetOwnerClass(trees[i].Id)',
+          ]
+          for value in required:
+              if value not in framework:
+                  raise RuntimeError('class isolation audit missing: ' + value)
+
+          if 'CoreSpecializationPersistence' not in policy:
+              raise RuntimeError('Core persistence missing')
+          if 'classId|treeId|nodeId|rank' not in policy:
+              raise RuntimeError('class-partitioned persistence format missing')
+          if 'LeviathanMod.PlayerHasLeviathan()' in network:
+              raise RuntimeError('Leviathan-only transport gate returned')
+
+          subprocess.run(['git', 'diff', '--check'], check=True)
+          PY
+
+      - name: Commit review fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Assets/Leviathan/Content/Scripts/CoreSpecializationFramework.cs
+          git commit -m "Isolate Core specialization domains by class"
+          git push origin HEAD:chatgpt/core-foundation-v2
