@@ -1,6 +1,8 @@
 from pathlib import Path
 import re, subprocess
 
+# Runs only on the disposable Core migration branch; generated output is audited
+# before the branch is allowed to replace skill-trees.
 ROOT = Path.cwd()
 S = ROOT / 'Assets/Leviathan/Content/Scripts'
 
