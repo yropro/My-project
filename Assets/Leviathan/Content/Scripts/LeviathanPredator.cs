@@ -252,6 +252,8 @@ public static class LeviathanPredatorRuntime
     public static class Flags
     {
         public static readonly LeviathanSpecializationFlag ThrillOfTheHunt = Flag("thrill.enabled", "Thrill of the Hunt");
+        public static readonly LeviathanSpecializationFlag ResetCooldownOnPreyDamage =
+            Flag("prey.reset_cooldown_on_damage", "Reset Predator Cooldown On Damaging Prey");
         public static readonly LeviathanSpecializationFlag MassExtinction = Flag("mass.enabled", "Mass Extinction");
         public static readonly LeviathanSpecializationFlag HoldPrey = Flag("hold.enabled", "Hold Prey");
         public static readonly LeviathanSpecializationFlag ReturnAfterImpact = Flag("return.enabled", "Return After Impact");
@@ -287,6 +289,7 @@ public static class LeviathanPredatorRuntime
         public float HuntStreakDurationSeconds;
         public int HuntStacksPerPreyKill;
         public int HuntMaxStacks;
+        public bool ResetCooldownOnPreyDamage;
 
         public float HealMaxHpOnPreyKill;
         public float HealMaxHpOnLungeKill;
@@ -499,6 +502,7 @@ public static class LeviathanPredatorRuntime
         s.HuntStreakDurationSeconds = Pos(Apply(pilot, Knobs.HuntStreakDuration, Tuning.BaselineHuntStreakDurationSeconds));
         s.HuntStacksPerPreyKill = NonNegativeInt(Apply(pilot, Knobs.HuntStacksPerPreyKill, Tuning.BaselineHuntStacksPerPreyKill));
         s.HuntMaxStacks = NonNegativeInt(Apply(pilot, Knobs.HuntMaxStacks, Tuning.BaselineHuntMaxStacks));
+        s.ResetCooldownOnPreyDamage = Has(pilot, Flags.ResetCooldownOnPreyDamage);
         s.HealMaxHpOnPreyKill = Pos(Flat(pilot, Knobs.HealMaxHpOnPreyKill));
         s.HealMaxHpOnLungeKill = Pos(Flat(pilot, Knobs.HealMaxHpOnLungeKill));
         s.CooldownReductionOnPreyKill = Mathf.Clamp01(Flat(pilot, Knobs.CooldownReductionOnPreyKill));
@@ -815,6 +819,8 @@ public static class LeviathanPredatorRuntime
         public bool Lunging;
         public float LungeEnd;
         public float CooldownSeconds;
+        public bool CooldownResetForCurrentLunge;
+        public readonly HashSet<uint> CooldownResetEligibleEvents = new HashSet<uint>();
         public Vector2 PreviousPosition;
         public readonly HashSet<GameShip> HitTargets = new HashSet<GameShip>();
         public readonly HashSet<GameShip> NearbyTargets = new HashSet<GameShip>();
@@ -856,12 +862,15 @@ public static class LeviathanPredatorRuntime
             return false;
 
         GetRuntime(owner);
-        return LeviathanCombatState.Apply(
+        bool applied = LeviathanCombatState.Apply(
             owner,
             target,
             LeviathanCombat.Semantics.PredatorPrey,
             LeviathanCombatState.Scope.OwnerTarget,
             s.PreyDurationSeconds);
+        if (applied)
+            LeviathanPredatorPresentation.TrackPreyTarget(owner, target);
+        return applied;
     }
 
     public static bool IsPrey(GameShip owner, GameShip target)
@@ -1027,6 +1036,8 @@ public static class LeviathanPredatorRuntime
             (evt.Outcomes & LeviathanCombat.OutcomeFlags.Damaged) != 0;
         bool destroyed =
             (evt.Outcomes & LeviathanCombat.OutcomeFlags.Destroyed) != 0;
+        bool cooldownResetEligible =
+            runtime.CooldownResetEligibleEvents.Remove(evt.EventId);
 
         // Preserve current Predator semantics: status-only/rejected outcomes do
         // not create Prey. GuaranteedOutcome is still deferred, so a remote
@@ -1037,6 +1048,9 @@ public static class LeviathanPredatorRuntime
         ResolvedState s = GetResolvedState(owner);
         if (s == null)
             return;
+
+        if (damaged && cooldownResetEligible && s.ResetCooldownOnPreyDamage)
+            ResetCooldownForOriginatingLunge(runtime);
 
         bool hadPrey = LeviathanCombatState.Has(
             runtime.OwnerKey,
@@ -1093,6 +1107,26 @@ public static class LeviathanPredatorRuntime
                 false,
                 deathAt,
                 out ignored);
+        }
+    }
+
+    private static void ResetCooldownForOriginatingLunge(RuntimeState runtime)
+    {
+        if (runtime == null)
+            return;
+
+        runtime.CooldownResetForCurrentLunge = true;
+
+        // During the lunge, EndLunge will suppress the cooldown that belongs to
+        // this attack. If the authoritative result arrives after EndLunge, clear
+        // the already-applied cooldown immediately. Eligible EventIds are
+        // discarded when a newer lunge starts, so a late old result cannot clear
+        // the cooldown of a later attack.
+        if (!runtime.Lunging &&
+            runtime.Source != null &&
+            runtime.Source.parentShip != null)
+        {
+            runtime.Source.SetCooldown(0f);
         }
     }
 
@@ -1362,6 +1396,10 @@ public static class LeviathanPredatorRuntime
         runtime.Lunging = true;
         runtime.LungeEnd = Time.time + duration;
         runtime.CooldownSeconds = source.Cooldown * stats.CooldownMultiplier;
+        runtime.CooldownResetForCurrentLunge = false;
+        // A result from an older lunge must never reset this lunge's eventual
+        // cooldown. Any still-pending old EventIds become intentionally stale.
+        runtime.CooldownResetEligibleEvents.Clear();
         runtime.PreviousPosition = owner.transform.position;
         runtime.HitTargets.Clear();
         return false;
@@ -1373,7 +1411,10 @@ public static class LeviathanPredatorRuntime
         runtime.Lunging = false;
         if (owner != null) owner.lungeTimer = 0f;
         if (runtime.Source != null && runtime.Source.parentShip != null)
-            runtime.Source.SetCooldown(runtime.CooldownSeconds);
+        {
+            runtime.Source.SetCooldown(
+                runtime.CooldownResetForCurrentLunge ? 0f : runtime.CooldownSeconds);
+        }
         runtime.HitTargets.Clear();
     }
 
@@ -1433,7 +1474,9 @@ public static class LeviathanPredatorRuntime
         Assault source = runtime.Source;
         // Snapshot Vs Prey before this DirectLunge transaction is authored.
         // Prey is applied only after a qualifying authoritative outcome.
-        EffectiveStats stats = ResolveEffectiveStats(owner, GetCombatContext(owner, target));
+        CombatContext combatContext = GetCombatContext(owner, target);
+        ResolvedState configuration = GetResolvedState(owner);
+        EffectiveStats stats = ResolveEffectiveStats(configuration, combatContext);
         bool crit = Modifier.CritRoll(Mathf.Max(0f, source.GetCritChance() + stats.CritChanceBonus), target);
         if (crit) ApplyNativeCrit(source, owner);
         if (!ValidEnemy(owner, target)) return;
@@ -1467,6 +1510,15 @@ public static class LeviathanPredatorRuntime
                 LeviathanCombat.TrackingFlags.MeaningfulOutcome,
             0,
             owner);
+
+        LeviathanPredatorPresentation.TrackPreyTarget(owner, target);
+        if (combatScope.EventId != 0U &&
+            combatContext.TargetIsPrey &&
+            configuration != null &&
+            configuration.ResetCooldownOnPreyDamage)
+        {
+            runtime.CooldownResetEligibleEvents.Add(combatScope.EventId);
+        }
 
         bool killed;
         try
@@ -1561,6 +1613,7 @@ public static class LeviathanPredatorRuntime
 
     public static void Cancel()
     {
+        LeviathanPredatorPresentation.ResetAll();
         foreach (KeyValuePair<GameShip, RuntimeState> pair in RuntimeByOwner)
         {
             EndLunge(pair.Key, pair.Value);
@@ -1582,6 +1635,7 @@ public static class LeviathanPredatorRuntime
     {
         if (player == null)
             return;
+        LeviathanPredatorPresentation.ResetOwner(player);
         RuntimeState runtime;
         if (RuntimeByOwner.TryGetValue(player, out runtime) && runtime != null)
         {
@@ -1627,6 +1681,7 @@ public static class LeviathanPredatorRuntime
                             LeviathanCombat.SkillIds.Predator);
                     }
                 }
+                LeviathanPredatorPresentation.ResetOwner(owner);
                 RuntimeByOwner.Remove(owner);
                 continue;
             }
@@ -1637,6 +1692,7 @@ public static class LeviathanPredatorRuntime
                 state.HuntExpiry = 0f;
             }
             ProcessCombatEvents(owner, state);
+            LeviathanPredatorPresentation.FixedTick(owner);
             // Warm conditional state before contact collection uses its buffers.
             GetCombatContext(owner);
             TickLunge(owner, state);
