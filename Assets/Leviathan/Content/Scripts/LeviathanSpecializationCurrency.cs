@@ -380,49 +380,20 @@ public static class LeviathanEvolutionIconPatch
     }
 }
 
-// Never permit Evolution to be refunded below the amount of specialization
-// currency already committed across the trees.
+// CoreClassProgressionRules owns the downgrade/refund invariant. Leviathan only
+// reacts after an Evolution mutation to invalidate derived state and refresh the
+// chassis-dependent Growth presentation/runtime.
 [HarmonyPatch(typeof(Pilot), "SetUpgrade")]
-public static class LeviathanEvolutionDowngradeGuardPatch
+public static class LeviathanEvolutionMutationRefreshPatch
 {
-    public static bool Prefix(Pilot __instance, Upgrade.Key key, int level)
+    public static void Postfix(Pilot __instance, Upgrade.Key __0)
     {
         if (__instance == null ||
-            key != LeviathanSpecializationCurrency.UpgradeKey)
-        {
-            return true;
-        }
-
-        int current = __instance.GetUpgradeLevel(key);
-        if (level >= current)
-            return true;
-
-        int capacity = level * LeviathanSpecializationCurrency.PointsPerRank;
-        int spent = CoreSpecializationRuntime.GetTotalSpentPoints(__instance);
-
-        if (spent <= capacity)
-            return true;
-
-        Debug.LogWarning(
-            "[Leviathan] Evolution downgrade blocked: " +
-            spent.ToString() + " " +
-            LeviathanSpecializationCurrency.CurrencyName +
-            " are invested, but rank " + level.ToString() +
-            " would provide only " + capacity.ToString() + "."
-        );
-        return false;
-    }
-
-    public static void Postfix(Pilot __instance, Upgrade.Key key)
-    {
-        if (__instance == null ||
-            key != LeviathanSpecializationCurrency.UpgradeKey)
+            __0 != LeviathanSpecializationCurrency.UpgradeKey)
         {
             return;
         }
 
-        // Native upgrade mutations are outside specialization persistence, so
-        // explicitly invalidate derived unlock/root/Growth caches.
         CoreSpecializationRuntime.InvalidateConfiguration();
 
         GameShip player = WorldController.instance == null
@@ -441,56 +412,6 @@ public static class LeviathanEvolutionDowngradeGuardPatch
     }
 }
 
-[HarmonyPatch(typeof(CoreUpgrades), "CanDowngradeTooltip")]
-public static class LeviathanEvolutionCoreDowngradeTooltipPatch
-{
-    public static void Postfix(Upgrade upgrade, ref string __result)
-    {
-        AddReason(upgrade, ref __result);
-    }
-
-    internal static void AddReason(Upgrade upgrade, ref string result)
-    {
-        if (result != null ||
-            upgrade == null ||
-            upgrade.key != LeviathanSpecializationCurrency.UpgradeKey)
-        {
-            return;
-        }
-
-        Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
-        if (pilot == null)
-            return;
-
-        int current = pilot.GetUpgradeLevel(upgrade.key);
-        if (current <= 0)
-            return;
-
-        int capacity = (current - 1) *
-            LeviathanSpecializationCurrency.PointsPerRank;
-        int spent = CoreSpecializationRuntime.GetTotalSpentPoints(pilot);
-
-        if (spent > capacity)
-        {
-            result = "Refund " +
-                LeviathanSpecializationCurrency.CurrencyName +
-                " from specialization trees first.";
-        }
-    }
-}
-
-[HarmonyPatch(typeof(SciencePanel), "CanDowngradeTooltip")]
-public static class LeviathanEvolutionScienceDowngradeTooltipPatch
-{
-    public static void Postfix(Upgrade upgrade, ref string __result)
-    {
-        LeviathanEvolutionCoreDowngradeTooltipPatch.AddReason(
-            upgrade,
-            ref __result
-        );
-    }
-}
-
 // A native full upgrade reset should also clear the externally persisted web.
 [HarmonyPatch(typeof(Pilot), "ResetUpgrades")]
 public static class LeviathanSpecializationResetWithNativePatch
@@ -501,7 +422,10 @@ public static class LeviathanSpecializationResetWithNativePatch
             return;
 
         string reason;
-        CoreSpecializationRuntime.ResetClassBuild(__instance, CoreSpecializationRuntime.GetEffectiveClass(__instance), out reason);
+        CoreSpecializationRuntime.ResetClassBuild(
+            __instance,
+            CoreSpecializationRuntime.GetEffectiveClass(__instance),
+            out reason);
 
         if (!string.IsNullOrEmpty(reason))
         {
