@@ -286,18 +286,36 @@ public static class CoreProgressionRankMutationGuardPatch
     public static bool Prefix(Pilot __instance, Upgrade.Key key, int level)
     {
         string reason;
-        if (CoreClassProgressionRules.CanSetProgressionRank(
+        if (!CoreClassProgressionRules.CanSetProgressionRank(
                 __instance,
                 key,
                 level,
                 out reason))
         {
-            return true;
+            UnityEngine.Debug.LogWarning(
+                "[CoreClassProgression] Blocked progression downgrade: " + reason);
+            return false;
         }
 
-        UnityEngine.Debug.LogWarning(
-            "[CoreClassProgression] Blocked progression downgrade: " + reason);
-        return false;
+        ICoreSpecializationPolicy policy;
+        ICoreProgressionRankPolicy progression;
+        if (level > __instance.GetUpgradeLevel(key) &&
+            CoreClassProgressionRules.TryGetProgressionPolicy(
+                key,
+                out policy,
+                out progression) &&
+            !CoreClassProgressionRules.CanUnlockClass(
+                __instance,
+                progression.ClassCategory,
+                out reason))
+        {
+            UnityEngine.Debug.LogWarning(
+                "[CoreClassProgression] Blocked progression rank for mutually-exclusive class: " +
+                reason);
+            return false;
+        }
+
+        return true;
     }
 }
 
