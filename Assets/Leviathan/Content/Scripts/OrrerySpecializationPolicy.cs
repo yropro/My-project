@@ -5,18 +5,22 @@ using System.Collections.Generic;
 using static CoreTreeDsl;
 
 /// <summary>Minimal real second class. Content expansion follows the class design.</summary>
-public sealed class OrrerySpecializationPolicy : ICoreSpecializationPolicy
+public sealed class OrrerySpecializationPolicy : ICoreSpecializationPolicy, ICoreProgressionRankPolicy
 {
     public const int UpgradeKeyValue = 88;
     public static readonly Upgrade.Key UpgradeKey = (Upgrade.Key)UpgradeKeyValue;
+    public static readonly Upgrade.Category OrreryCategory = (Upgrade.Category)18;
     private static Upgrade nativeUpgrade;
     public static readonly CoreSpecializationKnob CastPower = CoreSpecializationKnob.Percent("orrery.cast_power", "Spell Power");
     public static readonly CoreSpecializationFlag Focus = CoreSpecializationFlag.Create("orrery.focus", "Arcane Focus");
     public CoreClassId ClassId { get { return CoreClassId.Orrery; } }
     public string ProgressionName { get { return "Orrery"; } }
     public string PointCurrencyName { get { return "Orrery Points"; } }
+    public Upgrade.Key ProgressionUpgradeKey { get { return UpgradeKey; } }
+    public Upgrade.Category ClassCategory { get { return OrreryCategory; } }
     public int GetProgressionRank(Pilot pilot) { return pilot == null ? 0 : pilot.GetUpgradeLevel(UpgradeKey); }
-    public int GetGrantedPoints(Pilot pilot) { return GetProgressionRank(pilot) * 2; }
+    public int GetGrantedPoints(Pilot pilot) { return GetGrantedPointsForProgressionRank(pilot, GetProgressionRank(pilot)); }
+    public int GetGrantedPointsForProgressionRank(Pilot pilot, int progressionRank) { return Math.Max(0, progressionRank) * 2; }
 
     public void EnsurePrerequisitesRegistered()
     {
@@ -26,7 +30,7 @@ public sealed class OrrerySpecializationPolicy : ICoreSpecializationPolicy
         var all = new List<Upgrade>((Upgrade[])field.GetValue(null));
         foreach (Upgrade item in all)
             if (item.key == UpgradeKey) throw new InvalidOperationException("Orrery upgrade key 88 is already registered.");
-        nativeUpgrade = new Upgrade((Upgrade.Category)18, UpgradeKey, 0, false, 2, 999, "Orrery");
+        nativeUpgrade = new Upgrade(OrreryCategory, UpgradeKey, 0, false, 2, 999, "Orrery");
         all.Add(nativeUpgrade);
         field.SetValue(null, all.ToArray());
         lookup.SetValue(null, null);
