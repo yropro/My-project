@@ -398,7 +398,7 @@ public static class LeviathanEvolutionDowngradeGuardPatch
             return true;
 
         int capacity = level * LeviathanSpecializationCurrency.PointsPerRank;
-        int spent = LeviathanSpecializationRuntime.GetTotalSpentPoints(__instance);
+        int spent = CoreSpecializationRuntime.GetTotalSpentPoints(__instance);
 
         if (spent <= capacity)
             return true;
@@ -423,7 +423,7 @@ public static class LeviathanEvolutionDowngradeGuardPatch
 
         // Native upgrade mutations are outside specialization persistence, so
         // explicitly invalidate derived unlock/root/Growth caches.
-        LeviathanSpecializationRuntime.InvalidateConfiguration();
+        CoreSpecializationRuntime.InvalidateConfiguration();
 
         GameShip player = WorldController.instance == null
             ? null
@@ -458,7 +458,7 @@ public static class LeviathanEvolutionCoreDowngradeTooltipPatch
             return;
         }
 
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+        Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
         if (pilot == null)
             return;
 
@@ -468,7 +468,7 @@ public static class LeviathanEvolutionCoreDowngradeTooltipPatch
 
         int capacity = (current - 1) *
             LeviathanSpecializationCurrency.PointsPerRank;
-        int spent = LeviathanSpecializationRuntime.GetTotalSpentPoints(pilot);
+        int spent = CoreSpecializationRuntime.GetTotalSpentPoints(pilot);
 
         if (spent > capacity)
         {
@@ -501,7 +501,7 @@ public static class LeviathanSpecializationResetWithNativePatch
             return;
 
         string reason;
-        LeviathanSpecializationRuntime.ResetAll(__instance, out reason);
+        CoreSpecializationRuntime.ResetAll(__instance, out reason);
 
         if (!string.IsNullOrEmpty(reason))
         {

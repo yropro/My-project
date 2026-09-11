@@ -1,4 +1,4 @@
-using static LeviathanTreeDsl;
+using static CoreTreeDsl;
 using Predator = LeviathanPredatorRuntime;
 
 /// <summary>
@@ -13,9 +13,9 @@ public static class LeviathanPredatorTree
     public const string TreeId = "predator";
     public const string RootNodeId = "predator";
 
-    public static LeviathanSpecializationTree Create()
+    public static CoreSpecializationTree Create()
     {
-        LeviathanSpecializationTree tree = Tree(
+        CoreSpecializationTree tree = Tree(
             TreeId,
             "Predator",
             RootNodeId,

@@ -61,63 +61,63 @@ public static class LeviathanConstrictor
     {
         // Semantic purchased rank. The tree contributes +1 per invested rank,
         // so gameplay never needs to inspect a node id directly.
-        public static readonly LeviathanSpecializationKnob Rank =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob Rank =
+            CoreSpecializationKnob.Flat(
                 "constrictor.rank",
                 "Constrictor Rank"
             );
 
         // Additive percentage relative to the Constrictor baseline.
-        public static readonly LeviathanSpecializationKnob FinalDamagePercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob FinalDamagePercent =
+            CoreSpecializationKnob.Percent(
                 "constrictor.final_damage_percent",
                 "Constrictor Damage"
             );
 
         // Additive percentage points on the source Assault's fully resolved crit.
-        public static readonly LeviathanSpecializationKnob CritChancePoints =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob CritChancePoints =
+            CoreSpecializationKnob.PercentagePoints(
                 "constrictor.crit_chance_points",
                 "Critical Chance"
             );
 
         // Absolute fraction of the source Assault's fully resolved status chance.
         // 0.20 means Constrictor contact uses 20% of the source status chance.
-        public static readonly LeviathanSpecializationKnob PassiveStatusFraction =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob PassiveStatusFraction =
+            CoreSpecializationKnob.Flat(
                 "constrictor.passive_status_fraction",
                 "Passive Status Fraction",
                 "x"
             );
 
-        public static readonly LeviathanSpecializationKnob AccelerationPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob AccelerationPercent =
+            CoreSpecializationKnob.Percent(
                 "constrictor.acceleration_percent",
                 "Acceleration"
             );
 
-        public static readonly LeviathanSpecializationKnob BoostPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob BoostPercent =
+            CoreSpecializationKnob.Percent(
                 "constrictor.boost_percent",
                 "Boost"
             );
 
-        public static readonly LeviathanSpecializationKnob TurnSpeedPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob TurnSpeedPercent =
+            CoreSpecializationKnob.Percent(
                 "constrictor.turn_speed_percent",
                 "Turn Speed"
             );
 
-        public static readonly LeviathanSpecializationKnob ManeuverabilityPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob ManeuverabilityPercent =
+            CoreSpecializationKnob.Percent(
                 "constrictor.maneuverability_percent",
                 "Maneuverability"
             );
 
         // Stored as a decimal fraction through PercentagePoints:
         // authored 10 = 0.10 = refund 10% of Growth's actual drag this call.
-        public static readonly LeviathanSpecializationKnob AirResistanceReductionPoints =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob AirResistanceReductionPoints =
+            CoreSpecializationKnob.PercentagePoints(
                 "constrictor.air_resistance_reduction_points",
                 "Leviathan Air Resistance Reduction"
             );
@@ -334,15 +334,15 @@ public static class LeviathanConstrictor
         // Remote specialization is transient and belongs to the exact current
         // replica. Until synchronized, fail closed to native presentation.
         if (!local && ship.IsAnyPlayerShip() &&
-            !LeviathanNetwork.HasSynchronizedSpecialization(ship))
+            !CoreNetwork.HasSynchronizedSpecialization(ship))
         {
             return InactiveState;
         }
 
         int configurationRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
 
-        int registryRevision = LeviathanSpecializationRegistry.Revision;
+        int registryRevision = CoreSpecializationRegistry.Revision;
 
         ResolvedCacheEntry cached;
         if (ResolvedByPilot.TryGetValue(pilot, out cached) &&
@@ -376,7 +376,7 @@ public static class LeviathanConstrictor
         ResolvedState state = new ResolvedState();
 
         if (pilot == null ||
-            !LeviathanSpecializationRuntime.IsTreeUnlocked(
+            !CoreSpecializationRuntime.IsTreeUnlocked(
                 pilot,
                 LeviathanConstrictorTree.TreeId
             ))
@@ -386,7 +386,7 @@ public static class LeviathanConstrictor
 
         int rank = Mathf.Clamp(
             Mathf.RoundToInt(
-                LeviathanSpecializationRuntime.GetKnobFlat(
+                CoreSpecializationRuntime.GetKnobFlat(
                     pilot,
                     Knobs.Rank
                 )
@@ -403,20 +403,20 @@ public static class LeviathanConstrictor
 
         state.DamageMultiplier = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobMultiplier(
+            CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.FinalDamagePercent
             )
         );
 
         state.CritChanceBonus =
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.CritChancePoints
             );
 
         state.PassiveStatusFraction = Mathf.Clamp01(
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.PassiveStatusFraction
             )
@@ -424,7 +424,7 @@ public static class LeviathanConstrictor
 
         state.AccelerationMultiplier = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobMultiplier(
+            CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.AccelerationPercent
             )
@@ -432,7 +432,7 @@ public static class LeviathanConstrictor
 
         state.BoostMultiplier = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobMultiplier(
+            CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.BoostPercent
             )
@@ -440,7 +440,7 @@ public static class LeviathanConstrictor
 
         state.TurnSpeedMultiplier = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobMultiplier(
+            CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.TurnSpeedPercent
             )
@@ -448,14 +448,14 @@ public static class LeviathanConstrictor
 
         state.ManeuverabilityMultiplier = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobMultiplier(
+            CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.ManeuverabilityPercent
             )
         );
 
         state.AirResistanceReduction = Mathf.Clamp01(
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.AirResistanceReductionPoints
             )
@@ -1247,12 +1247,12 @@ public static class LeviathanConstrictor
             return false;
 
         if (!IsCurrentPlayer(owner) && owner.IsAnyPlayerShip() &&
-            !LeviathanNetwork.HasSynchronizedSpecialization(owner))
+            !CoreNetwork.HasSynchronizedSpecialization(owner))
         {
             return false;
         }
 
-        return LeviathanSpecializationRuntime.IsTreeUnlocked(
+        return CoreSpecializationRuntime.IsTreeUnlocked(
             pilot,
             LeviathanPredatorTree.TreeId
         );

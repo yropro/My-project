@@ -88,8 +88,8 @@ public static class LeviathanBehemoth
 
     public static class Flags
     {
-        public static readonly LeviathanSpecializationFlag TemporalDive =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag TemporalDive =
+            CoreSpecializationFlag.Create(
                 "behemoth.temporal_dive",
                 "Temporal Dive"
             );
@@ -178,12 +178,12 @@ public static class LeviathanBehemoth
         }
 
         int configurationRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
 
         bool specializationReady =
             IsLocalOwner(ship) ||
             !NetSession.InSession ||
-            LeviathanNetwork.HasSynchronizedSpecialization(ship);
+            CoreNetwork.HasSynchronizedSpecialization(ship);
 
         ResolvedCacheEntry cached;
         if (resolvedByPilot.TryGetValue(pilot, out cached) &&
@@ -336,7 +336,7 @@ public static class LeviathanBehemoth
         state.TemporalDive =
             specializationReady &&
             pilot != null &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.TemporalDive
             );

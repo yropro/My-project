@@ -151,11 +151,11 @@ public static class OrrerySpellRegistry
         return definition.Executor(owner, invocation, definition);
     }
 
-    public static LeviathanCombat.SemanticKey GetCombatSemantic(
+    public static CoreCombat.SemanticKey GetCombatSemantic(
         SpellDefinition definition)
     {
         return definition == null
-            ? default(LeviathanCombat.SemanticKey)
+            ? default(CoreCombat.SemanticKey)
             : OrreryCombat.Spell(definition.CombatEffectId);
     }
 }

@@ -130,229 +130,229 @@ public static class LeviathanStellarConverter
 
     public static class Knobs
     {
-        public static readonly LeviathanSpecializationKnob ChargeTime =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob ChargeTime =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.charge_time", "Charge Time", "s");
 
-        public static readonly LeviathanSpecializationKnob PulseDuration =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob PulseDuration =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.pulse_duration", "Pulse Duration", "s");
 
-        public static readonly LeviathanSpecializationKnob FinalDamagePercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob FinalDamagePercent =
+            CoreSpecializationKnob.Percent(
                 "stellar_converter.final_damage_percent",
                 "Final Converter Damage");
 
-        public static readonly LeviathanSpecializationKnob WidthMultiplier =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob WidthMultiplier =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.width_multiplier", "Width Multiplier", "x");
 
-        public static readonly LeviathanSpecializationKnob CritChanceMultiplier =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob CritChanceMultiplier =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.crit_chance_multiplier",
                 "Critical Chance Multiplier",
                 "x");
 
-        public static readonly LeviathanSpecializationKnob CritChance =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob CritChance =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.crit_chance", "Critical Chance");
 
-        public static readonly LeviathanSpecializationKnob StatusChance =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob StatusChance =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.status_chance", "Status Chance");
 
-        public static readonly LeviathanSpecializationKnob RandomBasicStatusChance =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob RandomBasicStatusChance =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.random_basic_status_chance",
                 "Random Basic Status Chance");
 
-        public static readonly LeviathanSpecializationKnob OffElementRandomStatusChance =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob OffElementRandomStatusChance =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.off_element_random_status_chance",
                 "Off-Element Random Status Chance");
 
-        public static readonly LeviathanSpecializationKnob DebuffSpreadOnKillChance =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob DebuffSpreadOnKillChance =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.debuff_spread_on_kill_chance",
                 "Spread Debuffs on Kill");
 
-        public static readonly LeviathanSpecializationKnob ForkTargets =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob ForkTargets =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.fork_targets",
                 "Fork Targets");
 
-        public static readonly LeviathanSpecializationKnob ForkDamage =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob ForkDamage =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.fork_damage",
                 "Fork Damage",
                 "x");
 
-        public static readonly LeviathanSpecializationKnob ForkChainFraction =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob ForkChainFraction =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.fork_chain_fraction",
                 "Fork Chain Fraction",
                 "x");
 
-        public static readonly LeviathanSpecializationKnob ForkConeDegrees =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob ForkConeDegrees =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.fork_cone_degrees",
                 "Fork Cone",
                 "deg");
 
-        public static readonly LeviathanSpecializationKnob BodySegmentDamagePercent =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob BodySegmentDamagePercent =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.body_segment_damage_percent",
                 "Damage per Body Segment");
 
-        public static readonly LeviathanSpecializationKnob TailDamagePercent =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob TailDamagePercent =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.tail_damage_percent",
                 "Damage per Tail");
 
-        public static readonly LeviathanSpecializationKnob ChainTargets =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob ChainTargets =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.chain_targets", "Chain Targets");
 
-        public static readonly LeviathanSpecializationKnob FinalRangePercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob FinalRangePercent =
+            CoreSpecializationKnob.Percent(
                 "stellar_converter.final_range_percent", "Final Converter Range");
 
-        public static readonly LeviathanSpecializationKnob HeatGenerationPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob HeatGenerationPercent =
+            CoreSpecializationKnob.Percent(
                 "stellar_converter.heat_generation_percent",
                 "Converter Heat Generation");
 
-        public static readonly LeviathanSpecializationKnob ManifestationCooldown =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob ManifestationCooldown =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.manifestation.cooldown",
                 "Manifestation Cooldown",
                 "s");
 
-        public static readonly LeviathanSpecializationKnob GravityVelocityScaling =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob GravityVelocityScaling =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.gravity.velocity_scaling",
                 "Gravity Velocity Scaling",
                 "x");
 
         // Manifestation tuning. Tree files can point at these like any other knobs.
-        public static readonly LeviathanSpecializationKnob SingularitySpeed =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SingularitySpeed =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.singularity.speed", "Singularity Speed", "m/s");
-        public static readonly LeviathanSpecializationKnob SingularityLifetime =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SingularityLifetime =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.singularity.lifetime", "Singularity Lifetime", "s");
-        public static readonly LeviathanSpecializationKnob SingularityPullRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SingularityPullRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.singularity.pull_radius", "Singularity Pull Radius", "m");
-        public static readonly LeviathanSpecializationKnob SingularityPullStrength =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SingularityPullStrength =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.singularity.pull_strength", "Singularity Pull Strength", "x");
-        public static readonly LeviathanSpecializationKnob SingularityVisualScale =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SingularityVisualScale =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.singularity.visual_scale", "Singularity Visual Scale", "x");
-        public static readonly LeviathanSpecializationKnob SingularityVisualRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SingularityVisualRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.singularity.visual_radius", "Singularity Visual Radius", "m");
-        public static readonly LeviathanSpecializationKnob SingularityHaloRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SingularityHaloRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.singularity.halo_radius", "Singularity Halo Radius", "m");
-        public static readonly LeviathanSpecializationKnob SingularityDamage =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob SingularityDamage =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.singularity.damage", "Singularity Integrated Damage");
 
-        public static readonly LeviathanSpecializationKnob DyingStarSpeed =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DyingStarSpeed =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.dying_star.speed", "Dying Star Speed", "m/s");
-        public static readonly LeviathanSpecializationKnob DyingStarFuse =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DyingStarFuse =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.dying_star.fuse", "Dying Star Fuse", "s");
-        public static readonly LeviathanSpecializationKnob DyingStarPullRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DyingStarPullRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.dying_star.pull_radius", "Dying Star Pull Radius", "m");
-        public static readonly LeviathanSpecializationKnob DyingStarPullStrength =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DyingStarPullStrength =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.dying_star.pull_strength", "Dying Star Pull Strength", "x");
-        public static readonly LeviathanSpecializationKnob DyingStarVisualScale =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DyingStarVisualScale =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.dying_star.visual_scale", "Dying Star Visual Scale", "x");
-        public static readonly LeviathanSpecializationKnob DyingStarVisualRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DyingStarVisualRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.dying_star.visual_radius", "Dying Star Visual Radius", "m");
-        public static readonly LeviathanSpecializationKnob DyingStarExplosionRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DyingStarExplosionRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.dying_star.explosion_radius", "Dying Star Explosion Radius", "m");
-        public static readonly LeviathanSpecializationKnob DyingStarExplosionVisualRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DyingStarExplosionVisualRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.dying_star.explosion_visual_radius",
                 "Dying Star Explosion Visual Radius",
                 "m");
-        public static readonly LeviathanSpecializationKnob DyingStarDamage =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob DyingStarDamage =
+            CoreSpecializationKnob.PercentagePoints(
                 "stellar_converter.dying_star.damage", "Dying Star Integrated Damage");
 
-        public static readonly LeviathanSpecializationKnob EventHorizonTipSpeed =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob EventHorizonTipSpeed =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.event_horizon.tip_speed", "Event Horizon Tip Speed", "m/s");
-        public static readonly LeviathanSpecializationKnob EventHorizonPullRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob EventHorizonPullRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.event_horizon.pull_radius", "Event Horizon Pull Radius", "m");
-        public static readonly LeviathanSpecializationKnob EventHorizonPullStrength =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob EventHorizonPullStrength =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.event_horizon.pull_strength", "Event Horizon Pull Strength", "x");
-        public static readonly LeviathanSpecializationKnob EventHorizonVisualRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob EventHorizonVisualRadius =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.event_horizon.visual_radius",
                 "Event Horizon Tip Visual Radius",
                 "m");
 
         // Boolean-like numeric knob so a multi-rank node can enable piercing only
         // at a specific rank without making runtime logic depend on a node id.
-        public static readonly LeviathanSpecializationKnob Piercing =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob Piercing =
+            CoreSpecializationKnob.Flat(
                 "stellar_converter.piercing", "Piercing");
     }
 
     public static class Flags
     {
-        public static readonly LeviathanSpecializationFlag Continuous =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag Continuous =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.mode.continuous", "Continuous Conversion");
 
-        public static readonly LeviathanSpecializationFlag SpectrumSaturation =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag SpectrumSaturation =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.mode.spectrum_saturation",
                 "Spectrum Saturation");
 
-        public static readonly LeviathanSpecializationFlag ArcCascade =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag ArcCascade =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.mode.arc_cascade", "Arc Cascade");
 
-        public static readonly LeviathanSpecializationFlag FractalCascade =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag FractalCascade =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.mode.fractal_cascade", "Fractal Cascade");
 
-        public static readonly LeviathanSpecializationFlag Forking =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag Forking =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.mode.forking", "Forking");
 
-        public static readonly LeviathanSpecializationFlag Singularity =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag Singularity =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.mode.singularity", "Singularity");
 
-        public static readonly LeviathanSpecializationFlag DyingStar =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag DyingStar =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.mode.dying_star", "Dying Star");
 
-        public static readonly LeviathanSpecializationFlag EventHorizon =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag EventHorizon =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.mode.event_horizon", "Event Horizon");
 
-        public static readonly LeviathanSpecializationFlag Conduction =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag Conduction =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.structure.conduction", "Conduction");
 
-        public static readonly LeviathanSpecializationFlag Convergence =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag Convergence =
+            CoreSpecializationFlag.Create(
                 "stellar_converter.structure.convergence", "Convergence");
     }
 
@@ -966,22 +966,22 @@ public static class LeviathanStellarConverter
 
         bool synchronizedRemote =
             player.IsRemotePlayer() &&
-            LeviathanNetwork.HasSynchronizedSpecialization(player);
+            CoreNetwork.HasSynchronizedSpecialization(player);
 
         return (localOwner || synchronizedRemote) &&
-            LeviathanSpecializationRuntime.IsTreeActive(
+            CoreSpecializationRuntime.IsTreeActive(
                 pilot,
                 LeviathanStellarConverterTree.TreeId);
     }
 
     private static float ApplyKnob(
         Pilot pilot,
-        LeviathanSpecializationKnob knob,
+        CoreSpecializationKnob knob,
         float baseValue)
     {
         return pilot == null
             ? baseValue
-            : LeviathanSpecializationRuntime.ApplyKnob(
+            : CoreSpecializationRuntime.ApplyKnob(
                 pilot,
                 knob,
                 baseValue);
@@ -1002,9 +1002,9 @@ public static class LeviathanStellarConverter
         int tails = anatomy.TailCount;
 
         int configurationRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
         int registryRevision =
-            LeviathanSpecializationRegistry.Revision;
+            CoreSpecializationRegistry.Revision;
         int anatomyRevision = anatomy.Revision;
 
         ResolvedCacheEntry cached;
@@ -1029,7 +1029,7 @@ public static class LeviathanStellarConverter
             LeviathanStellarConverterTuning.BaselinePulseSeconds));
         state.FinalDamageMultiplier = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobMultiplier(
+            CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.FinalDamagePercent));
         state.DamageMultiplier =
@@ -1043,7 +1043,7 @@ public static class LeviathanStellarConverter
 
         state.FinalRangeMultiplier = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobMultiplier(
+            CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.FinalRangePercent));
         state.RangeMultiplier =
@@ -1052,7 +1052,7 @@ public static class LeviathanStellarConverter
 
         state.AdditionalHeatFraction = Mathf.Max(
             -1f,
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.HeatGenerationPercent));
 
@@ -1060,45 +1060,45 @@ public static class LeviathanStellarConverter
             pilot,
             Knobs.CritChanceMultiplier,
             LeviathanStellarConverterTuning.BaselineCritChanceMultiplier));
-        state.CritChanceBonus = LeviathanSpecializationRuntime.GetKnobFlat(
+        state.CritChanceBonus = CoreSpecializationRuntime.GetKnobFlat(
             pilot,
             Knobs.CritChance);
         state.CritDamageMultiplier =
             LeviathanStellarConverterTuning.BaselineCritDamageMultiplier;
         state.DebuffChanceMultiplier =
             LeviathanStellarConverterTuning.BaselineDebuffChanceMultiplier;
-        state.DebuffChanceBonus = LeviathanSpecializationRuntime.GetKnobFlat(
+        state.DebuffChanceBonus = CoreSpecializationRuntime.GetKnobFlat(
             pilot,
             Knobs.StatusChance);
         state.RandomBasicStatusChance = Mathf.Clamp01(
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.RandomBasicStatusChance));
         state.OffElementRandomStatusChance = Mathf.Clamp01(
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.OffElementRandomStatusChance));
         state.DebuffSpreadOnKillChance = Mathf.Clamp01(
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.DebuffSpreadOnKillChance));
         state.ForkTargets = Mathf.Max(
             0,
-            Mathf.RoundToInt(LeviathanSpecializationRuntime.GetKnobFlat(
+            Mathf.RoundToInt(CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.ForkTargets)));
         state.ForkDamageFraction = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.ForkDamage));
         state.ForkChainFraction = Mathf.Max(
             0f,
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.ForkChainFraction));
         state.ForkConeDegrees = Mathf.Clamp(
-            LeviathanSpecializationRuntime.GetKnobFlat(
+            CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.ForkConeDegrees),
             0f,
@@ -1107,38 +1107,38 @@ public static class LeviathanStellarConverter
             LeviathanStellarConverterTuning.BaselineBrightnessMultiplier;
         state.ExtraChainTargets = Mathf.Max(
             0,
-            Mathf.RoundToInt(LeviathanSpecializationRuntime.GetKnobFlat(
+            Mathf.RoundToInt(CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.ChainTargets)));
 
-        state.Continuous = LeviathanSpecializationRuntime.HasFlag(
+        state.Continuous = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.Continuous);
-        state.SpectrumSaturation = LeviathanSpecializationRuntime.HasFlag(
+        state.SpectrumSaturation = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.SpectrumSaturation);
-        bool arcCascade = LeviathanSpecializationRuntime.HasFlag(
+        bool arcCascade = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.ArcCascade);
-        bool fractalCascade = LeviathanSpecializationRuntime.HasFlag(
+        bool fractalCascade = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.FractalCascade);
-        state.Forking = LeviathanSpecializationRuntime.HasFlag(
+        state.Forking = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.Forking);
-        state.Singularity = LeviathanSpecializationRuntime.HasFlag(
+        state.Singularity = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.Singularity);
-        state.DyingStar = LeviathanSpecializationRuntime.HasFlag(
+        state.DyingStar = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.DyingStar);
-        state.EventHorizon = LeviathanSpecializationRuntime.HasFlag(
+        state.EventHorizon = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.EventHorizon);
-        state.Conduction = LeviathanSpecializationRuntime.HasFlag(
+        state.Conduction = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.Conduction);
-        state.Convergence = LeviathanSpecializationRuntime.HasFlag(
+        state.Convergence = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.Convergence);
 
@@ -1147,7 +1147,7 @@ public static class LeviathanStellarConverter
         if (state.Conduction)
         {
             float perBodySegment =
-                LeviathanSpecializationRuntime.GetKnobFlat(
+                CoreSpecializationRuntime.GetKnobFlat(
                     pilot,
                     Knobs.BodySegmentDamagePercent);
             structureDamageBonus += bodySegments * perBodySegment;
@@ -1156,7 +1156,7 @@ public static class LeviathanStellarConverter
         if (state.Convergence)
         {
             float perTail =
-                LeviathanSpecializationRuntime.GetKnobFlat(
+                CoreSpecializationRuntime.GetKnobFlat(
                     pilot,
                     Knobs.TailDamagePercent);
             structureDamageBonus += tails * perTail;
@@ -1262,7 +1262,7 @@ public static class LeviathanStellarConverter
             0f,
             LeviathanStellarConverterTuning.MaxManifestationVisualRadiusMeters);
 
-        state.Piercing = LeviathanSpecializationRuntime.GetKnobFlat(
+        state.Piercing = CoreSpecializationRuntime.GetKnobFlat(
             pilot,
             Knobs.Piercing) >= 0.5f;
         state.SuppressPiercing =
@@ -1684,9 +1684,9 @@ public static class LeviathanStellarConverter
         if (phase == Phase.Idle && !projectileActive)
             return;
 
-        LeviathanNetwork.SlotWriter writer =
-            LeviathanNetwork.BeginSlot(
-                LeviathanNetwork.SlotStellarConverter);
+        CoreNetwork.SlotWriter writer =
+            CoreNetwork.BeginSlot(
+                CoreNetwork.SlotStellarConverter);
 
         writer.Byte((byte)phase);
         writer.Percent(GetPhaseProgress(resolved));
@@ -1704,7 +1704,7 @@ public static class LeviathanStellarConverter
         writer.Percent(
             GetDyingStarExplosionProgress(gravityProjectileShot));
 
-        LeviathanNetwork.EndSlot(writer);
+        CoreNetwork.EndSlot(writer);
     }
 
     private static bool ReadRemoteNetworkState(
@@ -1716,10 +1716,10 @@ public static class LeviathanStellarConverter
         if (laser == null || player == null || resolved == null || state == null)
             return false;
 
-        LeviathanNetwork.SlotReader reader;
-        if (!LeviathanNetwork.TryReadSlot(
+        CoreNetwork.SlotReader reader;
+        if (!CoreNetwork.TryReadSlot(
                 player,
-                LeviathanNetwork.SlotStellarConverter,
+                CoreNetwork.SlotStellarConverter,
                 out reader))
         {
             state.hasNetworkState = false;
@@ -2253,7 +2253,7 @@ public static class LeviathanStellarConverter
     }
 
     // Native active is an implementation detail of the selected Laser. Co-op
-    // presentation is published through LeviathanNetwork.SlotStellarConverter;
+    // presentation is published through CoreNetwork.SlotStellarConverter;
     // remote replicas never infer Converter phase from native active bits.
 
     private static void SetNativeActive(Laser laser, bool active)

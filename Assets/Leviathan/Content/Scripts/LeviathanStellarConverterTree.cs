@@ -1,5 +1,5 @@
 ﻿using HarmonyLib;
-using static LeviathanTreeDsl;
+using static CoreTreeDsl;
 using Converter = LeviathanStellarConverter;
 
 /// <summary>
@@ -15,9 +15,9 @@ public static class LeviathanStellarConverterTree
     private const string PrimaryPath = "stellar_converter.primary_path";
     private const string ManifestationPath = "stellar_converter.manifestation";
 
-    public static LeviathanSpecializationTree Create()
+    public static CoreSpecializationTree Create()
     {
-        LeviathanSpecializationTree tree = Tree(
+        CoreSpecializationTree tree = Tree(
             TreeId,
             "Stellar Converter",
             RootNodeId,
@@ -263,7 +263,7 @@ public static class LeviathanStellarConverterTree
     /// Applies the authored Converter layout exported from the tree workbench.
     /// Auto-layout still owns edge construction; this only replaces coordinates.
     /// </summary>
-    public static void ApplyAuthoredLayout(LeviathanSpecializationLayout layout)
+    public static void ApplyAuthoredLayout(CoreSpecializationLayout layout)
     {
         if (layout == null)
             return;
@@ -305,15 +305,15 @@ public static class LeviathanStellarConverterTree
     }
 
     private static void SetPosition(
-        LeviathanSpecializationLayout layout,
+        CoreSpecializationLayout layout,
         string nodeId,
         float x,
         float y)
     {
-        LeviathanSpecializationLayoutNode node;
+        CoreSpecializationLayoutNode node;
         if (layout.Nodes.TryGetValue(nodeId, out node) && node != null)
         {
-            node.Position = new LeviathanLayoutPoint(x, y);
+            node.Position = new CoreLayoutPoint(x, y);
         }
     }
 }
@@ -322,12 +322,12 @@ public static class LeviathanStellarConverterTree
 /// The generic framework remains generic. Converter supplies its own authored
 /// presentation coordinates after the normal auto-layout has built nodes/edges.
 /// </summary>
-[HarmonyPatch(typeof(LeviathanSpecializationAutoLayout), "Build")]
+[HarmonyPatch(typeof(CoreSpecializationAutoLayout), "Build")]
 public static class LeviathanStellarConverterLayoutPatch
 {
     public static void Postfix(
-        LeviathanSpecializationTree __0,
-        ref LeviathanSpecializationLayout __result)
+        CoreSpecializationTree __0,
+        ref CoreSpecializationLayout __result)
     {
         if (__0 == null ||
             __result == null ||

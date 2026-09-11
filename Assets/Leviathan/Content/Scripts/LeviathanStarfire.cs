@@ -80,175 +80,175 @@ public static class LeviathanStarfireRuntime
 
     public static class Knobs
     {
-        public static readonly LeviathanSpecializationKnob HeatGeneration =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob HeatGeneration =
+            CoreSpecializationKnob.Percent(
                 "starfire.heat_generation",
                 "Heat Generation"
             );
 
-        public static readonly LeviathanSpecializationKnob Length =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob Length =
+            CoreSpecializationKnob.Percent(
                 "starfire.length",
                 "Length"
             );
 
-        public static readonly LeviathanSpecializationKnob Width =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob Width =
+            CoreSpecializationKnob.Percent(
                 "starfire.width",
                 "Width"
             );
 
-        public static readonly LeviathanSpecializationKnob Damage =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob Damage =
+            CoreSpecializationKnob.Percent(
                 "starfire.damage",
                 "Damage"
             );
 
-        public static readonly LeviathanSpecializationKnob StatusChance =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob StatusChance =
+            CoreSpecializationKnob.PercentagePoints(
                 "starfire.status_chance",
                 "Status Chance"
             );
 
-        public static readonly LeviathanSpecializationKnob ProjectileSize =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob ProjectileSize =
+            CoreSpecializationKnob.Percent(
                 "starfire.projectile_size",
                 "Projectile Size"
             );
 
-        public static readonly LeviathanSpecializationKnob FullSizeHoldSeconds =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob FullSizeHoldSeconds =
+            CoreSpecializationKnob.Flat(
                 "starfire.full_size_hold_seconds",
                 "Full-Power Capacity",
                 "s"
             );
 
-        public static readonly LeviathanSpecializationKnob RetreatSeconds =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob RetreatSeconds =
+            CoreSpecializationKnob.Flat(
                 "starfire.retreat_seconds",
                 "Falloff Capacity",
                 "s"
             );
 
-        public static readonly LeviathanSpecializationKnob ActiveDrainRate =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob ActiveDrainRate =
+            CoreSpecializationKnob.Percent(
                 "starfire.active_drain_rate",
                 "Breath Drain Rate"
             );
 
-        public static readonly LeviathanSpecializationKnob RecoveryRate =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob RecoveryRate =
+            CoreSpecializationKnob.Percent(
                 "starfire.recovery_rate",
                 "Breath Recovery Rate"
             );
 
-        public static readonly LeviathanSpecializationKnob DamageFalloffCurveExponent =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob DamageFalloffCurveExponent =
+            CoreSpecializationKnob.Flat(
                 "starfire.damage_falloff_curve_exponent",
                 "Damage Falloff Curve Exponent"
             );
 
-        public static readonly LeviathanSpecializationKnob LengthFalloffCurveExponent =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob LengthFalloffCurveExponent =
+            CoreSpecializationKnob.Flat(
                 "starfire.length_falloff_curve_exponent",
                 "Length Falloff Curve Exponent"
             );
 
-        public static readonly LeviathanSpecializationKnob WidthFalloffCurveExponent =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob WidthFalloffCurveExponent =
+            CoreSpecializationKnob.Flat(
                 "starfire.width_falloff_curve_exponent",
                 "Width Falloff Curve Exponent"
             );
 
-        public static readonly LeviathanSpecializationKnob StartupDelaySeconds =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob StartupDelaySeconds =
+            CoreSpecializationKnob.Flat(
                 "starfire.startup_delay_seconds",
                 "Startup Delay",
                 "s"
             );
 
-        public static readonly LeviathanSpecializationKnob FiringHalfAngleDegrees =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob FiringHalfAngleDegrees =
+            CoreSpecializationKnob.Flat(
                 "starfire.firing_half_angle_degrees",
                 "Firing Half-Angle",
                 "°"
             );
 
-        public static readonly LeviathanSpecializationKnob RechargePullRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob RechargePullRadius =
+            CoreSpecializationKnob.Flat(
                 "starfire.recharge_pull_radius",
                 "Recharge Pull Radius",
                 "m"
             );
 
-        public static readonly LeviathanSpecializationKnob RechargePullStrength =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob RechargePullStrength =
+            CoreSpecializationKnob.Flat(
                 "starfire.recharge_pull_strength",
                 "Recharge Pull Strength"
             );
 
-        public static readonly LeviathanSpecializationKnob RechargePullFalloffExponent =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob RechargePullFalloffExponent =
+            CoreSpecializationKnob.Flat(
                 "starfire.recharge_pull_falloff_exponent",
                 "Recharge Pull Falloff Exponent"
             );
 
-        public static readonly LeviathanSpecializationKnob RechargePullMaxSpeed =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob RechargePullMaxSpeed =
+            CoreSpecializationKnob.Flat(
                 "starfire.recharge_pull_max_speed",
                 "Recharge Pull Max Speed",
                 "m/s"
             );
 
-        public static readonly LeviathanSpecializationKnob BlastWaveArcDegrees =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob BlastWaveArcDegrees =
+            CoreSpecializationKnob.Flat(
                 "starfire.blast_wave_arc_degrees",
                 "Blast Wave Arc",
                 "°"
             );
 
-        public static readonly LeviathanSpecializationKnob BlastWaveDamageMultiplier =
-            LeviathanSpecializationKnob.Multiplier(
+        public static readonly CoreSpecializationKnob BlastWaveDamageMultiplier =
+            CoreSpecializationKnob.Multiplier(
                 "starfire.blast_wave_damage_multiplier",
                 "Blast Wave Damage"
             );
 
-        public static readonly LeviathanSpecializationKnob BlastWaveSpeed =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob BlastWaveSpeed =
+            CoreSpecializationKnob.Flat(
                 "starfire.blast_wave_speed",
                 "Blast Wave Speed",
                 "m/s"
             );
 
-        public static readonly LeviathanSpecializationKnob BlastWaveRange =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob BlastWaveRange =
+            CoreSpecializationKnob.Flat(
                 "starfire.blast_wave_range",
                 "Blast Wave Range",
                 "m"
             );
 
-        public static readonly LeviathanSpecializationKnob BlastWaveWidth =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob BlastWaveWidth =
+            CoreSpecializationKnob.Flat(
                 "starfire.blast_wave_width",
                 "Blast Wave Front Thickness",
                 "m"
             );
 
-        public static readonly LeviathanSpecializationKnob BlastWaveVisualOpacity =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob BlastWaveVisualOpacity =
+            CoreSpecializationKnob.PercentagePoints(
                 "starfire.blast_wave_visual_opacity",
                 "Blast Wave Visual Opacity"
             );
 
-        public static readonly LeviathanSpecializationKnob BlastWaveStartRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob BlastWaveStartRadius =
+            CoreSpecializationKnob.Flat(
                 "starfire.blast_wave_start_radius",
                 "Blast Wave Start Radius",
                 "m"
             );
 
-        public static readonly LeviathanSpecializationKnob BlastWaveEndRadius =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob BlastWaveEndRadius =
+            CoreSpecializationKnob.Flat(
                 "starfire.blast_wave_end_radius",
                 "Blast Wave End Radius",
                 "m"
@@ -257,14 +257,14 @@ public static class LeviathanStarfireRuntime
 
     public static class Flags
     {
-        public static readonly LeviathanSpecializationFlag RechargePull =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag RechargePull =
+            CoreSpecializationFlag.Create(
                 "starfire.recharge_pull",
                 "Recharge Pull"
             );
 
-        public static readonly LeviathanSpecializationFlag BlastWave =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag BlastWave =
+            CoreSpecializationFlag.Create(
                 "starfire.blast_wave",
                 "Blast Wave"
             );
@@ -284,12 +284,12 @@ public static class LeviathanStarfireRuntime
     {
         public readonly string NodeId;
         public readonly StarfireSourceFamily Family;
-        internal readonly LeviathanSpecializationEffect Effect;
+        internal readonly CoreSpecializationEffect Effect;
 
         public FamilyKnobEffect(
             string nodeId,
             StarfireSourceFamily family,
-            LeviathanTreeDsl.Effect effect)
+            CoreTreeDsl.Effect effect)
         {
             if (string.IsNullOrEmpty(nodeId))
                 throw new ArgumentException("Node id is required.", "nodeId");
@@ -303,7 +303,7 @@ public static class LeviathanStarfireRuntime
             Effect = effect.Inner;
         }
 
-        internal void ValidateForNode(LeviathanSpecializationNode node)
+        internal void ValidateForNode(CoreSpecializationNode node)
         {
             if (node == null)
                 throw new InvalidOperationException(
@@ -693,7 +693,7 @@ public static class LeviathanStarfireRuntime
         if (pilot == null || !LeviathanGrowth.IsGrowthActive(player))
             return false;
 
-        return LeviathanSpecializationRuntime.IsTreeActive(
+        return CoreSpecializationRuntime.IsTreeActive(
             pilot,
             LeviathanStarfireTree.TreeId
         );
@@ -2579,7 +2579,7 @@ public static class LeviathanStarfireRuntime
     }
 
     private static void AccumulateEffect(
-        LeviathanSpecializationEffect effect,
+        CoreSpecializationEffect effect,
         int rank,
         ref KnobAggregate aggregate)
     {
@@ -2589,13 +2589,13 @@ public static class LeviathanStarfireRuntime
         float value = effect.GetAccumulatedValue(rank);
         switch (effect.Type)
         {
-            case LeviathanSpecializationEffectType.Flat:
+            case CoreSpecializationEffectType.Flat:
                 aggregate.flat += value;
                 break;
-            case LeviathanSpecializationEffectType.Percent:
+            case CoreSpecializationEffectType.Percent:
                 aggregate.percent += value;
                 break;
-            case LeviathanSpecializationEffectType.Multiplier:
+            case CoreSpecializationEffectType.Multiplier:
                 aggregate.multiplier *= value;
                 break;
         }
@@ -2608,7 +2608,7 @@ public static class LeviathanStarfireRuntime
     private static KnobAggregate AggregateStarfireKnob(
         Pilot pilot,
         StarfireSourceFamily family,
-        LeviathanSpecializationKnob knob)
+        CoreSpecializationKnob knob)
     {
         KnobAggregate aggregate = new KnobAggregate();
         aggregate.multiplier = 1f;
@@ -2616,16 +2616,16 @@ public static class LeviathanStarfireRuntime
         if (pilot == null || knob == null)
             return aggregate;
 
-        LeviathanSpecializationTree tree =
-            LeviathanSpecializationRegistry.Get(LeviathanStarfireTree.TreeId);
+        CoreSpecializationTree tree =
+            CoreSpecializationRegistry.Get(LeviathanStarfireTree.TreeId);
         if (tree == null)
             return aggregate;
 
-        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+        IList<CoreSpecializationNode> nodes = tree.Nodes;
         for (int i = 0; i < nodes.Count; i++)
         {
-            LeviathanSpecializationNode node = nodes[i];
-            int rank = LeviathanSpecializationRuntime.GetNodeRank(
+            CoreSpecializationNode node = nodes[i];
+            int rank = CoreSpecializationRuntime.GetNodeRank(
                 pilot,
                 LeviathanStarfireTree.TreeId,
                 node.Id
@@ -2633,10 +2633,10 @@ public static class LeviathanStarfireRuntime
             if (rank <= 0)
                 continue;
 
-            LeviathanSpecializationEffect[] effects = node.Effects;
+            CoreSpecializationEffect[] effects = node.Effects;
             for (int effectIndex = 0; effectIndex < effects.Length; effectIndex++)
             {
-                LeviathanSpecializationEffect effect = effects[effectIndex];
+                CoreSpecializationEffect effect = effects[effectIndex];
                 if (effect != null && effect.Key == knob.Id)
                     AccumulateEffect(effect, rank, ref aggregate);
             }
@@ -2654,7 +2654,7 @@ public static class LeviathanStarfireRuntime
                 continue;
             }
 
-            int rank = LeviathanSpecializationRuntime.GetNodeRank(
+            int rank = CoreSpecializationRuntime.GetNodeRank(
                 pilot,
                 LeviathanStarfireTree.TreeId,
                 definition.NodeId
@@ -2668,7 +2668,7 @@ public static class LeviathanStarfireRuntime
     private static float ApplyKnob(
         Pilot pilot,
         StarfireSourceFamily family,
-        LeviathanSpecializationKnob knob,
+        CoreSpecializationKnob knob,
         float baseValue)
     {
         KnobAggregate aggregate = AggregateStarfireKnob(pilot, family, knob);
@@ -2680,7 +2680,7 @@ public static class LeviathanStarfireRuntime
     private static float GetKnobMultiplier(
         Pilot pilot,
         StarfireSourceFamily family,
-        LeviathanSpecializationKnob knob)
+        CoreSpecializationKnob knob)
     {
         KnobAggregate aggregate = AggregateStarfireKnob(pilot, family, knob);
         return (1f + aggregate.percent) * aggregate.multiplier;
@@ -2696,7 +2696,7 @@ public static class LeviathanStarfireRuntime
             : GameShip.GetPlayerSourcePilot(player);
         Activatable source = player == null ? null : FindSource(player);
         StarfireSourceFamily family = GetSourceFamily(source);
-        int revision = LeviathanSpecializationRuntime.ConfigurationRevision;
+        int revision = CoreSpecializationRuntime.ConfigurationRevision;
 
         if (resolvedState != null &&
             resolvedStateRevision == revision &&
@@ -2834,7 +2834,7 @@ public static class LeviathanStarfireRuntime
             )
         );
 
-        state.RechargePullEnabled = LeviathanSpecializationRuntime.HasFlag(
+        state.RechargePullEnabled = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.RechargePull
         );
@@ -2855,7 +2855,7 @@ public static class LeviathanStarfireRuntime
             ApplyKnob(pilot, family, Knobs.RechargePullMaxSpeed, 0f)
         ) * WorldUnitsPerMeter;
 
-        state.BlastWaveEnabled = LeviathanSpecializationRuntime.HasFlag(
+        state.BlastWaveEnabled = CoreSpecializationRuntime.HasFlag(
             pilot,
             Flags.BlastWave
         );
@@ -2898,7 +2898,7 @@ public static class LeviathanStarfireRuntime
         resolvedStateSource = source;
         resolvedStateFamily = family;
         resolvedStateRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
         resolvedState = state;
         return state;
     }
