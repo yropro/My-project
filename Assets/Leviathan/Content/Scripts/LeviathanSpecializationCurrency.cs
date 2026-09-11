@@ -411,27 +411,3 @@ public static class LeviathanEvolutionMutationRefreshPatch
         }
     }
 }
-
-// A native full upgrade reset should also clear the externally persisted web.
-[HarmonyPatch(typeof(Pilot), "ResetUpgrades")]
-public static class LeviathanSpecializationResetWithNativePatch
-{
-    public static void Prefix(Pilot __instance)
-    {
-        if (__instance == null)
-            return;
-
-        string reason;
-        CoreSpecializationRuntime.ResetClassBuild(
-            __instance,
-            CoreSpecializationRuntime.GetEffectiveClass(__instance),
-            out reason);
-
-        if (!string.IsNullOrEmpty(reason))
-        {
-            Debug.LogWarning(
-                "[Leviathan] Could not persist specialization reset: " + reason
-            );
-        }
-    }
-}
