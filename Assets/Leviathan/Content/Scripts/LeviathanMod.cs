@@ -44,6 +44,18 @@ public class LeviathanMod : IStarVortexMod
         // Upgrade's key lookup before any UI or Pilot code can request them.
         LeviathanSkillSystem.Register();
 
+        CoreClassRuntime.RegisterLocalClass(
+            CoreClassId.Leviathan,
+            delegate(Pilot pilot)
+            {
+                return pilot != null &&
+                    pilot.GetUpgradeLevel(
+                        LeviathanSpecializationCurrency.UpgradeKey) >= 1;
+            });
+
+        CoreSpecializationPolicies.Register(
+            new LeviathanSpecializationPolicy());
+
         harmony.PatchAll();
 
         if (controllerObject != null)

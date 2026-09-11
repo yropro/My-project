@@ -11,7 +11,7 @@ public static class LeviathanSpecializationUiBootstrapPatch
 {
     public static void Postfix(WorldController __instance)
     {
-        LeviathanSpecializationRuntime.RegisterDefaults();
+        CoreSpecializationRuntime.RegisterDefaults();
 
         if (__instance == null ||
             __instance.GetComponent<LeviathanSpecializationDebugUI>() != null)
@@ -62,7 +62,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         root.SetActive(!root.activeSelf);
         if (root.activeSelf)
         {
-            LeviathanSpecializationRuntime.RefreshTreeDefinitions();
+            CoreSpecializationRuntime.RefreshTreeDefinitions();
             lastRenderedTreeId = null;
             selectedNodeId = null;
             Refresh();
@@ -185,29 +185,29 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
     private void Refresh()
     {
-        LeviathanSpecializationRuntime.RegisterDefaults();
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+        CoreSpecializationRuntime.RegisterDefaults();
+        Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
 
-        IList<LeviathanSpecializationTree> trees =
-            LeviathanSpecializationRegistry.All();
+        IList<CoreSpecializationTree> trees =
+            CoreSpecializationRegistry.All();
 
         if (trees.Count == 0)
             return;
 
-        LeviathanSpecializationTree selectedTree =
+        CoreSpecializationTree selectedTree =
             string.IsNullOrEmpty(selectedTreeId)
                 ? null
-                : LeviathanSpecializationRegistry.Get(selectedTreeId);
+                : CoreSpecializationRegistry.Get(selectedTreeId);
 
         if (selectedTree == null ||
-            !LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, selectedTree))
+            !CoreSpecializationRuntime.IsTreeUnlocked(pilot, selectedTree))
         {
             selectedTreeId = FindFirstUnlockedTreeId(pilot, trees);
             selectedNodeId = null;
         }
 
-        LeviathanSpecializationTree tree =
-            LeviathanSpecializationRegistry.Get(selectedTreeId);
+        CoreSpecializationTree tree =
+            CoreSpecializationRegistry.Get(selectedTreeId);
 
         if (tree == null)
             return;
@@ -215,18 +215,18 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         titleText.text = tree.Name.ToUpperInvariant() + " SPECIALIZATION";
 
         string pointReason;
-        bool canSpend = LeviathanSpecializationRuntime.CanSafelySpend(pilot, out pointReason);
+        bool canSpend = CoreSpecializationRuntime.CanSafelySpend(pilot, out pointReason);
         int available = canSpend
-            ? LeviathanSpecializationRuntime.GetAvailablePoints(pilot)
+            ? CoreSpecializationRuntime.GetAvailablePoints(pilot)
             : 0;
         int granted = canSpend
-            ? LeviathanSpecializationRuntime.GetGrantedPoints(pilot)
+            ? CoreSpecializationRuntime.GetGrantedPoints(pilot)
             : 0;
         int spent = canSpend
-            ? LeviathanSpecializationRuntime.GetTotalSpentPoints(pilot)
+            ? CoreSpecializationRuntime.GetTotalSpentPoints(pilot)
             : 0;
         int evolutionRank = canSpend
-            ? LeviathanSpecializationRuntime.GetEvolutionRank(pilot)
+            ? CoreSpecializationRuntime.GetEvolutionRank(pilot)
             : 0;
 
         pointsText.text = canSpend
@@ -283,7 +283,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
     private void RefreshTreeTabs(
         Pilot pilot,
-        IList<LeviathanSpecializationTree> trees)
+        IList<CoreSpecializationTree> trees)
     {
         for (int i = treeBar.childCount - 1; i >= 0; i--)
             Destroy(treeBar.GetChild(i).gameObject);
@@ -291,8 +291,8 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         float x = 0f;
         for (int i = 0; i < trees.Count; i++)
         {
-            LeviathanSpecializationTree tree = trees[i];
-            bool unlocked = LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, tree);
+            CoreSpecializationTree tree = trees[i];
+            bool unlocked = CoreSpecializationRuntime.IsTreeUnlocked(pilot, tree);
             if (!unlocked)
                 continue;
 
@@ -324,37 +324,37 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
     private static string FindFirstUnlockedTreeId(
         Pilot pilot,
-        IList<LeviathanSpecializationTree> trees)
+        IList<CoreSpecializationTree> trees)
     {
-        LeviathanSpecializationTree evolution =
-            LeviathanSpecializationRegistry.Get(LeviathanEvolutionTree.TreeId);
+        CoreSpecializationTree evolution =
+            CoreSpecializationRegistry.Get(LeviathanEvolutionTree.TreeId);
 
         if (evolution != null &&
-            LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, evolution))
+            CoreSpecializationRuntime.IsTreeUnlocked(pilot, evolution))
         {
             return evolution.Id;
         }
 
         for (int i = 0; i < trees.Count; i++)
         {
-            if (LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, trees[i]))
+            if (CoreSpecializationRuntime.IsTreeUnlocked(pilot, trees[i]))
                 return trees[i].Id;
         }
 
         return trees.Count > 0 ? trees[0].Id : null;
     }
 
-    private void RenderGraph(LeviathanSpecializationTree tree, Pilot pilot)
+    private void RenderGraph(CoreSpecializationTree tree, Pilot pilot)
     {
         for (int i = graphContent.childCount - 1; i >= 0; i--)
             Destroy(graphContent.GetChild(i).gameObject);
 
         nodeButtons.Clear();
 
-        LeviathanSpecializationLayout layout =
+        CoreSpecializationLayout layout =
             string.Equals(tree.Id, LeviathanEvolutionTree.TreeId, StringComparison.Ordinal)
                 ? BuildEvolutionLayout(tree)
-                : LeviathanSpecializationAutoLayout.Build(tree);
+                : CoreSpecializationAutoLayout.Build(tree);
 
         int definitionNodeCount = tree.Nodes.Count;
         int layoutNodeCount = layout.Nodes.Count;
@@ -366,34 +366,34 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
         for (int i = 0; i < layout.Edges.Count; i++)
         {
-            LeviathanSpecializationLayoutEdge edge = layout.Edges[i];
-            LeviathanSpecializationLayoutNode from = layout.Nodes[edge.FromNodeId];
-            LeviathanSpecializationLayoutNode to = layout.Nodes[edge.ToNodeId];
+            CoreSpecializationLayoutEdge edge = layout.Edges[i];
+            CoreSpecializationLayoutNode from = layout.Nodes[edge.FromNodeId];
+            CoreSpecializationLayoutNode to = layout.Nodes[edge.ToNodeId];
 
             Vector2 a = new Vector2(left + from.Position.X, centerY - from.Position.Y);
             Vector2 b = new Vector2(left + to.Position.X, centerY - to.Position.Y);
 
-            Color lineColor = edge.TargetRequirementKind == LeviathanRequirementKind.Any
+            Color lineColor = edge.TargetRequirementKind == CoreRequirementKind.Any
                 ? new Color(0.35f, 0.72f, 1f, 0.72f)
                 : new Color(0.72f, 0.76f, 0.82f, 0.68f);
 
             DrawLine(graphContent, a, b, lineColor, 4f);
         }
 
-        LeviathanSpecializationState state =
-            LeviathanSpecializationRuntime.GetState(pilot, tree.Id);
+        CoreSpecializationState state =
+            CoreSpecializationRuntime.GetState(pilot, tree.Id);
 
-        bool treeUnlocked = LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, tree);
+        bool treeUnlocked = CoreSpecializationRuntime.IsTreeUnlocked(pilot, tree);
 
-        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+        IList<CoreSpecializationNode> nodes = tree.Nodes;
         for (int i = 0; i < nodes.Count; i++)
         {
-            LeviathanSpecializationNode node = nodes[i];
-            LeviathanSpecializationLayoutNode nodeLayout = layout.Nodes[node.Id];
+            CoreSpecializationNode node = nodes[i];
+            CoreSpecializationLayoutNode nodeLayout = layout.Nodes[node.Id];
 
             string reason;
             bool available = treeUnlocked &&
-                LeviathanSpecializationRuntime.CanInvest(
+                CoreSpecializationRuntime.CanInvest(
                     pilot,
                     tree.Id,
                     node.Id,
@@ -426,24 +426,24 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
             {
                 selectedNodeId = captured;
                 RefreshDetails(
-                    LeviathanSpecializationRegistry.Get(selectedTreeId),
-                    LeviathanSpecializationRuntime.GetCurrentPilot()
+                    CoreSpecializationRegistry.Get(selectedTreeId),
+                    CoreSpecializationRuntime.GetCurrentPilot()
                 );
             });
 
             nodeButtons[node.Id] = button;
 
             List<string> simpleParents;
-            if ((node.Requirement.Kind == LeviathanRequirementKind.All ||
-                 node.Requirement.Kind == LeviathanRequirementKind.Any) &&
+            if ((node.Requirement.Kind == CoreRequirementKind.All ||
+                 node.Requirement.Kind == CoreRequirementKind.Any) &&
                 node.Requirement.TryGetSimpleParents(out simpleParents) &&
                 simpleParents.Count > 1)
             {
                 Text badge = CreateText(graphContent, "Gateway", 12, TextAnchor.MiddleCenter);
-                badge.text = node.Requirement.Kind == LeviathanRequirementKind.All
+                badge.text = node.Requirement.Kind == CoreRequirementKind.All
                     ? "ALL"
                     : "ANY";
-                badge.color = node.Requirement.Kind == LeviathanRequirementKind.All
+                badge.color = node.Requirement.Kind == CoreRequirementKind.All
                     ? new Color(1f, 0.78f, 0.32f, 1f)
                     : new Color(0.35f, 0.78f, 1f, 1f);
                 SetRect(
@@ -466,7 +466,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         titleText.text =
             tree.Name.ToUpperInvariant() +
             " SPECIALIZATION   [" +
-            LeviathanSpecializationRuntime.DiagnosticBuildMarker +
+            CoreSpecializationRuntime.DiagnosticBuildMarker +
             " | DEF " + definitionNodeCount.ToString() +
             " | LAYOUT " + layoutNodeCount.ToString() +
             " | BUTTONS " + nodeButtons.Count.ToString() +
@@ -474,7 +474,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
         Debug.Log(
             "[Leviathan SpecDiag] " +
-            LeviathanSpecializationRuntime.DiagnosticBuildMarker +
+            CoreSpecializationRuntime.DiagnosticBuildMarker +
             " tree=" + tree.Id +
             " def=" + definitionNodeCount.ToString() +
             " layout=" + layoutNodeCount.ToString() +
@@ -483,21 +483,21 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         );
     }
 
-    private static LeviathanSpecializationLayout BuildEvolutionLayout(
-        LeviathanSpecializationTree tree)
+    private static CoreSpecializationLayout BuildEvolutionLayout(
+        CoreSpecializationTree tree)
     {
-        LeviathanSpecializationLayout layout =
-            new LeviathanSpecializationLayout();
+        CoreSpecializationLayout layout =
+            new CoreSpecializationLayout();
 
         const float childSpacing = 230f;
         const float rowSpacing = 220f;
         const float topY = 120f;
 
-        List<LeviathanSpecializationNode> children =
-            new List<LeviathanSpecializationNode>();
+        List<CoreSpecializationNode> children =
+            new List<CoreSpecializationNode>();
 
-        IList<LeviathanSpecializationNode> nodes = tree.Nodes;
-        LeviathanSpecializationNode rootNode = null;
+        IList<CoreSpecializationNode> nodes = tree.Nodes;
+        CoreSpecializationNode rootNode = null;
 
         for (int i = 0; i < nodes.Count; i++)
         {
@@ -512,29 +512,29 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
         if (rootNode != null)
         {
-            layout.Nodes[rootNode.Id] = new LeviathanSpecializationLayoutNode
+            layout.Nodes[rootNode.Id] = new CoreSpecializationLayoutNode
             {
                 NodeId = rootNode.Id,
                 Layer = 0,
                 Order = 0,
-                Position = new LeviathanLayoutPoint(centerX, topY)
+                Position = new CoreLayoutPoint(centerX, topY)
             };
         }
 
         for (int i = 0; i < children.Count; i++)
         {
-            LeviathanSpecializationNode node = children[i];
-            layout.Nodes[node.Id] = new LeviathanSpecializationLayoutNode
+            CoreSpecializationNode node = children[i];
+            layout.Nodes[node.Id] = new CoreSpecializationLayoutNode
             {
                 NodeId = node.Id,
                 Layer = 1,
                 Order = i,
-                Position = new LeviathanLayoutPoint(i * childSpacing, topY - rowSpacing)
+                Position = new CoreLayoutPoint(i * childSpacing, topY - rowSpacing)
             };
 
             if (rootNode != null)
             {
-                layout.Edges.Add(new LeviathanSpecializationLayoutEdge
+                layout.Edges.Add(new CoreSpecializationLayoutEdge
                 {
                     FromNodeId = rootNode.Id,
                     ToNodeId = node.Id,
@@ -548,15 +548,15 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         return layout;
     }
 
-    private void RefreshDetails(LeviathanSpecializationTree tree, Pilot pilot)
+    private void RefreshDetails(CoreSpecializationTree tree, Pilot pilot)
     {
         if (tree == null)
             return;
 
-        LeviathanSpecializationState state =
-            LeviathanSpecializationRuntime.GetState(pilot, tree.Id);
+        CoreSpecializationState state =
+            CoreSpecializationRuntime.GetState(pilot, tree.Id);
 
-        bool unlocked = LeviathanSpecializationRuntime.IsTreeUnlocked(pilot, tree);
+        bool unlocked = CoreSpecializationRuntime.IsTreeUnlocked(pilot, tree);
 
         if (string.IsNullOrEmpty(selectedNodeId))
         {
@@ -579,7 +579,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
             return;
         }
 
-        LeviathanSpecializationNode node = tree.GetNode(selectedNodeId);
+        CoreSpecializationNode node = tree.GetNode(selectedNodeId);
         if (node == null)
         {
             selectedNodeId = null;
@@ -613,7 +613,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         if (!string.IsNullOrEmpty(node.ExclusiveGroup))
         {
             text += "Exclusive group: ";
-            IList<LeviathanSpecializationNode> members =
+            IList<CoreSpecializationNode> members =
                 tree.GetExclusiveGroupMembers(node.ExclusiveGroup);
 
             for (int i = 0; i < members.Count; i++)
@@ -636,7 +636,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
             {
                 text += "• " + node.Effects[i].DescribeRankContribution(
                     displayRank,
-                    LeviathanSpecializationRegistry.ResolveEffectName
+                    CoreSpecializationRegistry.ResolveEffectName
                 ) + "\n";
             }
         }
@@ -649,13 +649,13 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         detailsText.text = text;
 
         string reason;
-        spendButton.interactable = LeviathanSpecializationRuntime.CanInvest(
+        spendButton.interactable = CoreSpecializationRuntime.CanInvest(
             pilot,
             tree.Id,
             node.Id,
             out reason
         );
-        refundButton.interactable = LeviathanSpecializationRuntime.CanRefund(
+        refundButton.interactable = CoreSpecializationRuntime.CanRefund(
             pilot,
             tree.Id,
             node.Id,
@@ -665,19 +665,19 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
     private void SpendSelected()
     {
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
-        LeviathanSpecializationTree tree =
-            LeviathanSpecializationRegistry.Get(selectedTreeId);
+        Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
+        CoreSpecializationTree tree =
+            CoreSpecializationRegistry.Get(selectedTreeId);
 
         if (tree == null || string.IsNullOrEmpty(selectedNodeId))
             return;
 
-        LeviathanSpecializationNode node = tree.GetNode(selectedNodeId);
+        CoreSpecializationNode node = tree.GetNode(selectedNodeId);
         string nodeName = node == null ? selectedNodeId : node.Name;
         int cost = node == null ? 1 : node.PointCostPerRank;
 
         string reason;
-        bool success = LeviathanSpecializationRuntime.TryInvest(
+        bool success = CoreSpecializationRuntime.TryInvest(
             pilot,
             tree.Id,
             selectedNodeId,
@@ -694,19 +694,19 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
 
     private void RefundSelected()
     {
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
-        LeviathanSpecializationTree tree =
-            LeviathanSpecializationRegistry.Get(selectedTreeId);
+        Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
+        CoreSpecializationTree tree =
+            CoreSpecializationRegistry.Get(selectedTreeId);
 
         if (tree == null || string.IsNullOrEmpty(selectedNodeId))
             return;
 
-        LeviathanSpecializationNode node = tree.GetNode(selectedNodeId);
+        CoreSpecializationNode node = tree.GetNode(selectedNodeId);
         string nodeName = node == null ? selectedNodeId : node.Name;
         int cost = node == null ? 1 : node.PointCostPerRank;
 
         string reason;
-        bool success = LeviathanSpecializationRuntime.TryRefund(
+        bool success = CoreSpecializationRuntime.TryRefund(
             pilot,
             tree.Id,
             selectedNodeId,
@@ -725,16 +725,16 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         Transform parent,
         string label,
         Vector2 position,
-        LeviathanSpecializationNodeType type,
+        CoreSpecializationNodeType type,
         bool invested,
         bool available,
         bool treeUnlocked)
     {
-        Vector2 size = type == LeviathanSpecializationNodeType.Root
+        Vector2 size = type == CoreSpecializationNodeType.Root
             ? new Vector2(178f, 90f)
-            : type == LeviathanSpecializationNodeType.Keystone
+            : type == CoreSpecializationNodeType.Keystone
                 ? new Vector2(170f, 82f)
-                : type == LeviathanSpecializationNodeType.Major
+                : type == CoreSpecializationNodeType.Major
                     ? new Vector2(150f, 70f)
                     : new Vector2(142f, 66f);
 

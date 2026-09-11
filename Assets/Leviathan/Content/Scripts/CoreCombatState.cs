@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Bounded local registry for temporary Leviathan combat truth.
+/// Bounded local registry for temporary semantic combat truth.
 ///
 /// State is intentionally distinct from combat events/history.  OwnerTarget and
 /// TargetGlobal states are source-qualified by default, so two owners applying
@@ -15,7 +15,7 @@ using UnityEngine;
 /// a remote target.  The sparse reliable authority-transfer channel is a later
 /// phase; it can call the same key-based methods after delivery.
 /// </summary>
-public static class LeviathanCombatState
+public static class CoreCombatState
 {
     public enum Scope : byte
     {
@@ -26,10 +26,10 @@ public static class LeviathanCombatState
 
     public struct Snapshot
     {
-        public LeviathanCombat.SemanticKey Semantic;
+        public CoreCombat.SemanticKey Semantic;
         public Scope StateScope;
-        public LeviathanCombat.CombatEntityKey SourceOwner;
-        public LeviathanCombat.CombatEntityKey Target;
+        public CoreCombat.CombatEntityKey SourceOwner;
+        public CoreCombat.CombatEntityKey Target;
         public int Stacks;
         public float Magnitude;
         public float AppliedAt;
@@ -44,9 +44,9 @@ public static class LeviathanCombatState
     private struct StateKey : IEquatable<StateKey>
     {
         public Scope StateScope;
-        public LeviathanCombat.CombatEntityKey SourceOwner;
-        public LeviathanCombat.CombatEntityKey Target;
-        public LeviathanCombat.SemanticKey Semantic;
+        public CoreCombat.CombatEntityKey SourceOwner;
+        public CoreCombat.CombatEntityKey Target;
+        public CoreCombat.SemanticKey Semantic;
 
         public bool Equals(StateKey other)
         {
@@ -105,15 +105,15 @@ public static class LeviathanCombatState
     public static bool Apply(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float durationSeconds,
         int stacks = 1,
         float magnitude = 0f,
         byte flags = 0)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return false;
 
@@ -133,7 +133,7 @@ public static class LeviathanCombatState
     public static bool ApplyAt(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float occurredAt,
         float durationSeconds,
@@ -153,7 +153,7 @@ public static class LeviathanCombatState
     public static bool ApplyAt(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float occurredAt,
         uint eventId,
@@ -162,8 +162,8 @@ public static class LeviathanCombatState
         float magnitude = 0f,
         byte flags = 0)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return false;
 
@@ -174,7 +174,7 @@ public static class LeviathanCombatState
     public static bool Set(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float durationSeconds,
         int stacks,
@@ -188,12 +188,12 @@ public static class LeviathanCombatState
     public static bool Refresh(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float durationSeconds)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return false;
 
@@ -203,13 +203,13 @@ public static class LeviathanCombatState
     public static bool AddStacks(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         int amount,
         float refreshDurationSeconds = -1f)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return false;
 
@@ -220,12 +220,12 @@ public static class LeviathanCombatState
     public static bool SetStacks(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         int stacks)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return false;
 
@@ -235,11 +235,11 @@ public static class LeviathanCombatState
     public static bool Remove(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return false;
 
@@ -249,11 +249,11 @@ public static class LeviathanCombatState
     public static bool Has(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return false;
 
@@ -263,11 +263,11 @@ public static class LeviathanCombatState
     public static int GetStacks(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return 0;
 
@@ -277,11 +277,11 @@ public static class LeviathanCombatState
     public static float GetRemainingSeconds(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return 0f;
 
@@ -291,14 +291,14 @@ public static class LeviathanCombatState
     public static bool TryGet(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         out Snapshot snapshot)
     {
         snapshot = default(Snapshot);
 
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!ResolveKeys(sourceOwner, target, scope, out ownerKey, out targetKey))
             return false;
 
@@ -315,9 +315,9 @@ public static class LeviathanCombatState
     /// authority's own local clock; callers must not transmit occurredAt itself.
     /// </summary>
     public static bool ApplyAt(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float occurredAt,
         float durationSeconds,
@@ -330,9 +330,9 @@ public static class LeviathanCombatState
     }
 
     public static bool ApplyAt(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float occurredAt,
         uint eventId,
@@ -393,9 +393,9 @@ public static class LeviathanCombatState
     }
 
     public static bool Apply(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float durationSeconds,
         int stacks = 1,
@@ -436,9 +436,9 @@ public static class LeviathanCombatState
     }
 
     public static bool Refresh(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float durationSeconds)
     {
@@ -459,9 +459,9 @@ public static class LeviathanCombatState
     }
 
     public static bool AddStacks(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         int amount,
         float refreshDurationSeconds = -1f)
@@ -490,9 +490,9 @@ public static class LeviathanCombatState
     }
 
     public static bool SetStacks(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         int stacks)
     {
@@ -513,9 +513,9 @@ public static class LeviathanCombatState
     }
 
     public static bool SetMagnitude(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float magnitude)
     {
@@ -536,9 +536,9 @@ public static class LeviathanCombatState
     }
 
     public static bool Remove(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
         if (!ValidateKeyParts(sourceOwner, target, semantic, scope))
@@ -548,9 +548,9 @@ public static class LeviathanCombatState
     }
 
     public static bool Has(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
         StateKey key;
@@ -560,9 +560,9 @@ public static class LeviathanCombatState
     }
 
     public static int GetStacks(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
         StateKey key;
@@ -572,9 +572,9 @@ public static class LeviathanCombatState
     }
 
     public static float GetRemainingSeconds(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
         StateKey key;
@@ -593,9 +593,9 @@ public static class LeviathanCombatState
     }
 
     public static bool TryGet(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         out Snapshot snapshot)
     {
@@ -630,10 +630,10 @@ public static class LeviathanCombatState
     /// removed.
     /// </summary>
     public static void ResetOwnerSkill(
-        LeviathanCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey sourceOwner,
         byte skillId)
     {
-        if (!sourceOwner.IsValid || skillId == LeviathanCombat.SkillIds.None)
+        if (!sourceOwner.IsValid || skillId == CoreCombat.SkillIds.None)
             return;
 
         PruneScratch.Clear();
@@ -650,7 +650,7 @@ public static class LeviathanCombatState
     }
 
     /// <summary>Removes every state authored by this owner runtime.</summary>
-    public static void ResetOwner(LeviathanCombat.CombatEntityKey sourceOwner)
+    public static void ResetOwner(CoreCombat.CombatEntityKey sourceOwner)
     {
         if (!sourceOwner.IsValid)
             return;
@@ -666,7 +666,7 @@ public static class LeviathanCombatState
     }
 
     /// <summary>Removes states whose target identity no longer exists.</summary>
-    public static void ResetTarget(LeviathanCombat.CombatEntityKey target)
+    public static void ResetTarget(CoreCombat.CombatEntityKey target)
     {
         if (!target.IsValid)
             return;
@@ -701,25 +701,25 @@ public static class LeviathanCombatState
         GameShip sourceOwner,
         GameShip target,
         Scope scope,
-        out LeviathanCombat.CombatEntityKey sourceOwnerKey,
-        out LeviathanCombat.CombatEntityKey targetKey)
+        out CoreCombat.CombatEntityKey sourceOwnerKey,
+        out CoreCombat.CombatEntityKey targetKey)
     {
-        sourceOwnerKey = default(LeviathanCombat.CombatEntityKey);
-        targetKey = default(LeviathanCombat.CombatEntityKey);
+        sourceOwnerKey = default(CoreCombat.CombatEntityKey);
+        targetKey = default(CoreCombat.CombatEntityKey);
 
-        if (!LeviathanCombat.TryGetEntityKey(sourceOwner, out sourceOwnerKey))
+        if (!CoreCombat.TryGetEntityKey(sourceOwner, out sourceOwnerKey))
             return false;
 
         if (scope == Scope.OwnerSelf)
             return true;
 
-        return LeviathanCombat.TryGetEntityKey(target, out targetKey);
+        return CoreCombat.TryGetEntityKey(target, out targetKey);
     }
 
     private static bool ValidateKeyParts(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
         if (!sourceOwner.IsValid || !semantic.IsValid)
@@ -734,25 +734,25 @@ public static class LeviathanCombatState
     }
 
     private static StateKey MakeKey(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope)
     {
         StateKey key = new StateKey();
         key.StateScope = scope;
         key.SourceOwner = sourceOwner;
         key.Target = scope == Scope.OwnerSelf
-            ? default(LeviathanCombat.CombatEntityKey)
+            ? default(CoreCombat.CombatEntityKey)
             : target;
         key.Semantic = semantic;
         return key;
     }
 
     private static bool TryGetLiveRecord(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         Scope scope,
         float now,
         out StateKey key,

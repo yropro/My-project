@@ -85,7 +85,7 @@ public static class OrrerySatellites
         public bool Locked { get; internal set; }
         public OrreryElement CapturedElement { get; internal set; }
 
-        public LeviathanCombat.ContributorKey Contributor
+        public CoreCombat.ContributorKey Contributor
         {
             get { return OrreryCombat.Satellite(SatelliteId); }
         }
@@ -355,7 +355,7 @@ public static class OrrerySatellites
             if (context == null || context.Ship == null)
                 continue;
             contextBySatellite.Remove(context.Ship);
-            LeviathanCombat.ReleaseContributorObject(context.Ship);
+            CoreCombat.ReleaseContributorObject(context.Ship);
         }
     }
 }

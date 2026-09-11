@@ -1,4 +1,4 @@
-using static LeviathanTreeDsl;
+using static CoreTreeDsl;
 
 /// <summary>
 /// Behemoth specialization definition.
@@ -13,9 +13,9 @@ public static class LeviathanBehemothTree
     public const string TreeId = "behemoth";
     public const string RootNodeId = "behemoth";
 
-    public static LeviathanSpecializationTree Create()
+    public static CoreSpecializationTree Create()
     {
-        LeviathanSpecializationTree tree = Tree(
+        CoreSpecializationTree tree = Tree(
             TreeId,
             "Behemoth",
             RootNodeId,

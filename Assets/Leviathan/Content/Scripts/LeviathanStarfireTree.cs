@@ -1,4 +1,4 @@
-using static LeviathanTreeDsl;
+using static CoreTreeDsl;
 using Starfire = LeviathanStarfireRuntime;
 
 /// <summary>
@@ -46,7 +46,7 @@ public static class LeviathanStarfireTree
     private static Starfire.FamilyKnobEffect Family(
         string nodeName,
         Starfire.StarfireSourceFamily family,
-        LeviathanTreeDsl.Effect effect)
+        CoreTreeDsl.Effect effect)
     {
         return new Starfire.FamilyKnobEffect(
             Id(nodeName),
@@ -55,7 +55,7 @@ public static class LeviathanStarfireTree
         );
     }
 
-    private static void ValidateFamilyEffects(LeviathanSpecializationTree tree)
+    private static void ValidateFamilyEffects(CoreSpecializationTree tree)
     {
         for (int i = 0; i < FamilyEffects.Length; i++)
         {
@@ -64,9 +64,9 @@ public static class LeviathanStarfireTree
         }
     }
 
-    public static LeviathanSpecializationTree Create()
+    public static CoreSpecializationTree Create()
     {
-        LeviathanSpecializationTree tree = Tree(
+        CoreSpecializationTree tree = Tree(
             TreeId,
             "Starfire",
             RootNodeId,

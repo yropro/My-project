@@ -4,12 +4,12 @@ using StarVortex;
 /// <summary>
 /// Orrery-owned presentation contract over the current shared ship-state
 /// transport. Gameplay remains owner-authoritative. This wrapper intentionally
-/// hides the historical LeviathanNetwork name from all other Orrery systems so
+/// hides the historical CoreNetwork name from all other Orrery systems so
 /// the transport can be renamed/factored later without rewriting class logic.
 /// </summary>
 public static class OrreryNetwork
 {
-    public const byte SharedSlotId = 6;
+    public const byte SharedSlotId = CoreNetwork.SlotOrrery;
     public const byte PayloadVersion = 1;
     public const int MaxPresentedSatellites = 8;
     private const byte PayloadEndSentinel = 0xA7;
@@ -101,8 +101,8 @@ public static class OrreryNetwork
         if (!TryBuildLocalState(owner, out state))
             return;
 
-        LeviathanNetwork.SlotWriter writer =
-            LeviathanNetwork.BeginSlot(SharedSlotId);
+        CoreNetwork.SlotWriter writer =
+            CoreNetwork.BeginSlot(SharedSlotId);
 
         writer.Byte(PayloadVersion);
         writer.Byte((byte)state.Phase);
@@ -120,7 +120,7 @@ public static class OrreryNetwork
         writer.Byte((byte)((state.PackedElementsBySatellite >> 8) & 0xFF));
         writer.Byte((byte)((state.PackedElementsBySatellite >> 16) & 0xFF));
         writer.Byte(PayloadEndSentinel);
-        LeviathanNetwork.EndSlot(writer);
+        CoreNetwork.EndSlot(writer);
     }
 
     public static bool TryReadRemote(
@@ -129,9 +129,9 @@ public static class OrreryNetwork
     {
         state = default(PresentationState);
 
-        LeviathanNetwork.SlotReader reader;
+        CoreNetwork.SlotReader reader;
         if (remoteOwner == null ||
-            !LeviathanNetwork.TryReadSlot(remoteOwner, SharedSlotId, out reader))
+            !CoreNetwork.TryReadSlot(remoteOwner, SharedSlotId, out reader))
         {
             return false;
         }
