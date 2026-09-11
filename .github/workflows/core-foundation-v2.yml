@@ -21,12 +21,24 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('Assets/Leviathan/Content/Scripts/LeviathanCombat.cs')
-          t = p.read_text(encoding='utf-8-sig')
+
+          combat = Path('Assets/Leviathan/Content/Scripts/LeviathanCombat.cs')
+          t = combat.read_text(encoding='utf-8-sig')
           t = t.replace('Leviathan owner', 'class owner')
           t = t.replace('Leviathan local transaction', 'local authored transaction')
           t = t.replace('Leviathan skills owned by the same player', 'semantic skills owned by the same player')
-          p.write_text(t, encoding='utf-8')
+          combat.write_text(t, encoding='utf-8')
+
+          network = Path('Assets/Leviathan/Content/Scripts/LeviathanNetwork.cs')
+          t = network.read_text(encoding='utf-8-sig')
+          t = t.replace('Co-op presentation transport for Leviathan.', 'Co-op presentation transport for shared custom classes.')
+          t = t.replace('versioned Leviathan payload', 'versioned Core payload')
+          t = t.replace("owner's Leviathan specialization tree ranks", "owner's specialization tree ranks")
+          t = t.replace('identical Leviathan build.', 'identical mod build.')
+          t = t.replace('LeviathanRemoteSkillVisuals already depends on this.', 'Existing remote skill visuals already depend on this.')
+          t = t.replace('Every packet a Leviathan sends', 'Every packet an active custom class sends')
+          t = t.replace('Appends the Leviathan payload', 'Appends the Core payload')
+          network.write_text(t, encoding='utf-8')
           PY
 
       - name: Run Core foundation migration
