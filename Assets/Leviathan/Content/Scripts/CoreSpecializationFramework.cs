@@ -2381,11 +2381,23 @@ public static class CoreSpecializationRuntime
 
     private static void SynchronizeAllAutoGrantedNodes(Pilot pilot)
     {
+        ICoreSpecializationPolicy policy =
+            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+        if (policy == null)
+            return;
+
+        CoreClassId ownerClass = policy.ClassId;
         IList<CoreSpecializationTree> trees =
             CoreSpecializationRegistry.All();
 
         for (int i = 0; i < trees.Count; i++)
         {
+            if (CoreSpecializationPolicies.GetOwnerClass(trees[i].Id) !=
+                ownerClass)
+            {
+                continue;
+            }
+
             CoreSpecializationState state = GetRawState(pilot, trees[i].Id);
             SynchronizeAutoGrantedNodes(pilot, trees[i], state);
         }
@@ -2482,6 +2494,11 @@ public static class CoreSpecializationRuntime
         if (!path.Add(tree.Id))
             return false;
 
+        CoreClassId targetOwner =
+            CoreSpecializationPolicies.GetOwnerClass(tree.Id);
+        if (targetOwner == CoreClassId.None)
+            return false;
+
         bool result = false;
 
         try
@@ -2505,6 +2522,8 @@ public static class CoreSpecializationRuntime
                 {
                     CoreSpecializationTree sourceTree = all[i];
                     if (sourceTree.Id == tree.Id ||
+                        CoreSpecializationPolicies.GetOwnerClass(
+                            sourceTree.Id) != targetOwner ||
                         !EvaluateTreeUnlocked(
                             pilot,
                             sourceTree,
@@ -2581,6 +2600,16 @@ public static class CoreSpecializationRuntime
         if (tree == null || pilot == null)
         {
             reason = "Tree or Pilot unavailable.";
+            return false;
+        }
+
+        ICoreSpecializationPolicy policy =
+            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+        if (policy == null ||
+            CoreSpecializationPolicies.GetOwnerClass(tree.Id) !=
+                policy.ClassId)
+        {
+            reason = tree.Name + " does not belong to the active class.";
             return false;
         }
 
@@ -2675,6 +2704,16 @@ public static class CoreSpecializationRuntime
             return false;
         }
 
+        ICoreSpecializationPolicy policy =
+            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+        if (policy == null ||
+            CoreSpecializationPolicies.GetOwnerClass(tree.Id) !=
+                policy.ClassId)
+        {
+            reason = tree.Name + " does not belong to the active class.";
+            return false;
+        }
+
         if (!CanSafelySpend(pilot, out reason))
             return false;
 
@@ -2739,12 +2778,26 @@ public static class CoreSpecializationRuntime
     private static bool ValidateAllInvestedState(Pilot pilot, out string reason)
     {
         reason = string.Empty;
+        ICoreSpecializationPolicy policy =
+            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+        if (policy == null)
+        {
+            reason = "No specialization policy is available for this Pilot.";
+            return false;
+        }
+
+        CoreClassId ownerClass = policy.ClassId;
         IList<CoreSpecializationTree> trees =
             CoreSpecializationRegistry.All();
 
         for (int i = 0; i < trees.Count; i++)
         {
             CoreSpecializationTree tree = trees[i];
+            if (CoreSpecializationPolicies.GetOwnerClass(tree.Id) !=
+                ownerClass)
+            {
+                continue;
+            }
             CoreSpecializationState state = GetRawState(pilot, tree.Id);
             if (state == null)
                 continue;
@@ -2753,7 +2806,7 @@ public static class CoreSpecializationRuntime
             if (paid > 0 && !IsTreeUnlockedRaw(pilot, tree))
             {
                 reason = "Refund points from " + tree.Name +
-                    " before removing its Evolution unlock.";
+                    " before removing its class unlock.";
                 return false;
             }
 
