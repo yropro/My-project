@@ -91,182 +91,182 @@ public static class LeviathanGrowth
         // budget into Heads/Tails without changing how many sections exist.
         // Future terminal-granting nodes combine this with AdditionalHeads or
         // AdditionalTails when they also add a new physical section.
-        public static readonly LeviathanSpecializationKnob AdditionalSections =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob AdditionalSections =
+            CoreSpecializationKnob.Flat(
                 "growth.additional_sections",
                 "Sections"
             );
 
-        public static readonly LeviathanSpecializationKnob AdditionalHeads =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob AdditionalHeads =
+            CoreSpecializationKnob.Flat(
                 "growth.additional_heads",
                 "Heads"
             );
 
-        public static readonly LeviathanSpecializationKnob AdditionalTails =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob AdditionalTails =
+            CoreSpecializationKnob.Flat(
                 "growth.additional_tails",
                 "Tails"
             );
 
         // Thermal physiology.
-        public static readonly LeviathanSpecializationKnob MaxHeatPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob MaxHeatPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.max_heat_percent",
                 "Maximum Heat Capacity"
             );
 
-        public static readonly LeviathanSpecializationKnob HeatDissipationPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob HeatDissipationPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.heat_dissipation_percent",
                 "Heat Dissipation"
             );
 
-        public static readonly LeviathanSpecializationKnob HeatDissipationPerSegmentPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob HeatDissipationPerSegmentPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.heat_dissipation_per_segment_percent",
                 "Heat Dissipation per Segment"
             );
 
         // Straightforward chassis stats. These are resolved now and intentionally
         // hooked into native gameplay in later verified passes.
-        public static readonly LeviathanSpecializationKnob HullFlat =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob HullFlat =
+            CoreSpecializationKnob.Flat(
                 "growth.hull_flat",
                 "Hull"
             );
 
-        public static readonly LeviathanSpecializationKnob HealthRegenFlat =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob HealthRegenFlat =
+            CoreSpecializationKnob.Flat(
                 "growth.health_regen_flat",
                 "Health Regeneration",
                 "/s"
             );
 
-        public static readonly LeviathanSpecializationKnob AccelerationPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob AccelerationPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.acceleration_percent",
                 "Acceleration"
             );
 
-        public static readonly LeviathanSpecializationKnob MobilityPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob MobilityPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.mobility_percent",
                 "Maneuverability"
             );
 
-        public static readonly LeviathanSpecializationKnob TurnSpeedPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob TurnSpeedPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.turn_speed_percent",
                 "Turn Speed"
             );
 
-        public static readonly LeviathanSpecializationKnob TurnSpeedPerSegmentPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob TurnSpeedPerSegmentPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.turn_speed_per_segment_percent",
                 "Turn Speed per Segment"
             );
 
-        public static readonly LeviathanSpecializationKnob TopSpeedPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob TopSpeedPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.top_speed_percent",
                 "Top Speed"
             );
 
-        public static readonly LeviathanSpecializationKnob TopSpeedPerSegmentPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob TopSpeedPerSegmentPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.top_speed_per_segment_percent",
                 "Top Speed per Segment"
             );
 
-        public static readonly LeviathanSpecializationKnob BoostPerSegmentPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob BoostPerSegmentPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.boost_per_segment_percent",
                 "Boost per Segment"
             );
 
-        public static readonly LeviathanSpecializationKnob ArmorPoints =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob ArmorPoints =
+            CoreSpecializationKnob.PercentagePoints(
                 "growth.armor_points",
                 "Armor"
             );
 
-        public static readonly LeviathanSpecializationKnob ArmorPerSegmentPoints =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob ArmorPerSegmentPoints =
+            CoreSpecializationKnob.PercentagePoints(
                 "growth.armor_per_segment_points",
                 "Armor per Segment"
             );
 
-        public static readonly LeviathanSpecializationKnob AllResistancePoints =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob AllResistancePoints =
+            CoreSpecializationKnob.PercentagePoints(
                 "growth.all_resistance_points",
                 "All Resistances"
             );
 
-        public static readonly LeviathanSpecializationKnob ShieldPerSegmentPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob ShieldPerSegmentPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.shield_per_segment_percent",
                 "Shield per Segment"
             );
 
-        public static readonly LeviathanSpecializationKnob AirResistancePercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob AirResistancePercent =
+            CoreSpecializationKnob.Percent(
                 "growth.air_resistance_percent",
                 "Leviathan Air Resistance"
             );
 
-        public static readonly LeviathanSpecializationKnob MassPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob MassPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.mass_percent",
                 "Mass"
             );
 
-        public static readonly LeviathanSpecializationKnob MassPerSegmentPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob MassPerSegmentPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.mass_per_segment_percent",
                 "Mass per Segment"
             );
 
-        public static readonly LeviathanSpecializationKnob CritDamagePerSegmentPercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob CritDamagePerSegmentPercent =
+            CoreSpecializationKnob.Percent(
                 "growth.crit_damage_per_segment_percent",
                 "Critical Damage per Segment"
             );
 
-        public static readonly LeviathanSpecializationKnob StatusChancePerSegmentPoints =
-            LeviathanSpecializationKnob.PercentagePoints(
+        public static readonly CoreSpecializationKnob StatusChancePerSegmentPoints =
+            CoreSpecializationKnob.PercentagePoints(
                 "growth.status_chance_per_segment_points",
                 "Status Chance per Segment"
             );
 
-        public static readonly LeviathanSpecializationKnob GlobalDamagePercent =
-            LeviathanSpecializationKnob.Percent(
+        public static readonly CoreSpecializationKnob GlobalDamagePercent =
+            CoreSpecializationKnob.Percent(
                 "growth.global_damage_percent",
                 "Global Damage"
             );
 
-        public static readonly LeviathanSpecializationKnob WeaponSlotsFlat =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob WeaponSlotsFlat =
+            CoreSpecializationKnob.Flat(
                 "growth.weapon_slots_flat",
                 "Weapon Slots"
             );
 
-        public static readonly LeviathanSpecializationKnob ShipSizeCategoryIncrease =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob ShipSizeCategoryIncrease =
+            CoreSpecializationKnob.Flat(
                 "growth.ship_size_category_increase",
                 "Ship Size Category"
             );
 
         // Supernova/CME configuration. The behavior layer consumes these later.
-        public static readonly LeviathanSpecializationKnob SupernovaCollapseHeatPercent =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SupernovaCollapseHeatPercent =
+            CoreSpecializationKnob.Flat(
                 "growth.supernova_collapse_heat_percent",
                 "Supernova Collapse Heat",
                 "%"
             );
 
-        public static readonly LeviathanSpecializationKnob SupernovaDisableSeconds =
-            LeviathanSpecializationKnob.Flat(
+        public static readonly CoreSpecializationKnob SupernovaDisableSeconds =
+            CoreSpecializationKnob.Flat(
                 "growth.supernova_disable_seconds",
                 "Supernova Disable",
                 "s"
@@ -275,50 +275,50 @@ public static class LeviathanGrowth
 
     public static class Flags
     {
-        public static readonly LeviathanSpecializationFlag ColdBlooded =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag ColdBlooded =
+            CoreSpecializationFlag.Create(
                 "growth.cold_blooded",
                 "Cold Blooded"
             );
 
-        public static readonly LeviathanSpecializationFlag StarDragon =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag StarDragon =
+            CoreSpecializationFlag.Create(
                 "growth.star_dragon",
                 "Star Dragon / Supernova"
             );
 
-        public static readonly LeviathanSpecializationFlag CoronalMassEjection =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag CoronalMassEjection =
+            CoreSpecializationFlag.Create(
                 "growth.coronal_mass_ejection",
                 "Coronal Mass Ejection"
             );
 
-        public static readonly LeviathanSpecializationFlag Bifurcation =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag Bifurcation =
+            CoreSpecializationFlag.Create(
                 "growth.bifurcation",
                 "Bifurcation"
             );
 
-        public static readonly LeviathanSpecializationFlag Gigantism =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag Gigantism =
+            CoreSpecializationFlag.Create(
                 "growth.gigantism",
                 "Gigantism"
             );
 
-        public static readonly LeviathanSpecializationFlag SpecializedPredator =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag SpecializedPredator =
+            CoreSpecializationFlag.Create(
                 "growth.specialized_predator",
                 "Specialized Predator"
             );
 
-        public static readonly LeviathanSpecializationFlag LaminarScutes =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag LaminarScutes =
+            CoreSpecializationFlag.Create(
                 "growth.laminar_scutes",
                 "Laminar Scutes"
             );
 
-        public static readonly LeviathanSpecializationFlag CoolingFins =
-            LeviathanSpecializationFlag.Create(
+        public static readonly CoreSpecializationFlag CoolingFins =
+            CoreSpecializationFlag.Create(
                 "growth.cooling_fins",
                 "Cooling Fins"
             );
@@ -926,7 +926,7 @@ public static class LeviathanGrowth
         Pilot pilot)
     {
         int configurationRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
         int evolutionRank = pilot.GetUpgradeLevel(
             LeviathanSpecializationCurrency.UpgradeKey
         );
@@ -965,28 +965,28 @@ public static class LeviathanGrowth
             return intent;
 
         intent.Active = true;
-        intent.TreeActive = LeviathanSpecializationRuntime.IsTreeUnlocked(
+        intent.TreeActive = CoreSpecializationRuntime.IsTreeUnlocked(
             pilot,
             LeviathanGrowthTree.TreeId
         );
 
         int additionalSections = intent.TreeActive
             ? Mathf.Max(0, Mathf.RoundToInt(
-                LeviathanSpecializationRuntime.GetKnobFlat(
+                CoreSpecializationRuntime.GetKnobFlat(
                     pilot,
                     Knobs.AdditionalSections)))
             : 0;
 
         int additionalHeads = intent.TreeActive
             ? Mathf.Max(0, Mathf.RoundToInt(
-                LeviathanSpecializationRuntime.GetKnobFlat(
+                CoreSpecializationRuntime.GetKnobFlat(
                     pilot,
                     Knobs.AdditionalHeads)))
             : 0;
 
         int additionalTails = intent.TreeActive
             ? Mathf.Max(0, Mathf.RoundToInt(
-                LeviathanSpecializationRuntime.GetKnobFlat(
+                CoreSpecializationRuntime.GetKnobFlat(
                     pilot,
                     Knobs.AdditionalTails)))
             : 0;
@@ -1065,7 +1065,7 @@ public static class LeviathanGrowth
             squadron == null ? null : squadron.ships;
         int slotCount = slots == null ? 0 : slots.Count;
         int configurationRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
 
         if (cached.Snapshot != null &&
             cached.ConfigurationRevision == configurationRevision &&
@@ -1226,7 +1226,7 @@ public static class LeviathanGrowth
 
         entry.PublishedByBuilder = publishedByBuilder;
         entry.ConfigurationRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
         entry.Squadron = owner.squadron;
         entry.SquadronSlotCount =
             entry.Squadron == null || entry.Squadron.ships == null
@@ -1298,7 +1298,7 @@ public static class LeviathanGrowth
             return false;
 
         return IsLocalOwner(ship) ||
-            LeviathanNetwork.HasSynchronizedSpecialization(ship);
+            CoreNetwork.HasSynchronizedSpecialization(ship);
     }
 
     // ---------------------------------------------------------------------
@@ -1322,7 +1322,7 @@ public static class LeviathanGrowth
 
         int baselineRevision = baseline == null ? 0 : baseline.Revision;
         int configurationRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
         int evolutionRank = pilot.GetUpgradeLevel(
             LeviathanSpecializationCurrency.UpgradeKey
         );
@@ -1626,7 +1626,7 @@ public static class LeviathanGrowth
         int scalingSegmentCount = state.Anatomy.ScalingSegmentCount;
 
         state.GrowthTreePointsSpent = state.TreeActive
-            ? LeviathanSpecializationRuntime.GetTreeSpentPoints(
+            ? CoreSpecializationRuntime.GetTreeSpentPoints(
                 pilot,
                 LeviathanGrowthTree.TreeId
             )
@@ -1654,7 +1654,7 @@ public static class LeviathanGrowth
                 Tuning.BaselineHeatDissipationMultiplier;
 
             float maxHeatMultiplier = state.TreeActive
-                ? LeviathanSpecializationRuntime.GetKnobMultiplier(
+                ? CoreSpecializationRuntime.GetKnobMultiplier(
                     pilot,
                     Knobs.MaxHeatPercent)
                 : 1f;
@@ -1695,25 +1695,25 @@ public static class LeviathanGrowth
         }
 
         state.HullFlat = state.TreeActive
-            ? LeviathanSpecializationRuntime.GetKnobFlat(
+            ? CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.HullFlat)
             : 0f;
 
         state.HealthRegenFlat = state.TreeActive
-            ? LeviathanSpecializationRuntime.GetKnobFlat(
+            ? CoreSpecializationRuntime.GetKnobFlat(
                 pilot,
                 Knobs.HealthRegenFlat)
             : 0f;
 
         state.AccelerationMultiplier = state.TreeActive
-            ? LeviathanSpecializationRuntime.GetKnobMultiplier(
+            ? CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.AccelerationPercent)
             : 1f;
 
         state.MobilityMultiplier = state.TreeActive
-            ? LeviathanSpecializationRuntime.GetKnobMultiplier(
+            ? CoreSpecializationRuntime.GetKnobMultiplier(
                 pilot,
                 Knobs.MobilityPercent)
             : 1f;
@@ -1842,42 +1842,42 @@ public static class LeviathanGrowth
         );
 
         state.Bifurcation = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.Bifurcation);
 
         state.ColdBlooded = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.ColdBlooded);
 
         state.StarDragon = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.StarDragon);
 
         state.CoronalMassEjection = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.CoronalMassEjection);
 
         state.Gigantism = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.Gigantism);
 
         state.SpecializedPredator = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.SpecializedPredator);
 
         state.LaminarScutes = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.LaminarScutes);
 
         state.CoolingFins = state.TreeActive &&
-            LeviathanSpecializationRuntime.HasFlag(
+            CoreSpecializationRuntime.HasFlag(
                 pilot,
                 Flags.CoolingFins);
 
@@ -1898,18 +1898,18 @@ public static class LeviathanGrowth
 
     private static float PercentContribution(
         Pilot pilot,
-        LeviathanSpecializationKnob knob)
+        CoreSpecializationKnob knob)
     {
         return Mathf.Max(
             -1f,
-            LeviathanSpecializationRuntime.GetKnobMultiplier(pilot, knob) - 1f
+            CoreSpecializationRuntime.GetKnobMultiplier(pilot, knob) - 1f
         );
     }
 
     private static float GrowthPercentContribution(
         Pilot pilot,
         bool treeActive,
-        LeviathanSpecializationKnob knob)
+        CoreSpecializationKnob knob)
     {
         return treeActive ? PercentContribution(pilot, knob) : 0f;
     }
@@ -1917,20 +1917,20 @@ public static class LeviathanGrowth
     private static float GrowthFlat(
         Pilot pilot,
         bool treeActive,
-        LeviathanSpecializationKnob knob)
+        CoreSpecializationKnob knob)
     {
         return treeActive
-            ? LeviathanSpecializationRuntime.GetKnobFlat(pilot, knob)
+            ? CoreSpecializationRuntime.GetKnobFlat(pilot, knob)
             : 0f;
     }
 
     private static float GrowthMultiplier(
         Pilot pilot,
         bool treeActive,
-        LeviathanSpecializationKnob knob)
+        CoreSpecializationKnob knob)
     {
         return treeActive
-            ? LeviathanSpecializationRuntime.GetKnobMultiplier(pilot, knob)
+            ? CoreSpecializationRuntime.GetKnobMultiplier(pilot, knob)
             : 1f;
     }
 
@@ -2295,13 +2295,13 @@ public static class LeviathanGrowthGigantismShipBuilderPatch
 
     public static void Prefix(ref bool __4)
     {
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+        Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
 
         if (pilot == null ||
-            !LeviathanSpecializationRuntime.IsTreeUnlocked(
+            !CoreSpecializationRuntime.IsTreeUnlocked(
                 pilot,
                 LeviathanGrowthTree.TreeId) ||
-            !LeviathanSpecializationRuntime.HasFlag(
+            !CoreSpecializationRuntime.HasFlag(
                 pilot,
                 LeviathanGrowth.Flags.Gigantism))
         {
@@ -2389,7 +2389,7 @@ public static class LeviathanGrowthCurrentPlayerShipPatch
 // Specialization changes do not imply vanilla modifiers changed. Keep the
 // captured native baseline and only invalidate/re-clamp the derived Leviathan
 // state. This is intentionally separate from RegenerateModifiers.
-[HarmonyPatch(typeof(LeviathanSpecializationRuntime), "InvalidateConfiguration")]
+[HarmonyPatch(typeof(CoreSpecializationRuntime), "InvalidateConfiguration")]
 public static class LeviathanGrowthSpecializationInvalidationPatch
 {
     public static void Postfix()

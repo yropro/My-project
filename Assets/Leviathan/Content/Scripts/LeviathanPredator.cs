@@ -48,27 +48,27 @@ public static class LeviathanPredatorRuntime
     }
 
     // Small constructors keep a large knob surface readable and consistent.
-    private static LeviathanSpecializationKnob P(string id, string name)
+    private static CoreSpecializationKnob P(string id, string name)
     {
-        return LeviathanSpecializationKnob.Percent("predator." + id, name);
+        return CoreSpecializationKnob.Percent("predator." + id, name);
     }
 
-    private static LeviathanSpecializationKnob PP(string id, string name)
+    private static CoreSpecializationKnob PP(string id, string name)
     {
-        return LeviathanSpecializationKnob.PercentagePoints("predator." + id, name);
+        return CoreSpecializationKnob.PercentagePoints("predator." + id, name);
     }
 
-    private static LeviathanSpecializationKnob F(
+    private static CoreSpecializationKnob F(
         string id,
         string name,
         string unit = "")
     {
-        return LeviathanSpecializationKnob.Flat("predator." + id, name, unit);
+        return CoreSpecializationKnob.Flat("predator." + id, name, unit);
     }
 
-    private static LeviathanSpecializationFlag Flag(string id, string name)
+    private static CoreSpecializationFlag Flag(string id, string name)
     {
-        return LeviathanSpecializationFlag.Create("predator." + id, name);
+        return CoreSpecializationFlag.Create("predator." + id, name);
     }
 
     // =========================================================================
@@ -81,16 +81,16 @@ public static class LeviathanPredatorRuntime
     /// </summary>
     public sealed class ModifierKnobSet
     {
-        public readonly LeviathanSpecializationKnob Damage;
-        public readonly LeviathanSpecializationKnob LungeDistance;
-        public readonly LeviathanSpecializationKnob LungeSpeed;
-        public readonly LeviathanSpecializationKnob Cooldown;
-        public readonly LeviathanSpecializationKnob CooldownRecovery;
-        public readonly LeviathanSpecializationKnob CritChance;
-        public readonly LeviathanSpecializationKnob StatusChance;
-        public readonly LeviathanSpecializationKnob MoveSpeed;
-        public readonly LeviathanSpecializationKnob Acceleration;
-        public readonly LeviathanSpecializationKnob TurnSpeed;
+        public readonly CoreSpecializationKnob Damage;
+        public readonly CoreSpecializationKnob LungeDistance;
+        public readonly CoreSpecializationKnob LungeSpeed;
+        public readonly CoreSpecializationKnob Cooldown;
+        public readonly CoreSpecializationKnob CooldownRecovery;
+        public readonly CoreSpecializationKnob CritChance;
+        public readonly CoreSpecializationKnob StatusChance;
+        public readonly CoreSpecializationKnob MoveSpeed;
+        public readonly CoreSpecializationKnob Acceleration;
+        public readonly CoreSpecializationKnob TurnSpeed;
 
         internal ModifierKnobSet(string id, string name)
         {
@@ -143,96 +143,96 @@ public static class LeviathanPredatorRuntime
     public static class Knobs
     {
         // Canonical Predator stats.
-        public static readonly LeviathanSpecializationKnob Damage = P("damage", "Damage");
-        public static readonly LeviathanSpecializationKnob LungeDistance = P("lunge_distance", "Lunge Distance");
-        public static readonly LeviathanSpecializationKnob LungeSpeed = P("lunge_speed", "Lunge Speed");
-        public static readonly LeviathanSpecializationKnob DamagePerScalingSegment = P("per_scaling_segment.damage", "Damage Per Scaling Segment");
-        public static readonly LeviathanSpecializationKnob LungeSpeedPerScalingSegment = P("per_scaling_segment.lunge_speed", "Lunge Speed Per Scaling Segment");
-        public static readonly LeviathanSpecializationKnob LungeDistancePerScalingSegment = P("per_scaling_segment.lunge_distance", "Lunge Distance Per Scaling Segment");
-        public static readonly LeviathanSpecializationKnob DamagePerHead = P("per_head.damage", "Damage Per Head");
-        public static readonly LeviathanSpecializationKnob LungeSpeedPerHead = P("per_head.lunge_speed", "Lunge Speed Per Head");
-        public static readonly LeviathanSpecializationKnob LungeDistancePerHead = P("per_head.lunge_distance", "Lunge Distance Per Head");
-        public static readonly LeviathanSpecializationKnob Cooldown = P("cooldown", "Cooldown");
-        public static readonly LeviathanSpecializationKnob CooldownRecovery = P("cooldown_recovery", "Cooldown Recovery");
-        public static readonly LeviathanSpecializationKnob CritChance = PP("crit_chance", "Critical Chance");
-        public static readonly LeviathanSpecializationKnob StatusChance = PP("status_chance", "Status Chance");
-        public static readonly LeviathanSpecializationKnob MoveSpeed = P("move_speed", "Move Speed");
-        public static readonly LeviathanSpecializationKnob Acceleration = P("acceleration", "Acceleration");
-        public static readonly LeviathanSpecializationKnob TurnSpeed = P("turn_speed", "Turn Speed");
+        public static readonly CoreSpecializationKnob Damage = P("damage", "Damage");
+        public static readonly CoreSpecializationKnob LungeDistance = P("lunge_distance", "Lunge Distance");
+        public static readonly CoreSpecializationKnob LungeSpeed = P("lunge_speed", "Lunge Speed");
+        public static readonly CoreSpecializationKnob DamagePerScalingSegment = P("per_scaling_segment.damage", "Damage Per Scaling Segment");
+        public static readonly CoreSpecializationKnob LungeSpeedPerScalingSegment = P("per_scaling_segment.lunge_speed", "Lunge Speed Per Scaling Segment");
+        public static readonly CoreSpecializationKnob LungeDistancePerScalingSegment = P("per_scaling_segment.lunge_distance", "Lunge Distance Per Scaling Segment");
+        public static readonly CoreSpecializationKnob DamagePerHead = P("per_head.damage", "Damage Per Head");
+        public static readonly CoreSpecializationKnob LungeSpeedPerHead = P("per_head.lunge_speed", "Lunge Speed Per Head");
+        public static readonly CoreSpecializationKnob LungeDistancePerHead = P("per_head.lunge_distance", "Lunge Distance Per Head");
+        public static readonly CoreSpecializationKnob Cooldown = P("cooldown", "Cooldown");
+        public static readonly CoreSpecializationKnob CooldownRecovery = P("cooldown_recovery", "Cooldown Recovery");
+        public static readonly CoreSpecializationKnob CritChance = PP("crit_chance", "Critical Chance");
+        public static readonly CoreSpecializationKnob StatusChance = PP("status_chance", "Status Chance");
+        public static readonly CoreSpecializationKnob MoveSpeed = P("move_speed", "Move Speed");
+        public static readonly CoreSpecializationKnob Acceleration = P("acceleration", "Acceleration");
+        public static readonly CoreSpecializationKnob TurnSpeed = P("turn_speed", "Turn Speed");
 
         // Prey / Hunt Streak.
-        public static readonly LeviathanSpecializationKnob PreyDuration = F("prey.duration", "Prey Duration", "s");
-        public static readonly LeviathanSpecializationKnob HuntStreakDuration = F("hunt.duration", "Hunt Streak Duration", "s");
-        public static readonly LeviathanSpecializationKnob HuntStacksPerPreyKill = F("hunt.stacks_per_prey_kill", "Hunt Stacks Per Prey Kill", " stacks");
-        public static readonly LeviathanSpecializationKnob HuntMaxStacks = F("hunt.max_stacks", "Hunt Streak Maximum Stacks", " stacks");
-        public static readonly LeviathanSpecializationKnob HealMaxHpOnPreyKill = PP("prey_kill.heal_max_hp", "Maximum HP Healed On Prey Kill");
-        public static readonly LeviathanSpecializationKnob HealMaxHpOnLungeKill = PP("lunge_kill.heal_max_hp", "Maximum HP Healed On Lunge Kill");
-        public static readonly LeviathanSpecializationKnob CooldownReductionOnPreyKill = PP("prey_kill.cooldown_reduction", "Remaining Cooldown Reduced On Prey Kill");
-        public static readonly LeviathanSpecializationKnob CooldownReductionOnLungeKill = PP("lunge_kill.cooldown_reduction", "Remaining Cooldown Reduced On Lunge Kill");
-        public static readonly LeviathanSpecializationKnob FullResetChanceOnPreyKill = PP("prey_kill.reset_chance", "Full Cooldown Reset Chance On Prey Kill");
-        public static readonly LeviathanSpecializationKnob FullResetChanceOnLungeKill = PP("lunge_kill.reset_chance", "Full Cooldown Reset Chance On Lunge Kill");
+        public static readonly CoreSpecializationKnob PreyDuration = F("prey.duration", "Prey Duration", "s");
+        public static readonly CoreSpecializationKnob HuntStreakDuration = F("hunt.duration", "Hunt Streak Duration", "s");
+        public static readonly CoreSpecializationKnob HuntStacksPerPreyKill = F("hunt.stacks_per_prey_kill", "Hunt Stacks Per Prey Kill", " stacks");
+        public static readonly CoreSpecializationKnob HuntMaxStacks = F("hunt.max_stacks", "Hunt Streak Maximum Stacks", " stacks");
+        public static readonly CoreSpecializationKnob HealMaxHpOnPreyKill = PP("prey_kill.heal_max_hp", "Maximum HP Healed On Prey Kill");
+        public static readonly CoreSpecializationKnob HealMaxHpOnLungeKill = PP("lunge_kill.heal_max_hp", "Maximum HP Healed On Lunge Kill");
+        public static readonly CoreSpecializationKnob CooldownReductionOnPreyKill = PP("prey_kill.cooldown_reduction", "Remaining Cooldown Reduced On Prey Kill");
+        public static readonly CoreSpecializationKnob CooldownReductionOnLungeKill = PP("lunge_kill.cooldown_reduction", "Remaining Cooldown Reduced On Lunge Kill");
+        public static readonly CoreSpecializationKnob FullResetChanceOnPreyKill = PP("prey_kill.reset_chance", "Full Cooldown Reset Chance On Prey Kill");
+        public static readonly CoreSpecializationKnob FullResetChanceOnLungeKill = PP("lunge_kill.reset_chance", "Full Cooldown Reset Chance On Lunge Kill");
 
         // Thrill of the Hunt. The modifier bundle below decides what Thrill buffs.
-        public static readonly LeviathanSpecializationKnob ThrillHealthThreshold = PP("thrill.health_threshold", "Thrill Enemy Health Threshold");
-        public static readonly LeviathanSpecializationKnob ThrillRadius = F("thrill.radius", "Thrill Detection Radius", "m");
-        public static readonly LeviathanSpecializationKnob ThrillRequiredEnemies = F("thrill.required_enemies", "Thrill Required Enemies", " enemies");
-        public static readonly LeviathanSpecializationKnob ThrillMaxStacks = F("thrill.max_stacks", "Thrill Maximum Enemy Stacks", " stacks");
-        public static readonly LeviathanSpecializationKnob ThrillAdditionalEnemyEffectScale = F("thrill.additional_enemy_scale", "Thrill Additional Enemy Effect Scale", "x");
+        public static readonly CoreSpecializationKnob ThrillHealthThreshold = PP("thrill.health_threshold", "Thrill Enemy Health Threshold");
+        public static readonly CoreSpecializationKnob ThrillRadius = F("thrill.radius", "Thrill Detection Radius", "m");
+        public static readonly CoreSpecializationKnob ThrillRequiredEnemies = F("thrill.required_enemies", "Thrill Required Enemies", " enemies");
+        public static readonly CoreSpecializationKnob ThrillMaxStacks = F("thrill.max_stacks", "Thrill Maximum Enemy Stacks", " stacks");
+        public static readonly CoreSpecializationKnob ThrillAdditionalEnemyEffectScale = F("thrill.additional_enemy_scale", "Thrill Additional Enemy Effect Scale", "x");
 
         // Generic execute: either threshold can independently qualify a target.
-        public static readonly LeviathanSpecializationKnob ExecuteTargetOwnHealthThreshold = PP("execute.target_health", "Execute Target Health Threshold");
-        public static readonly LeviathanSpecializationKnob ExecuteVsLeviathanMaxHealthThreshold = PP("execute.vs_leviathan_hp", "Execute Threshold Vs Leviathan Max HP");
+        public static readonly CoreSpecializationKnob ExecuteTargetOwnHealthThreshold = PP("execute.target_health", "Execute Target Health Threshold");
+        public static readonly CoreSpecializationKnob ExecuteVsLeviathanMaxHealthThreshold = PP("execute.vs_leviathan_hp", "Execute Threshold Vs Leviathan Max HP");
 
         // Mass Extinction: deliberately linear. +0.5 means +0.5% damage per mass unit.
-        public static readonly LeviathanSpecializationKnob MassDamagePerMassUnit = PP("mass.damage_per_unit", "Damage Per Mass Unit");
-        public static readonly LeviathanSpecializationKnob MassDamageCap = PP("mass.damage_cap", "Mass Damage Bonus Cap");
+        public static readonly CoreSpecializationKnob MassDamagePerMassUnit = PP("mass.damage_per_unit", "Damage Per Mass Unit");
+        public static readonly CoreSpecializationKnob MassDamageCap = PP("mass.damage_cap", "Mass Damage Bonus Cap");
 
         // Reusable forced movement / carrying.
-        public static readonly LeviathanSpecializationKnob MaxHeldTargets = F("hold.max_targets", "Maximum Held Targets", " targets");
-        public static readonly LeviathanSpecializationKnob MaximumHeldTargetMassRatio = F("hold.max_mass_ratio", "Maximum Held Target Mass Ratio", "x");
-        public static readonly LeviathanSpecializationKnob HoldOffset = F("hold.offset", "Held Prey Offset", "m");
-        public static readonly LeviathanSpecializationKnob HoldBreakDistance = F("hold.break_distance", "Hold Break Distance", "m");
-        public static readonly LeviathanSpecializationKnob PullSpeed = F("pull.speed", "Pull Speed", "m/s");
-        public static readonly LeviathanSpecializationKnob PullAcceleration = F("pull.acceleration", "Pull Acceleration", "m/s²");
-        public static readonly LeviathanSpecializationKnob ReturnSpeed = F("return.speed", "Return Speed", "m/s");
-        public static readonly LeviathanSpecializationKnob ReturnAcceleration = F("return.acceleration", "Return Acceleration", "m/s²");
-        public static readonly LeviathanSpecializationKnob ReturnDelay = F("return.delay", "Return Delay", "s");
+        public static readonly CoreSpecializationKnob MaxHeldTargets = F("hold.max_targets", "Maximum Held Targets", " targets");
+        public static readonly CoreSpecializationKnob MaximumHeldTargetMassRatio = F("hold.max_mass_ratio", "Maximum Held Target Mass Ratio", "x");
+        public static readonly CoreSpecializationKnob HoldOffset = F("hold.offset", "Held Prey Offset", "m");
+        public static readonly CoreSpecializationKnob HoldBreakDistance = F("hold.break_distance", "Hold Break Distance", "m");
+        public static readonly CoreSpecializationKnob PullSpeed = F("pull.speed", "Pull Speed", "m/s");
+        public static readonly CoreSpecializationKnob PullAcceleration = F("pull.acceleration", "Pull Acceleration", "m/s²");
+        public static readonly CoreSpecializationKnob ReturnSpeed = F("return.speed", "Return Speed", "m/s");
+        public static readonly CoreSpecializationKnob ReturnAcceleration = F("return.acceleration", "Return Acceleration", "m/s²");
+        public static readonly CoreSpecializationKnob ReturnDelay = F("return.delay", "Return Delay", "s");
 
         // Swallow / digestion / spit.
-        public static readonly LeviathanSpecializationKnob SwallowTargetOwnHealthThreshold = PP("swallow.target_health", "Swallow Target Health Threshold");
-        public static readonly LeviathanSpecializationKnob SwallowVsLeviathanMaxHealthThreshold = PP("swallow.vs_leviathan_hp", "Swallow Threshold Vs Leviathan Max HP");
-        public static readonly LeviathanSpecializationKnob SwallowSizeAdvantageThresholdGain = PP("swallow.size_advantage_gain", "Swallow Threshold Gain Per Size Advantage");
-        public static readonly LeviathanSpecializationKnob SwallowMaximumHealthThreshold = PP("swallow.max_health_threshold", "Swallow Maximum Health Threshold");
-        public static readonly LeviathanSpecializationKnob MaxSwallowedTargets = F("swallow.max_targets", "Maximum Swallowed Targets", " targets");
-        public static readonly LeviathanSpecializationKnob SwallowDuration = F("swallow.duration", "Swallow Duration", "s");
-        public static readonly LeviathanSpecializationKnob DigestionTargetMaxHpPerSecond = PP("swallow.target_hp_per_second", "Digestion Target Max HP Per Second");
-        public static readonly LeviathanSpecializationKnob DigestionPredatorHitFractionPerSecond = F("swallow.predator_hits_per_second", "Digestion Predator Hits Per Second", "x");
-        public static readonly LeviathanSpecializationKnob SpitSpeed = F("spit.speed", "Spit Speed", "m/s");
-        public static readonly LeviathanSpecializationKnob SpitCollisionDamage = P("spit.collision_damage", "Spit Collision Damage");
-        public static readonly LeviathanSpecializationKnob SpitThrownPreyDamage = P("spit.thrown_prey_damage", "Spit Damage To Thrown Prey");
+        public static readonly CoreSpecializationKnob SwallowTargetOwnHealthThreshold = PP("swallow.target_health", "Swallow Target Health Threshold");
+        public static readonly CoreSpecializationKnob SwallowVsLeviathanMaxHealthThreshold = PP("swallow.vs_leviathan_hp", "Swallow Threshold Vs Leviathan Max HP");
+        public static readonly CoreSpecializationKnob SwallowSizeAdvantageThresholdGain = PP("swallow.size_advantage_gain", "Swallow Threshold Gain Per Size Advantage");
+        public static readonly CoreSpecializationKnob SwallowMaximumHealthThreshold = PP("swallow.max_health_threshold", "Swallow Maximum Health Threshold");
+        public static readonly CoreSpecializationKnob MaxSwallowedTargets = F("swallow.max_targets", "Maximum Swallowed Targets", " targets");
+        public static readonly CoreSpecializationKnob SwallowDuration = F("swallow.duration", "Swallow Duration", "s");
+        public static readonly CoreSpecializationKnob DigestionTargetMaxHpPerSecond = PP("swallow.target_hp_per_second", "Digestion Target Max HP Per Second");
+        public static readonly CoreSpecializationKnob DigestionPredatorHitFractionPerSecond = F("swallow.predator_hits_per_second", "Digestion Predator Hits Per Second", "x");
+        public static readonly CoreSpecializationKnob SpitSpeed = F("spit.speed", "Spit Speed", "m/s");
+        public static readonly CoreSpecializationKnob SpitCollisionDamage = P("spit.collision_damage", "Spit Collision Damage");
+        public static readonly CoreSpecializationKnob SpitThrownPreyDamage = P("spit.thrown_prey_damage", "Spit Damage To Thrown Prey");
 
         // Automatic chained lunges.
-        public static readonly LeviathanSpecializationKnob AutoChainMaxFollowups = F("chain.max_followups", "Maximum Automatic Follow-up Lunges", " lunges");
-        public static readonly LeviathanSpecializationKnob AutoChainAcquireRadius = F("chain.acquire_radius", "Automatic Lunge Acquire Radius", "m");
-        public static readonly LeviathanSpecializationKnob AutoChainDelay = F("chain.delay", "Automatic Lunge Delay", "s");
+        public static readonly CoreSpecializationKnob AutoChainMaxFollowups = F("chain.max_followups", "Maximum Automatic Follow-up Lunges", " lunges");
+        public static readonly CoreSpecializationKnob AutoChainAcquireRadius = F("chain.acquire_radius", "Automatic Lunge Acquire Radius", "m");
+        public static readonly CoreSpecializationKnob AutoChainDelay = F("chain.delay", "Automatic Lunge Delay", "s");
 
         // Heavy DoT / venom transformation.
-        public static readonly LeviathanSpecializationKnob VenomImmediateDamage = P("venom.immediate_damage", "Venom Immediate Damage");
-        public static readonly LeviathanSpecializationKnob VenomDotDamageFraction = PP("venom.dot_damage_fraction", "Venom DoT Damage Fraction");
-        public static readonly LeviathanSpecializationKnob VenomDuration = F("venom.duration", "Venom Duration", "s");
-        public static readonly LeviathanSpecializationKnob VenomTickSeconds = F("venom.tick_seconds", "Venom Tick Interval", "s");
-        public static readonly LeviathanSpecializationKnob VenomMaxStacks = F("venom.max_stacks", "Venom Maximum Stacks", " stacks");
-        public static readonly LeviathanSpecializationKnob VenomCritChance = PP("venom.crit_chance", "Venom Critical Chance");
-        public static readonly LeviathanSpecializationKnob VenomStatusChance = PP("venom.status_chance", "Venom Status Chance");
+        public static readonly CoreSpecializationKnob VenomImmediateDamage = P("venom.immediate_damage", "Venom Immediate Damage");
+        public static readonly CoreSpecializationKnob VenomDotDamageFraction = PP("venom.dot_damage_fraction", "Venom DoT Damage Fraction");
+        public static readonly CoreSpecializationKnob VenomDuration = F("venom.duration", "Venom Duration", "s");
+        public static readonly CoreSpecializationKnob VenomTickSeconds = F("venom.tick_seconds", "Venom Tick Interval", "s");
+        public static readonly CoreSpecializationKnob VenomMaxStacks = F("venom.max_stacks", "Venom Maximum Stacks", " stacks");
+        public static readonly CoreSpecializationKnob VenomCritChance = PP("venom.crit_chance", "Venom Critical Chance");
+        public static readonly CoreSpecializationKnob VenomStatusChance = PP("venom.status_chance", "Venom Status Chance");
 
         // Predator-owned cross-tree outputs. Foreign skills can query semantic
         // helpers below; they do not need to know which Predator node granted them.
-        public static readonly LeviathanSpecializationKnob ConstrictorDamageVsPrey = P("cross.constrictor_damage_vs_prey", "Constrictor Damage Vs Prey");
-        public static readonly LeviathanSpecializationKnob DroneDamageVsPrey = P("cross.drone_damage_vs_prey", "Drone Damage Vs Prey");
-        public static readonly LeviathanSpecializationKnob DroneTargetPriorityVsPrey = F("cross.drone_priority_vs_prey", "Drone Target Priority Vs Prey");
-        public static readonly LeviathanSpecializationKnob StarfireDamageVsPrey = P("cross.starfire_damage_vs_prey", "Starfire Damage Vs Prey");
-        public static readonly LeviathanSpecializationKnob StarfireStatusChanceVsPrey = PP("cross.starfire_status_vs_prey", "Starfire Status Chance Vs Prey");
-        public static readonly LeviathanSpecializationKnob StarfireResourceOnPreyKill = PP("cross.starfire_resource_on_prey_kill", "Starfire Resource Restored On Prey Kill");
+        public static readonly CoreSpecializationKnob ConstrictorDamageVsPrey = P("cross.constrictor_damage_vs_prey", "Constrictor Damage Vs Prey");
+        public static readonly CoreSpecializationKnob DroneDamageVsPrey = P("cross.drone_damage_vs_prey", "Drone Damage Vs Prey");
+        public static readonly CoreSpecializationKnob DroneTargetPriorityVsPrey = F("cross.drone_priority_vs_prey", "Drone Target Priority Vs Prey");
+        public static readonly CoreSpecializationKnob StarfireDamageVsPrey = P("cross.starfire_damage_vs_prey", "Starfire Damage Vs Prey");
+        public static readonly CoreSpecializationKnob StarfireStatusChanceVsPrey = PP("cross.starfire_status_vs_prey", "Starfire Status Chance Vs Prey");
+        public static readonly CoreSpecializationKnob StarfireResourceOnPreyKill = PP("cross.starfire_resource_on_prey_kill", "Starfire Resource Restored On Prey Kill");
 
         // Conditional contributors to the SAME canonical stats above.
         public static readonly ModifierKnobSet VsPrey = new ModifierKnobSet("prey", "Vs Prey");
@@ -245,27 +245,25 @@ public static class LeviathanPredatorRuntime
         public static readonly ModifierKnobSet PerAutoChainLink = new ModifierKnobSet("auto_chain_link", "Per Automatic Lunge Chain Link");
 
         // Redshift's velocity-specific component sits on top of the generic gravity bundle.
-        public static readonly LeviathanSpecializationKnob RedshiftDamagePerIncomingVelocity = PP("redshift.damage_per_incoming_mps", "Redshift Damage Per Incoming m/s");
-        public static readonly LeviathanSpecializationKnob RedshiftVelocityDamageCap = PP("redshift.damage_cap", "Redshift Velocity Damage Cap");
+        public static readonly CoreSpecializationKnob RedshiftDamagePerIncomingVelocity = PP("redshift.damage_per_incoming_mps", "Redshift Damage Per Incoming m/s");
+        public static readonly CoreSpecializationKnob RedshiftVelocityDamageCap = PP("redshift.damage_cap", "Redshift Velocity Damage Cap");
     }
 
     public static class Flags
     {
-        public static readonly LeviathanSpecializationFlag ThrillOfTheHunt = Flag("thrill.enabled", "Thrill of the Hunt");
-        public static readonly LeviathanSpecializationFlag ResetCooldownOnPreyDamage =
-            Flag("prey.reset_cooldown_on_damage", "Reset Predator Cooldown On Damaging Prey");
-        public static readonly LeviathanSpecializationFlag MassExtinction = Flag("mass.enabled", "Mass Extinction");
-        public static readonly LeviathanSpecializationFlag HoldPrey = Flag("hold.enabled", "Hold Prey");
-        public static readonly LeviathanSpecializationFlag ReturnAfterImpact = Flag("return.enabled", "Return After Impact");
-        public static readonly LeviathanSpecializationFlag SwallowWhole = Flag("swallow.enabled", "Swallow Whole");
-        public static readonly LeviathanSpecializationFlag SpitPrey = Flag("spit.enabled", "Spit Prey");
-        public static readonly LeviathanSpecializationFlag VenomousBite = Flag("venom.enabled", "Venomous Bite");
-        public static readonly LeviathanSpecializationFlag VenomRefreshes = Flag("venom.refreshes", "Venom Refreshes On Re-bite");
-        public static readonly LeviathanSpecializationFlag AutoChainOnPreyKill = Flag("chain.on_prey_kill", "Automatic Lunge On Prey Kill");
-        public static readonly LeviathanSpecializationFlag AutoChainOnLungeKill = Flag("chain.on_lunge_kill", "Automatic Lunge On Lunge Kill");
-        public static readonly LeviathanSpecializationFlag UnlimitedAutoChain = Flag("chain.unlimited", "Unlimited Automatic Lunge Chain");
-        public static readonly LeviathanSpecializationFlag StopChainWhenTargetSurvives = Flag("chain.stop_on_survivor", "Stop Automatic Chain When Target Survives");
-        public static readonly LeviathanSpecializationFlag Redshift = Flag("redshift.enabled", "Redshift");
+        public static readonly CoreSpecializationFlag ThrillOfTheHunt = Flag("thrill.enabled", "Thrill of the Hunt");
+        public static readonly CoreSpecializationFlag MassExtinction = Flag("mass.enabled", "Mass Extinction");
+        public static readonly CoreSpecializationFlag HoldPrey = Flag("hold.enabled", "Hold Prey");
+        public static readonly CoreSpecializationFlag ReturnAfterImpact = Flag("return.enabled", "Return After Impact");
+        public static readonly CoreSpecializationFlag SwallowWhole = Flag("swallow.enabled", "Swallow Whole");
+        public static readonly CoreSpecializationFlag SpitPrey = Flag("spit.enabled", "Spit Prey");
+        public static readonly CoreSpecializationFlag VenomousBite = Flag("venom.enabled", "Venomous Bite");
+        public static readonly CoreSpecializationFlag VenomRefreshes = Flag("venom.refreshes", "Venom Refreshes On Re-bite");
+        public static readonly CoreSpecializationFlag AutoChainOnPreyKill = Flag("chain.on_prey_kill", "Automatic Lunge On Prey Kill");
+        public static readonly CoreSpecializationFlag AutoChainOnLungeKill = Flag("chain.on_lunge_kill", "Automatic Lunge On Lunge Kill");
+        public static readonly CoreSpecializationFlag UnlimitedAutoChain = Flag("chain.unlimited", "Unlimited Automatic Lunge Chain");
+        public static readonly CoreSpecializationFlag StopChainWhenTargetSurvives = Flag("chain.stop_on_survivor", "Stop Automatic Chain When Target Survives");
+        public static readonly CoreSpecializationFlag Redshift = Flag("redshift.enabled", "Redshift");
     }
 
     // =========================================================================
@@ -432,8 +430,8 @@ public static class LeviathanPredatorRuntime
         if (pilot == null || !IsSpecializationProfile(owner, pilot))
             return null;
 
-        int configRevision = LeviathanSpecializationRuntime.ConfigurationRevision;
-        int registryRevision = LeviathanSpecializationRegistry.Revision;
+        int configRevision = CoreSpecializationRuntime.ConfigurationRevision;
+        int registryRevision = CoreSpecializationRegistry.Revision;
         LeviathanGrowth.AnatomySnapshot anatomy = LeviathanGrowth.GetAnatomy(owner);
 
         CacheEntry entry;
@@ -476,10 +474,10 @@ public static class LeviathanPredatorRuntime
         bool local = WorldController.instance != null &&
             ReferenceEquals(WorldController.instance.GetCurrentPlayerShip(), owner);
         bool remote = owner.IsRemotePlayer() &&
-            LeviathanNetwork.HasSynchronizedSpecialization(owner);
+            CoreNetwork.HasSynchronizedSpecialization(owner);
 
         return (local || remote) &&
-            LeviathanSpecializationRuntime.IsTreeActive(
+            CoreSpecializationRuntime.IsTreeActive(
                 pilot,
                 LeviathanPredatorTree.TreeId);
     }
@@ -808,7 +806,7 @@ public static class LeviathanPredatorRuntime
 
     private sealed class RuntimeState
     {
-        public LeviathanCombat.CombatEntityKey OwnerKey;
+        public CoreCombat.CombatEntityKey OwnerKey;
         public ulong CombatEventCursor;
         public float RuntimeStartedAt;
         public int HuntStacks;
@@ -862,11 +860,11 @@ public static class LeviathanPredatorRuntime
             return false;
 
         GetRuntime(owner);
-        bool applied = LeviathanCombatState.Apply(
+        return CoreCombatState.Apply(
             owner,
             target,
-            LeviathanCombat.Semantics.PredatorPrey,
-            LeviathanCombatState.Scope.OwnerTarget,
+            CoreCombat.Semantics.PredatorPrey,
+            CoreCombatState.Scope.OwnerTarget,
             s.PreyDurationSeconds);
         if (applied)
             LeviathanPredatorPresentation.TrackPreyTarget(owner, target);
@@ -878,11 +876,11 @@ public static class LeviathanPredatorRuntime
         if (owner == null || target == null)
             return false;
 
-        return LeviathanCombatState.Has(
+        return CoreCombatState.Has(
             owner,
             target,
-            LeviathanCombat.Semantics.PredatorPrey,
-            LeviathanCombatState.Scope.OwnerTarget);
+            CoreCombat.Semantics.PredatorPrey,
+            CoreCombatState.Scope.OwnerTarget);
     }
 
     public static float GetPreyRemainingSeconds(GameShip owner, GameShip target)
@@ -890,11 +888,11 @@ public static class LeviathanPredatorRuntime
         if (owner == null || target == null)
             return 0f;
 
-        return LeviathanCombatState.GetRemainingSeconds(
+        return CoreCombatState.GetRemainingSeconds(
             owner,
             target,
-            LeviathanCombat.Semantics.PredatorPrey,
-            LeviathanCombatState.Scope.OwnerTarget);
+            CoreCombat.Semantics.PredatorPrey,
+            CoreCombatState.Scope.OwnerTarget);
     }
 
     /// <summary>
@@ -912,9 +910,9 @@ public static class LeviathanPredatorRuntime
             return false;
 
         ResolvedState s = GetResolvedState(owner);
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (s == null || target == null ||
-            !LeviathanCombat.TryGetEntityKey(target, out targetKey))
+            !CoreCombat.TryGetEntityKey(target, out targetKey))
         {
             return false;
         }
@@ -923,11 +921,11 @@ public static class LeviathanPredatorRuntime
         if (runtime == null || !runtime.OwnerKey.IsValid)
             return false;
 
-        bool preyKill = LeviathanCombatState.Has(
+        bool preyKill = CoreCombatState.Has(
             runtime.OwnerKey,
             targetKey,
-            LeviathanCombat.Semantics.PredatorPrey,
-            LeviathanCombatState.Scope.OwnerTarget);
+            CoreCombat.Semantics.PredatorPrey,
+            CoreCombatState.Scope.OwnerTarget);
 
         if (!preyKill && !lungeKill)
             return false;
@@ -945,7 +943,7 @@ public static class LeviathanPredatorRuntime
     private static bool RegisterSemanticKill(
         RuntimeState runtime,
         ResolvedState s,
-        LeviathanCombat.CombatEntityKey targetKey,
+        CoreCombat.CombatEntityKey targetKey,
         bool preyKill,
         bool lungeKill,
         float occurredAt,
@@ -956,17 +954,17 @@ public static class LeviathanPredatorRuntime
             return false;
 
         bool newPreyKill = preyKill &&
-            !LeviathanCombatHistory.WasObservedSince(
+            !CoreCombatHistory.WasObservedSince(
                 runtime.OwnerKey,
                 targetKey,
-                LeviathanCombat.Semantics.PredatorPreyKill,
+                CoreCombat.Semantics.PredatorPreyKill,
                 runtime.RuntimeStartedAt);
 
         bool newLungeKill = lungeKill &&
-            !LeviathanCombatHistory.WasObservedSince(
+            !CoreCombatHistory.WasObservedSince(
                 runtime.OwnerKey,
                 targetKey,
-                LeviathanCombat.Semantics.PredatorLungeKill,
+                CoreCombat.Semantics.PredatorLungeKill,
                 runtime.RuntimeStartedAt);
 
         if (!newPreyKill && !newLungeKill)
@@ -974,31 +972,31 @@ public static class LeviathanPredatorRuntime
 
         if (newPreyKill)
         {
-            LeviathanCombatHistory.RecordSemanticMarker(
+            CoreCombatHistory.RecordSemanticMarker(
                 runtime.OwnerKey,
                 targetKey,
-                LeviathanCombat.Semantics.PredatorPreyKill,
+                CoreCombat.Semantics.PredatorPreyKill,
                 occurredAt,
                 true);
         }
 
         if (newLungeKill)
         {
-            LeviathanCombatHistory.RecordSemanticMarker(
+            CoreCombatHistory.RecordSemanticMarker(
                 runtime.OwnerKey,
                 targetKey,
-                LeviathanCombat.Semantics.PredatorLungeKill,
+                CoreCombat.Semantics.PredatorLungeKill,
                 occurredAt,
                 true);
         }
 
         if (newPreyKill)
         {
-            LeviathanCombatState.Remove(
+            CoreCombatState.Remove(
                 runtime.OwnerKey,
                 targetKey,
-                LeviathanCombat.Semantics.PredatorPrey,
-                LeviathanCombatState.Scope.OwnerTarget);
+                CoreCombat.Semantics.PredatorPrey,
+                CoreCombatState.Scope.OwnerTarget);
         }
 
         result = RegisterKill(runtime, s, newPreyKill, newLungeKill);
@@ -1010,14 +1008,14 @@ public static class LeviathanPredatorRuntime
         if (owner == null || runtime == null || !runtime.OwnerKey.IsValid)
             return;
 
-        LeviathanCombatHistory.MeaningfulEvent evt;
-        while (LeviathanCombatHistory.TryReadNextMeaningfulEvent(
+        CoreCombatHistory.MeaningfulEvent evt;
+        while (CoreCombatHistory.TryReadNextMeaningfulEvent(
             runtime.OwnerKey,
             ref runtime.CombatEventCursor,
             out evt))
         {
-            if (evt.Kind != LeviathanCombatHistory.MeaningfulEventKind.CombatOutcome ||
-                !evt.Semantic.Equals(LeviathanCombat.Semantics.PredatorDirectLunge) ||
+            if (evt.Kind != CoreCombatHistory.MeaningfulEventKind.CombatOutcome ||
+                !evt.Semantic.Equals(CoreCombat.Semantics.PredatorDirectLunge) ||
                 evt.OccurredAt < runtime.RuntimeStartedAt)
             {
                 continue;
@@ -1030,14 +1028,12 @@ public static class LeviathanPredatorRuntime
     private static void HandleDirectLungeOutcome(
         GameShip owner,
         RuntimeState runtime,
-        LeviathanCombatHistory.MeaningfulEvent evt)
+        CoreCombatHistory.MeaningfulEvent evt)
     {
         bool damaged =
-            (evt.Outcomes & LeviathanCombat.OutcomeFlags.Damaged) != 0;
+            (evt.Outcomes & CoreCombat.OutcomeFlags.Damaged) != 0;
         bool destroyed =
-            (evt.Outcomes & LeviathanCombat.OutcomeFlags.Destroyed) != 0;
-        bool cooldownResetEligible =
-            runtime.CooldownResetEligibleEvents.Remove(evt.EventId);
+            (evt.Outcomes & CoreCombat.OutcomeFlags.Destroyed) != 0;
 
         // Preserve current Predator semantics: status-only/rejected outcomes do
         // not create Prey. GuaranteedOutcome is still deferred, so a remote
@@ -1049,14 +1045,11 @@ public static class LeviathanPredatorRuntime
         if (s == null)
             return;
 
-        if (damaged && cooldownResetEligible && s.ResetCooldownOnPreyDamage)
-            ResetCooldownForOriginatingLunge(runtime);
-
-        bool hadPrey = LeviathanCombatState.Has(
+        bool hadPrey = CoreCombatState.Has(
             runtime.OwnerKey,
             evt.Target,
-            LeviathanCombat.Semantics.PredatorPrey,
-            LeviathanCombatState.Scope.OwnerTarget);
+            CoreCombat.Semantics.PredatorPrey,
+            CoreCombatState.Scope.OwnerTarget);
 
         if (destroyed)
         {
@@ -1077,11 +1070,11 @@ public static class LeviathanPredatorRuntime
         if (s.PreyDurationSeconds <= 0f)
             return;
 
-        LeviathanCombatState.ApplyAt(
+        CoreCombatState.ApplyAt(
             runtime.OwnerKey,
             evt.Target,
-            LeviathanCombat.Semantics.PredatorPrey,
-            LeviathanCombatState.Scope.OwnerTarget,
+            CoreCombat.Semantics.PredatorPrey,
+            CoreCombatState.Scope.OwnerTarget,
             evt.OccurredAt,
             evt.EventId,
             s.PreyDurationSeconds);
@@ -1090,10 +1083,10 @@ public static class LeviathanPredatorRuntime
         // the result returns to the source owner. Reconcile against the shared
         // semantic death observation using authored occurrence time, not result
         // arrival time.
-        float deathAt = LeviathanCombatHistory.GetLastObservationTime(
+        float deathAt = CoreCombatHistory.GetLastObservationTime(
             runtime.OwnerKey,
             evt.Target,
-            LeviathanCombat.Semantics.PredatorTargetDeathObserved);
+            CoreCombat.Semantics.PredatorTargetDeathObserved);
 
         if (deathAt >= evt.OccurredAt &&
             deathAt < evt.OccurredAt + s.PreyDurationSeconds)
@@ -1495,19 +1488,19 @@ public static class LeviathanPredatorRuntime
         target.lastDamagedByShipName = owner.GetName();
         target.lastDamagedByFaction = owner.faction;
         bool bypass = source.HasCustomizer(Customizer.Type.BypassDamageLimit);
-        LeviathanCombat.AcknowledgementMode acknowledgement =
-            LeviathanCombat.SupportsGuaranteedOutcome
-                ? LeviathanCombat.AcknowledgementMode.GuaranteedOutcome
-                : LeviathanCombat.AcknowledgementMode.NativeResult;
+        CoreCombat.AcknowledgementMode acknowledgement =
+            CoreCombat.SupportsGuaranteedOutcome
+                ? CoreCombat.AcknowledgementMode.GuaranteedOutcome
+                : CoreCombat.AcknowledgementMode.NativeResult;
 
-        LeviathanCombat.DamageScope combatScope = LeviathanCombat.BeginDamage(
+        CoreCombat.DamageScope combatScope = CoreCombat.BeginDamage(
             owner,
             target,
-            LeviathanCombat.Semantics.PredatorDirectLunge,
-            default(LeviathanCombat.ContributorKey),
+            CoreCombat.Semantics.PredatorDirectLunge,
+            default(CoreCombat.ContributorKey),
             acknowledgement,
-            LeviathanCombat.TrackingFlags.Summary |
-                LeviathanCombat.TrackingFlags.MeaningfulOutcome,
+            CoreCombat.TrackingFlags.Summary |
+                CoreCombat.TrackingFlags.MeaningfulOutcome,
             0,
             owner);
 
@@ -1529,7 +1522,7 @@ public static class LeviathanPredatorRuntime
         }
         finally
         {
-            LeviathanCombat.EndDamage(combatScope);
+            CoreCombat.EndDamage(combatScope);
         }
 
         // Local-authority outcomes have committed by the time RouteDamage
@@ -1552,33 +1545,33 @@ public static class LeviathanPredatorRuntime
 
         GameShip owner = WorldController.instance.GetCurrentPlayerShip();
         RuntimeState runtime;
-        LeviathanCombat.CombatEntityKey targetKey;
+        CoreCombat.CombatEntityKey targetKey;
         if (!IsOwnerActive(owner) ||
             !RuntimeByOwner.TryGetValue(owner, out runtime) || runtime == null ||
             !runtime.OwnerKey.IsValid ||
-            !LeviathanCombat.TryGetEntityKey(target, out targetKey))
+            !CoreCombat.TryGetEntityKey(target, out targetKey))
         {
             return;
         }
 
-        bool prey = LeviathanCombatState.Has(
+        bool prey = CoreCombatState.Has(
             runtime.OwnerKey,
             targetKey,
-            LeviathanCombat.Semantics.PredatorPrey,
-            LeviathanCombatState.Scope.OwnerTarget);
-        bool pendingDirect = LeviathanCombat.HasPendingEvent(
+            CoreCombat.Semantics.PredatorPrey,
+            CoreCombatState.Scope.OwnerTarget);
+        bool pendingDirect = CoreCombat.HasPendingEvent(
             runtime.OwnerKey,
             targetKey,
-            LeviathanCombat.Semantics.PredatorDirectLunge);
+            CoreCombat.Semantics.PredatorDirectLunge);
 
         if (!prey && !pendingDirect)
             return;
 
         float now = Time.time;
-        LeviathanCombatHistory.RecordSemanticMarker(
+        CoreCombatHistory.RecordSemanticMarker(
             runtime.OwnerKey,
             targetKey,
-            LeviathanCombat.Semantics.PredatorTargetDeathObserved,
+            CoreCombat.Semantics.PredatorTargetDeathObserved,
             now,
             false);
 
@@ -1619,9 +1612,9 @@ public static class LeviathanPredatorRuntime
             EndLunge(pair.Key, pair.Value);
             if (pair.Value != null && pair.Value.OwnerKey.IsValid)
             {
-                LeviathanCombat.ResetOwnerSkillRuntime(
+                CoreCombat.ResetOwnerSkillRuntime(
                     pair.Value.OwnerKey,
-                    LeviathanCombat.SkillIds.Predator);
+                    CoreCombat.SkillIds.Predator);
             }
         }
         RuntimeByOwner.Clear();
@@ -1642,9 +1635,9 @@ public static class LeviathanPredatorRuntime
             EndLunge(player, runtime);
             if (runtime.OwnerKey.IsValid)
             {
-                LeviathanCombat.ResetOwnerSkillRuntime(
+                CoreCombat.ResetOwnerSkillRuntime(
                     runtime.OwnerKey,
-                    LeviathanCombat.SkillIds.Predator);
+                    CoreCombat.SkillIds.Predator);
             }
         }
         RuntimeByOwner.Remove(player);
@@ -1676,9 +1669,9 @@ public static class LeviathanPredatorRuntime
                     EndLunge(owner, state);
                     if (state.OwnerKey.IsValid)
                     {
-                        LeviathanCombat.ResetOwnerSkillRuntime(
+                        CoreCombat.ResetOwnerSkillRuntime(
                             state.OwnerKey,
-                            LeviathanCombat.SkillIds.Predator);
+                            CoreCombat.SkillIds.Predator);
                     }
                 }
                 LeviathanPredatorPresentation.ResetOwner(owner);
@@ -1697,9 +1690,9 @@ public static class LeviathanPredatorRuntime
             GetCombatContext(owner);
             TickLunge(owner, state);
             // Slot 3: lunge-active only. Native replication already carries motion.
-            LeviathanNetwork.SlotWriter writer = LeviathanNetwork.BeginSlot(LeviathanNetwork.SlotPredator);
+            CoreNetwork.SlotWriter writer = CoreNetwork.BeginSlot(CoreNetwork.SlotPredator);
             writer.Bool(state.Lunging);
-            LeviathanNetwork.EndSlot(writer);
+            CoreNetwork.EndSlot(writer);
         }
 
         OwnerScratch.Clear();
@@ -1710,9 +1703,9 @@ public static class LeviathanPredatorRuntime
     {
         if (player != null && player.IsRemotePlayer())
         {
-            LeviathanNetwork.SlotReader reader;
-            return LeviathanNetwork.HasSynchronizedSpecialization(player) &&
-                LeviathanNetwork.TryReadSlot(player, LeviathanNetwork.SlotPredator, out reader) && reader.Bool();
+            CoreNetwork.SlotReader reader;
+            return CoreNetwork.HasSynchronizedSpecialization(player) &&
+                CoreNetwork.TryReadSlot(player, CoreNetwork.SlotPredator, out reader) && reader.Bool();
         }
         RuntimeState runtime;
         return player != null && RuntimeByOwner.TryGetValue(player, out runtime) &&
@@ -1739,27 +1732,27 @@ public static class LeviathanPredatorRuntime
             return;
         }
 
-        LeviathanCombat.CombatEntityKey targetKey =
-            LeviathanCombat.ForNetworkEntity(death.netId);
+        CoreCombat.CombatEntityKey targetKey =
+            CoreCombat.ForNetworkEntity(death.netId);
 
-        bool prey = LeviathanCombatState.Has(
+        bool prey = CoreCombatState.Has(
             runtime.OwnerKey,
             targetKey,
-            LeviathanCombat.Semantics.PredatorPrey,
-            LeviathanCombatState.Scope.OwnerTarget);
-        bool pendingDirect = LeviathanCombat.HasPendingEvent(
+            CoreCombat.Semantics.PredatorPrey,
+            CoreCombatState.Scope.OwnerTarget);
+        bool pendingDirect = CoreCombat.HasPendingEvent(
             runtime.OwnerKey,
             targetKey,
-            LeviathanCombat.Semantics.PredatorDirectLunge);
+            CoreCombat.Semantics.PredatorDirectLunge);
 
         if (!prey && !pendingDirect)
             return;
 
         float now = Time.time;
-        LeviathanCombatHistory.RecordSemanticMarker(
+        CoreCombatHistory.RecordSemanticMarker(
             runtime.OwnerKey,
             targetKey,
-            LeviathanCombat.Semantics.PredatorTargetDeathObserved,
+            CoreCombat.Semantics.PredatorTargetDeathObserved,
             now,
             false);
 
@@ -1778,15 +1771,15 @@ public static class LeviathanPredatorRuntime
         {
             s = new RuntimeState();
             s.RuntimeStartedAt = Time.time;
-            LeviathanCombat.TryGetEntityKey(owner, out s.OwnerKey);
+            CoreCombat.TryGetEntityKey(owner, out s.OwnerKey);
 
             // The meaningful ring is bounded owner history, not skill runtime
             // state. A replacement Predator runtime starts at the current tail
             // so pre-reset outcomes/markers cannot be replayed into it.
             if (s.OwnerKey.IsValid)
             {
-                LeviathanCombatHistory.MeaningfulEvent ignored;
-                while (LeviathanCombatHistory.TryReadNextMeaningfulEvent(
+                CoreCombatHistory.MeaningfulEvent ignored;
+                while (CoreCombatHistory.TryReadNextMeaningfulEvent(
                     s.OwnerKey,
                     ref s.CombatEventCursor,
                     out ignored))
@@ -1799,24 +1792,24 @@ public static class LeviathanPredatorRuntime
         return s;
     }
 
-    private static float Percent(Pilot pilot, LeviathanSpecializationKnob knob)
+    private static float Percent(Pilot pilot, CoreSpecializationKnob knob)
     {
-        return LeviathanSpecializationRuntime.GetKnobMultiplier(pilot, knob) - 1f;
+        return CoreSpecializationRuntime.GetKnobMultiplier(pilot, knob) - 1f;
     }
 
-    private static float Flat(Pilot pilot, LeviathanSpecializationKnob knob)
+    private static float Flat(Pilot pilot, CoreSpecializationKnob knob)
     {
-        return LeviathanSpecializationRuntime.GetKnobFlat(pilot, knob);
+        return CoreSpecializationRuntime.GetKnobFlat(pilot, knob);
     }
 
-    private static float Apply(Pilot pilot, LeviathanSpecializationKnob knob, float baseline)
+    private static float Apply(Pilot pilot, CoreSpecializationKnob knob, float baseline)
     {
-        return LeviathanSpecializationRuntime.ApplyKnob(pilot, knob, baseline);
+        return CoreSpecializationRuntime.ApplyKnob(pilot, knob, baseline);
     }
 
-    private static bool Has(Pilot pilot, LeviathanSpecializationFlag flag)
+    private static bool Has(Pilot pilot, CoreSpecializationFlag flag)
     {
-        return LeviathanSpecializationRuntime.HasFlag(pilot, flag);
+        return CoreSpecializationRuntime.HasFlag(pilot, flag);
     }
 
     private static float Pos(float value)

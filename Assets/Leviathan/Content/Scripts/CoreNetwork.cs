@@ -7,20 +7,20 @@ using System.Reflection;
 using UnityEngine;
 
 /// <summary>
-/// Co-op presentation transport for Leviathan.
+/// Co-op presentation transport for Core.
 ///
 /// ---------------------------------------------------------------------------
 /// WHAT THIS DOES
 /// ---------------------------------------------------------------------------
 /// Star Vortex replicates each player's ship state 20 times a second in a
-/// PlayerShipState message. This class appends a small, versioned Leviathan
+/// PlayerShipState message. This class appends a small, versioned Core
 /// payload to the end of that message and parses it back out on the receiving
 /// side. Nothing about the native packet is modified; the payload is strictly
 /// additional trailing bytes.
 ///
 /// Two kinds of data travel in that payload:
 ///
-///   SPEC BLOCK     The owner's Leviathan specialization tree ranks, packed to
+///   SPEC BLOCK     The owner's Core specialization tree ranks, packed to
 ///                  4 bits per player-chosen node. Auto-granted nodes are
 ///                  omitted: they are derived from the received specialization
 ///                  choices plus native-replicated tree unlock ranks, and the
@@ -46,7 +46,7 @@ using UnityEngine;
 /// ---------------------------------------------------------------------------
 /// * NetSession.HandleHello -> ModsMatch rejects any joiner whose mod id/version
 ///   set differs from the host's. Every peer in a session therefore runs the
-///   identical Leviathan build. There is no mixed-version case to negotiate,
+///   identical Core build. There is no mixed-version case to negotiate,
 ///   and no unmodded peer to protect against.
 ///
 /// * NetWorldBridge.TryDecodeShipState reads the native ShipStateSample and does
@@ -59,7 +59,7 @@ using UnityEngine;
 /// * The native ranks this design leans on (Upgrade.Key 81-86) already replicate:
 ///   Pilot.upgradeUnlocks is a serialized field inside the Ship JSON that
 ///   NetSession.ShareLocalShip broadcasts, and NetWorldBridge rebuilds each
-///   remote rep from it. LeviathanRemoteSkillVisuals already depends on this.
+///   remote rep from it. CoreRemoteSkillVisuals already depends on this.
 ///
 /// ---------------------------------------------------------------------------
 /// WIRE FORMAT
@@ -87,7 +87,7 @@ using UnityEngine;
 ///       byte    slotLength
 ///       bytes   slotLength bytes of slot data
 ///
-/// Every packet a Leviathan sends carries this block, including when it holds
+/// Every packet a Core sends carries this block, including when it holds
 /// zero slots. That costs six bytes (header plus a zero count), about 120 bytes
 /// per second per player, and it buys exact transition timing: a received block
 /// with no slot for a skill is an authoritative statement that the skill is
@@ -144,7 +144,7 @@ using UnityEngine;
 /// the reader position is restored untouched whenever the trailing bytes turn
 /// out not to be ours.
 /// </summary>
-public static class LeviathanNetwork
+public static class CoreNetwork
 {
     // =========================================================================
     // PROTOCOL CONSTANTS
@@ -191,6 +191,7 @@ public static class LeviathanNetwork
     public const byte SlotPredator = 3;
     public const byte SlotConstrictor = 4;
     public const byte SlotBehemoth = 5;
+    public const byte SlotOrrery = 6;
 
     private const int MaxSlots = 16;
     private const int MaxSlotBytes = 32;
@@ -237,6 +238,8 @@ public static class LeviathanNetwork
 
     private static int packetCounter;
     private static int specBurstRemaining;
+    private static int classClearBurstRemaining;
+    private static int lastSeenClassTransitionRevision = int.MinValue;
     private static int lastSeenConfigurationRevision = int.MinValue;
     private static int lastSeenRegistryRevision = int.MinValue;
 
@@ -389,13 +392,13 @@ public static class LeviathanNetwork
     private const byte CombatEventFlagAckMask = 0x03;
     private const byte CombatEventFlagHasAttackInstance = 1 << 2;
 
-    private static readonly Dictionary<MsgDamageEvent, LeviathanCombat.CombatEventMetadata>
+    private static readonly Dictionary<MsgDamageEvent, CoreCombat.CombatEventMetadata>
         combatEventMetadata =
-            new Dictionary<MsgDamageEvent, LeviathanCombat.CombatEventMetadata>(256);
+            new Dictionary<MsgDamageEvent, CoreCombat.CombatEventMetadata>(256);
 
-    private static readonly Dictionary<MsgDamageResult, LeviathanCombat.CombatResultMetadata>
+    private static readonly Dictionary<MsgDamageResult, CoreCombat.CombatResultMetadata>
         combatResultMetadata =
-            new Dictionary<MsgDamageResult, LeviathanCombat.CombatResultMetadata>(256);
+            new Dictionary<MsgDamageResult, CoreCombat.CombatResultMetadata>(256);
 
     private static readonly List<MsgDamageEvent> combatEventPruneScratch =
         new List<MsgDamageEvent>(128);
@@ -406,7 +409,7 @@ public static class LeviathanNetwork
 
     internal static void SetCombatEventMetadata(
         MsgDamageEvent message,
-        LeviathanCombat.CombatEventMetadata metadata)
+        CoreCombat.CombatEventMetadata metadata)
     {
         if (message == null || !metadata.Semantic.IsValid)
             return;
@@ -426,11 +429,11 @@ public static class LeviathanNetwork
 
     internal static bool TryGetCombatEventMetadata(
         MsgDamageEvent message,
-        out LeviathanCombat.CombatEventMetadata metadata)
+        out CoreCombat.CombatEventMetadata metadata)
     {
         if (message == null)
         {
-            metadata = default(LeviathanCombat.CombatEventMetadata);
+            metadata = default(CoreCombat.CombatEventMetadata);
             return false;
         }
 
@@ -445,7 +448,7 @@ public static class LeviathanNetwork
 
     internal static void SetCombatResultMetadata(
         MsgDamageResult message,
-        LeviathanCombat.CombatResultMetadata metadata)
+        CoreCombat.CombatResultMetadata metadata)
     {
         if (message == null || metadata.EventId == 0U)
             return;
@@ -465,11 +468,11 @@ public static class LeviathanNetwork
 
     internal static bool TryGetCombatResultMetadata(
         MsgDamageResult message,
-        out LeviathanCombat.CombatResultMetadata metadata)
+        out CoreCombat.CombatResultMetadata metadata)
     {
         if (message == null)
         {
-            metadata = default(LeviathanCombat.CombatResultMetadata);
+            metadata = default(CoreCombat.CombatResultMetadata);
             return false;
         }
 
@@ -489,7 +492,7 @@ public static class LeviathanNetwork
         if (serializer == null || serializer.writer == null || message == null)
             return;
 
-        LeviathanCombat.CombatEventMetadata metadata;
+        CoreCombat.CombatEventMetadata metadata;
         if (!combatEventMetadata.TryGetValue(message, out metadata))
             return;
 
@@ -538,7 +541,7 @@ public static class LeviathanNetwork
             }
 
             Debug.LogWarning(
-                "[LeviathanNetwork] Combat DamageEvent trailer failed: " +
+                "[CoreNetwork] Combat DamageEvent trailer failed: " +
                 ex.Message);
         }
         finally
@@ -557,7 +560,7 @@ public static class LeviathanNetwork
         if (serializer == null || serializer.writer == null || message == null)
             return;
 
-        LeviathanCombat.CombatResultMetadata metadata;
+        CoreCombat.CombatResultMetadata metadata;
         if (!combatResultMetadata.TryGetValue(message, out metadata))
             return;
 
@@ -569,9 +572,9 @@ public static class LeviathanNetwork
             writer.Write((byte)metadata.Outcomes);
 
             if ((metadata.Outcomes &
-                 LeviathanCombat.OutcomeFlags.StatusInflicted) != 0 &&
+                 CoreCombat.OutcomeFlags.StatusInflicted) != 0 &&
                 metadata.StatusDisposition !=
-                    LeviathanCombat.StatusDisposition.None)
+                    CoreCombat.StatusDisposition.None)
             {
                 writer.Write(metadata.NativeStatusType);
                 writer.Write((byte)metadata.StatusDisposition);
@@ -604,7 +607,7 @@ public static class LeviathanNetwork
             }
 
             Debug.LogWarning(
-                "[LeviathanNetwork] Combat DamageResult trailer failed: " +
+                "[CoreNetwork] Combat DamageResult trailer failed: " +
                 ex.Message);
         }
         finally
@@ -645,22 +648,22 @@ public static class LeviathanNetwork
             if (hasAttackInstance != (payloadLength == 9))
                 return;
 
-            LeviathanCombat.AcknowledgementMode acknowledgement =
-                (LeviathanCombat.AcknowledgementMode)
+            CoreCombat.AcknowledgementMode acknowledgement =
+                (CoreCombat.AcknowledgementMode)
                     (flags & CombatEventFlagAckMask);
 
             byte acknowledgementValue = (byte)acknowledgement;
             if (acknowledgementValue >
-                (byte)LeviathanCombat.AcknowledgementMode.GuaranteedOutcome)
+                (byte)CoreCombat.AcknowledgementMode.GuaranteedOutcome)
             {
                 return;
             }
 
-            LeviathanCombat.CombatEventMetadata metadata =
-                new LeviathanCombat.CombatEventMetadata();
+            CoreCombat.CombatEventMetadata metadata =
+                new CoreCombat.CombatEventMetadata();
             metadata.EventId = eventId;
             metadata.Semantic =
-                LeviathanCombat.SemanticKey.FromPacked(semanticValue);
+                CoreCombat.SemanticKey.FromPacked(semanticValue);
             metadata.Acknowledgement = acknowledgement;
             metadata.HasAttackInstance = hasAttackInstance;
             metadata.AttackInstanceId = hasAttackInstance
@@ -702,25 +705,25 @@ public static class LeviathanNetwork
 
         try
         {
-            LeviathanCombat.CombatResultMetadata metadata =
-                new LeviathanCombat.CombatResultMetadata();
+            CoreCombat.CombatResultMetadata metadata =
+                new CoreCombat.CombatResultMetadata();
             metadata.EventId = ReadUInt32(buffer, payloadOffset);
             byte outcomeBits = buffer[payloadOffset + 4];
             const byte knownOutcomeBits =
-                (byte)(LeviathanCombat.OutcomeFlags.Processed |
-                       LeviathanCombat.OutcomeFlags.Damaged |
-                       LeviathanCombat.OutcomeFlags.Destroyed |
-                       LeviathanCombat.OutcomeFlags.StatusInflicted);
+                (byte)(CoreCombat.OutcomeFlags.Processed |
+                       CoreCombat.OutcomeFlags.Damaged |
+                       CoreCombat.OutcomeFlags.Destroyed |
+                       CoreCombat.OutcomeFlags.StatusInflicted);
             if ((outcomeBits & ~knownOutcomeBits) != 0)
                 return;
 
             metadata.Outcomes =
-                (LeviathanCombat.OutcomeFlags)outcomeBits;
+                (CoreCombat.OutcomeFlags)outcomeBits;
             metadata.AttachedAtUnscaled = Time.unscaledTime;
 
             bool hasStatus =
                 (metadata.Outcomes &
-                 LeviathanCombat.OutcomeFlags.StatusInflicted) != 0;
+                 CoreCombat.OutcomeFlags.StatusInflicted) != 0;
 
             if (hasStatus != (payloadLength == 7))
                 return;
@@ -729,13 +732,13 @@ public static class LeviathanNetwork
             {
                 metadata.NativeStatusType = buffer[payloadOffset + 5];
                 metadata.StatusDisposition =
-                    (LeviathanCombat.StatusDisposition)
+                    (CoreCombat.StatusDisposition)
                         buffer[payloadOffset + 6];
 
                 if (metadata.StatusDisposition !=
-                        LeviathanCombat.StatusDisposition.New &&
+                        CoreCombat.StatusDisposition.New &&
                     metadata.StatusDisposition !=
-                        LeviathanCombat.StatusDisposition.Merged)
+                        CoreCombat.StatusDisposition.Merged)
                 {
                     return;
                 }
@@ -811,7 +814,7 @@ public static class LeviathanNetwork
             now + CombatAssociationPruneIntervalSeconds;
 
         combatEventPruneScratch.Clear();
-        foreach (KeyValuePair<MsgDamageEvent, LeviathanCombat.CombatEventMetadata>
+        foreach (KeyValuePair<MsgDamageEvent, CoreCombat.CombatEventMetadata>
             pair in combatEventMetadata)
         {
             if (pair.Key == null ||
@@ -827,7 +830,7 @@ public static class LeviathanNetwork
         combatEventPruneScratch.Clear();
 
         combatResultPruneScratch.Clear();
-        foreach (KeyValuePair<MsgDamageResult, LeviathanCombat.CombatResultMetadata>
+        foreach (KeyValuePair<MsgDamageResult, CoreCombat.CombatResultMetadata>
             pair in combatResultMetadata)
         {
             if (pair.Key == null ||
@@ -946,7 +949,7 @@ public static class LeviathanNetwork
         if (openSlotIndex >= 0)
         {
             Debug.LogWarning(
-                "[LeviathanNetwork] BeginSlot(" + slotId +
+                "[CoreNetwork] BeginSlot(" + slotId +
                 ") called while slot " + localSlotIds[openSlotIndex] +
                 " is still open. Missing EndSlot; ignoring.");
 
@@ -969,7 +972,7 @@ public static class LeviathanNetwork
             if (localSlotCount >= MaxSlots)
             {
                 Debug.LogWarning(
-                    "[LeviathanNetwork] Dropping slot " + slotId +
+                    "[CoreNetwork] Dropping slot " + slotId +
                     "; all " + MaxSlots + " dynamic slots are in use.");
 
                 return writer;
@@ -1244,8 +1247,9 @@ public static class LeviathanNetwork
         localSpecPacked = null;
         localSpecContentHash = 0u;
 
+        CoreClassRuntime.Reset();
         ResetCombatTransport();
-        LeviathanCombat.Reset();
+        CoreCombat.Reset();
     }
 
     /// <summary>Drop one player's replicated state.</summary>
@@ -1278,7 +1282,7 @@ public static class LeviathanNetwork
 
         if (pilot != null)
         {
-            LeviathanSpecializationRuntime.ClearRemoteSpecialization(pilot);
+            CoreSpecializationRuntime.ClearRemoteSpecialization(pilot);
         }
 
         // Match the exact replica, not only AppliedPilot. Dynamic state can be
@@ -1312,7 +1316,7 @@ public static class LeviathanNetwork
 
         if (snapshot.AppliedPilot != null)
         {
-            LeviathanSpecializationRuntime.ClearRemoteSpecialization(
+            CoreSpecializationRuntime.ClearRemoteSpecialization(
                 snapshot.AppliedPilot);
         }
 
@@ -1363,7 +1367,7 @@ public static class LeviathanNetwork
     // =========================================================================
 
     /// <summary>
-    /// Appends the Leviathan payload to a ShipStateSample that has just finished
+    /// Appends the Core payload to a ShipStateSample that has just finished
     /// writing its native fields. Runs from the ShipStateSample.Write postfix,
     /// which has exactly one caller: NetWorldBridge.SendLocalState.
     ///
@@ -1388,7 +1392,7 @@ public static class LeviathanNetwork
                 // length. Drop it entirely rather than sending a zero-length
                 // slot, which a remote would read as "active with no payload".
                 Debug.LogWarning(
-                    "[LeviathanNetwork] Slot " + localSlotIds[openSlotIndex] +
+                    "[CoreNetwork] Slot " + localSlotIds[openSlotIndex] +
                     " was never closed with EndSlot; dropping the incomplete " +
                     "slot for this packet.");
 
@@ -1396,11 +1400,31 @@ public static class LeviathanNetwork
                 openSlotIndex = -1;
             }
 
-            // Nothing to say if this player is not a Leviathan.
-            if (!LeviathanMod.PlayerHasLeviathan())
+            bool hasActiveClass = CoreClassRuntime.HasActiveLocalClass;
+            int classTransitionRevision = CoreClassRuntime.TransitionRevision;
+
+            if (lastSeenClassTransitionRevision == int.MinValue)
+            {
+                // Establish the initial baseline without manufacturing a clear
+                // burst before a real custom-class transition occurs.
+                lastSeenClassTransitionRevision = classTransitionRevision;
+            }
+            else if (classTransitionRevision != lastSeenClassTransitionRevision)
+            {
+                lastSeenClassTransitionRevision = classTransitionRevision;
+                classClearBurstRemaining = hasActiveClass ? 0 : SpecBurstPackets;
+            }
+
+            bool publishingClassClear =
+                !hasActiveClass && classClearBurstRemaining > 0;
+
+            if (!hasActiveClass && !publishingClassClear)
                 return;
 
-            bool wantSpec = ShouldSendSpecBlock();
+            if (publishingClassClear)
+                ClearLocalSlots();
+
+            bool wantSpec = hasActiveClass && ShouldSendSpecBlock();
 
             byte blockFlags;
             int payloadLength = BuildPayload(wantSpec, out blockFlags);
@@ -1430,10 +1454,17 @@ public static class LeviathanNetwork
             // burst attempts.
             if ((blockFlags & BlockFlagSpec) != 0 && specBurstRemaining > 0)
                 specBurstRemaining--;
+
+            if (publishingClassClear &&
+                (blockFlags & BlockFlagDynamic) != 0 &&
+                classClearBurstRemaining > 0)
+            {
+                classClearBurstRemaining--;
+            }
         }
         catch (Exception ex)
         {
-            Debug.LogWarning("[LeviathanNetwork] Send failed: " + ex.Message);
+            Debug.LogWarning("[CoreNetwork] Send failed: " + ex.Message);
         }
         finally
         {
@@ -1530,9 +1561,9 @@ public static class LeviathanNetwork
             return false;
 
         int configurationRevision =
-            LeviathanSpecializationRuntime.ConfigurationRevision;
+            CoreSpecializationRuntime.ConfigurationRevision;
 
-        int registryRevision = LeviathanSpecializationRegistry.Revision;
+        int registryRevision = CoreSpecializationRegistry.Revision;
 
         if (configurationRevision != lastSeenConfigurationRevision ||
             registryRevision != lastSeenRegistryRevision ||
@@ -1560,7 +1591,7 @@ public static class LeviathanNetwork
     /// </summary>
     private static bool RebuildLocalSpec()
     {
-        Pilot pilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+        Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
         if (pilot == null)
             return false;
 
@@ -1569,7 +1600,7 @@ public static class LeviathanNetwork
         if (packedLength > MaxPackedSpecBytes)
         {
             Debug.LogError(
-                "[LeviathanNetwork] Packed specialization is " + packedLength +
+                "[CoreNetwork] Packed specialization is " + packedLength +
                 " bytes, above the " + MaxPackedSpecBytes + " limit.");
 
             localSpecPacked = null;
@@ -1585,8 +1616,8 @@ public static class LeviathanNetwork
         {
             SchemaEntry entry = schema[i];
 
-            LeviathanSpecializationState state =
-                LeviathanSpecializationRuntime.GetState(pilot, entry.TreeId);
+            CoreSpecializationState state =
+                CoreSpecializationRuntime.GetState(pilot, entry.TreeId);
 
             int rank = state == null ? 0 : state.GetRank(entry.NodeId);
             rank = Mathf.Clamp(rank, 0, MaxPackedRank);
@@ -1898,7 +1929,7 @@ public static class LeviathanNetwork
 
             if (snapshot.AppliedPilot != null)
             {
-                LeviathanSpecializationRuntime.ClearRemoteSpecialization(
+                CoreSpecializationRuntime.ClearRemoteSpecialization(
                     snapshot.AppliedPilot);
             }
 
@@ -1920,7 +1951,7 @@ public static class LeviathanNetwork
         // the native routing should deliver our own player id back to us, but
         // the consequence of a mistake here is corrupting the local save's
         // in-memory specialization, so it is checked explicitly.
-        Pilot localPilot = LeviathanSpecializationRuntime.GetCurrentPilot();
+        Pilot localPilot = CoreSpecializationRuntime.GetCurrentPilot();
         if (localPilot != null && ReferenceEquals(localPilot, pilot))
         {
             snapshot.HasPendingSpec = false;
@@ -1938,13 +1969,13 @@ public static class LeviathanNetwork
             if (snapshot.AppliedPilot != null &&
                 !ReferenceEquals(snapshot.AppliedPilot, pilot))
             {
-                LeviathanSpecializationRuntime.ClearRemoteSpecialization(
+                CoreSpecializationRuntime.ClearRemoteSpecialization(
                     snapshot.AppliedPilot);
             }
 
             byte[] packed = snapshot.PendingSpecPacked;
 
-            LeviathanSpecializationRuntime.BeginRemoteSpecialization(pilot);
+            CoreSpecializationRuntime.BeginRemoteSpecialization(pilot);
 
             for (int i = 0; i < schema.Length; i++)
             {
@@ -1956,14 +1987,14 @@ public static class LeviathanNetwork
 
                 rank = Mathf.Clamp(rank, 0, entry.MaxRank);
 
-                LeviathanSpecializationRuntime.SetRemoteRank(
+                CoreSpecializationRuntime.SetRemoteRank(
                     pilot,
                     entry.TreeId,
                     entry.NodeId,
                     rank);
             }
 
-            LeviathanSpecializationRuntime.EndRemoteSpecialization(pilot);
+            CoreSpecializationRuntime.EndRemoteSpecialization(pilot);
 
             snapshot.RepShip = repShip;
             snapshot.AppliedPilot = pilot;
@@ -1973,7 +2004,7 @@ public static class LeviathanNetwork
         catch (Exception ex)
         {
             Debug.LogWarning(
-                "[LeviathanNetwork] Failed applying remote specialization for player " +
+                "[CoreNetwork] Failed applying remote specialization for player " +
                 playerId + ": " + ex.Message);
 
             snapshot.HasPendingSpec = false;
@@ -2002,21 +2033,21 @@ public static class LeviathanNetwork
     /// </summary>
     private static void EnsureSchema()
     {
-        LeviathanSpecializationRuntime.RegisterDefaults();
+        CoreSpecializationRuntime.RegisterDefaults();
 
-        int registryRevision = LeviathanSpecializationRegistry.Revision;
+        int registryRevision = CoreSpecializationRegistry.Revision;
 
         if (schema != null && schemaBuiltForRegistryRevision == registryRevision)
             return;
 
         List<SchemaEntry> entries = new List<SchemaEntry>();
-        IList<LeviathanSpecializationTree> trees =
-            LeviathanSpecializationRegistry.All();
+        IList<CoreSpecializationTree> trees =
+            CoreSpecializationRegistry.All();
 
         for (int t = 0; t < trees.Count; t++)
         {
-            LeviathanSpecializationTree tree = trees[t];
-            IList<LeviathanSpecializationNode> nodes = tree.Nodes;
+            CoreSpecializationTree tree = trees[t];
+            IList<CoreSpecializationNode> nodes = tree.Nodes;
 
             for (int n = 0; n < nodes.Count; n++)
             {
@@ -2035,7 +2066,7 @@ public static class LeviathanNetwork
                 if (entry.MaxRank > MaxPackedRank)
                 {
                     Debug.LogError(
-                        "[LeviathanNetwork] Node " + tree.Id + "/" + entry.NodeId +
+                        "[CoreNetwork] Node " + tree.Id + "/" + entry.NodeId +
                         " has MaxRank " + entry.MaxRank + ", above the " +
                         MaxPackedRank + " the 4-bit wire format supports. " +
                         "Remote clients will see this node capped.");
@@ -2048,7 +2079,7 @@ public static class LeviathanNetwork
         if (entries.Count > 255)
         {
             Debug.LogError(
-                "[LeviathanNetwork] " + entries.Count +
+                "[CoreNetwork] " + entries.Count +
                 " specialization nodes exceeds the 255 the wire format supports.");
 
             entries.RemoveRange(255, entries.Count - 255);
@@ -2167,45 +2198,45 @@ public static class LeviathanNetwork
 
 [HarmonyPatch(typeof(NetDamageCodec), "Write",
     new Type[] { typeof(NetSerializer), typeof(MsgDamageEvent) })]
-public static class LeviathanNetworkCombatDamageEventWritePatch
+public static class CoreNetworkCombatDamageEventWritePatch
 {
     public static void Postfix(NetSerializer __0, MsgDamageEvent __1)
     {
-        LeviathanNetwork.AppendCombatEventTrailer(__0, __1);
+        CoreNetwork.AppendCombatEventTrailer(__0, __1);
     }
 }
 
 [HarmonyPatch(typeof(NetDamageCodec), "ReadDamageEvent")]
-public static class LeviathanNetworkCombatDamageEventReadPatch
+public static class CoreNetworkCombatDamageEventReadPatch
 {
     public static void Postfix(
         byte[] __0,
         int __1,
         MsgDamageEvent __result)
     {
-        LeviathanNetwork.ParseCombatEventTrailer(__0, __1, __result);
+        CoreNetwork.ParseCombatEventTrailer(__0, __1, __result);
     }
 }
 
 [HarmonyPatch(typeof(NetDamageCodec), "Write",
     new Type[] { typeof(NetSerializer), typeof(MsgDamageResult) })]
-public static class LeviathanNetworkCombatDamageResultWritePatch
+public static class CoreNetworkCombatDamageResultWritePatch
 {
     public static void Postfix(NetSerializer __0, MsgDamageResult __1)
     {
-        LeviathanNetwork.AppendCombatResultTrailer(__0, __1);
+        CoreNetwork.AppendCombatResultTrailer(__0, __1);
     }
 }
 
 [HarmonyPatch(typeof(NetDamageCodec), "ReadDamageResult")]
-public static class LeviathanNetworkCombatDamageResultReadPatch
+public static class CoreNetworkCombatDamageResultReadPatch
 {
     public static void Postfix(
         byte[] __0,
         int __1,
         MsgDamageResult __result)
     {
-        LeviathanNetwork.ParseCombatResultTrailer(__0, __1, __result);
+        CoreNetwork.ParseCombatResultTrailer(__0, __1, __result);
     }
 }
 
@@ -2213,16 +2244,16 @@ public static class LeviathanNetworkCombatDamageResultReadPatch
 // HARMONY PATCHES
 // =============================================================================
 
-// Appends the Leviathan payload after the native sample's fields. Write has
+// Appends the Core payload after the native sample's fields. Write has
 // exactly one caller, NetWorldBridge.SendLocalState, which writes into the
 // NetSerializer whose Length is then handed to NetSession.SendPlayerShipState.
 // Appending here means the sent length is correct with no buffer surgery.
 [HarmonyPatch(typeof(ShipStateSample), "Write")]
-public static class LeviathanNetworkShipStateWritePatch
+public static class CoreNetworkShipStateWritePatch
 {
     public static void Postfix(BinaryWriter __0)
     {
-        LeviathanNetwork.AppendLocalExtension(__0);
+        CoreNetwork.AppendLocalExtension(__0);
     }
 }
 
@@ -2230,21 +2261,21 @@ public static class LeviathanNetworkShipStateWritePatch
 // variable-length arrays. Read has exactly one caller,
 // NetWorldBridge.TryDecodeShipState.
 [HarmonyPatch(typeof(ShipStateSample), "Read")]
-public static class LeviathanNetworkShipStateReadPatch
+public static class CoreNetworkShipStateReadPatch
 {
     public static void Postfix(BinaryReader __0)
     {
-        LeviathanNetwork.ParseIncomingExtension(__0);
+        CoreNetwork.ParseIncomingExtension(__0);
     }
 }
 
 // First point at which the parsed payload can be associated with a player id.
 [HarmonyPatch(typeof(NetWorldBridge), "TryDecodeShipState")]
-public static class LeviathanNetworkDecodePatch
+public static class CoreNetworkDecodePatch
 {
     public static void Postfix(bool __result, ref int __2)
     {
-        LeviathanNetwork.CommitIncoming(__2, __result);
+        CoreNetwork.CommitIncoming(__2, __result);
     }
 }
 
@@ -2252,7 +2283,7 @@ public static class LeviathanNetworkDecodePatch
 // available, so this is where a received specialization set is pushed into the
 // runtime for the remote Pilot.
 [HarmonyPatch(typeof(NetWorldBridge), "OnRemoteShipState")]
-public static class LeviathanNetworkRemoteStatePatch
+public static class CoreNetworkRemoteStatePatch
 {
     private static readonly FieldInfo RepsField =
         AccessTools.Field(typeof(NetWorldBridge), "reps");
@@ -2269,7 +2300,7 @@ public static class LeviathanNetworkRemoteStatePatch
         if (reps == null || !reps.TryGetValue(__0, out driver) || driver == null)
             return;
 
-        LeviathanNetwork.ApplyPendingSpecialization(__0, driver.gameShip);
+        CoreNetwork.ApplyPendingSpecialization(__0, driver.gameShip);
     }
 }
 
@@ -2278,20 +2309,20 @@ public static class LeviathanNetworkRemoteStatePatch
 // specialization here means no replicated ranks outlive the replica they
 // describe.
 [HarmonyPatch(typeof(RemoteShipDriver), "DestroyRep")]
-public static class LeviathanNetworkDestroyRepPatch
+public static class CoreNetworkDestroyRepPatch
 {
     public static void Prefix(GameShip __0)
     {
-        LeviathanNetwork.ForgetRep(__0);
+        CoreNetwork.ForgetRep(__0);
     }
 }
 
 // Full session/world teardown.
 [HarmonyPatch(typeof(NetWorldBridge), "Teardown")]
-public static class LeviathanNetworkTeardownPatch
+public static class CoreNetworkTeardownPatch
 {
     public static void Postfix()
     {
-        LeviathanNetwork.Reset();
+        CoreNetwork.Reset();
     }
 }

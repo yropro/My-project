@@ -7,14 +7,14 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 
 /// <summary>
-/// Shared Leviathan combat provenance/correlation foundation.
+/// Shared Core combat provenance/correlation foundation.
 ///
 /// This layer answers "which semantic mechanic authored this exact damage
 /// transaction?" while leaving native Star Vortex damage authoritative.  It is
 /// source-owner local for retained gameplay history; target authorities only
 /// hold transient metadata long enough to return authoritative outcomes.
 /// </summary>
-public static class LeviathanCombat
+public static class CoreCombat
 {
     // =====================================================================
     // STABLE SEMANTIC IDS
@@ -30,6 +30,7 @@ public static class LeviathanCombat
         public const byte Starfire = 5;
         public const byte StellarConverter = 6;
         public const byte DronesTurretsBeacons = 7;
+        public const byte Orrery = 8;
     }
 
     public static class EffectIds
@@ -202,6 +203,7 @@ public static class LeviathanCombat
         Beacon = 6,
         Clone = 7,
         WeaponSlot = 8,
+        Satellite = 9,
         Other = 255
     }
 
@@ -319,7 +321,7 @@ public static class LeviathanCombat
                 {
                     warnedContributorObjectCapacity = true;
                     Debug.LogWarning(
-                        "[LeviathanCombat] Contributor object mapping capacity " +
+                        "[CoreCombat] Contributor object mapping capacity " +
                         MaxContributorObjectMappings +
                         " reached; dropping optional object-backed contributor " +
                         "attribution. Prefer ContributorKey.Create with the " +
@@ -337,7 +339,7 @@ public static class LeviathanCombat
             {
                 warnedContributorIdExhaustion = true;
                 Debug.LogWarning(
-                    "[LeviathanCombat] Contributor ID space exhausted for kind " +
+                    "[CoreCombat] Contributor ID space exhausted for kind " +
                     kind + "; dropping optional contributor attribution.");
             }
             return default(ContributorKey);
@@ -412,7 +414,7 @@ public static class LeviathanCombat
             if (ship.IsRemotePlayer())
             {
                 int remotePlayerId;
-                if (LeviathanNetwork.TryGetPlayerId(ship, out remotePlayerId))
+                if (CoreNetwork.TryGetPlayerId(ship, out remotePlayerId))
                 {
                     key = ForPlayerId(remotePlayerId);
                     return key.IsValid;
@@ -738,7 +740,7 @@ public static class LeviathanCombat
 
     /// <summary>
     /// Opens an authored damage scope.  SourceOwner is the canonical player /
-    /// Leviathan owner; physicalSource is the ship that native RouteDamage will
+    /// Core owner; physicalSource is the ship that native RouteDamage will
     /// actually see (drone/section/etc.). Contributor remains local and never
     /// travels on the damage wire by default.
     /// </summary>
@@ -851,7 +853,7 @@ public static class LeviathanCombat
         bool retainMeaningful = false)
     {
         RecordSemanticEvent(sourceOwner, target, semantic, contributor,
-            LeviathanCombatHistory.SemanticObservationKind.Contact,
+            CoreCombatHistory.SemanticObservationKind.Contact,
             retainMeaningful);
     }
 
@@ -865,7 +867,7 @@ public static class LeviathanCombat
         GameShip target,
         SemanticKey semantic,
         ContributorKey contributor,
-        LeviathanCombatHistory.SemanticObservationKind kind,
+        CoreCombatHistory.SemanticObservationKind kind,
         bool retainMeaningful = false)
     {
         RunLifecycleMaintenance(Time.unscaledTime, false);
@@ -880,7 +882,7 @@ public static class LeviathanCombat
 
         PrepareTargetForNewInteraction(target, targetKey);
 
-        LeviathanCombatHistory.RecordObservation(ownerKey, targetKey, semantic,
+        CoreCombatHistory.RecordObservation(ownerKey, targetKey, semantic,
             contributor, kind, Time.time, retainMeaningful);
     }
 
@@ -926,7 +928,7 @@ public static class LeviathanCombat
 
                 if ((frame.Tracking & TrackingFlags.Summary) != 0)
                 {
-                    LeviathanCombatHistory.RecordAttempt(frame.SourceOwner,
+                    CoreCombatHistory.RecordAttempt(frame.SourceOwner,
                         frame.Target, frame.Semantic, frame.Contributor,
                         frame.EventId, frame.OccurredAt);
                 }
@@ -1005,7 +1007,7 @@ public static class LeviathanCombat
                 metadata.EventId = 0U;
         }
 
-        LeviathanNetwork.SetCombatEventMetadata(message, metadata);
+        CoreNetwork.SetCombatEventMetadata(message, metadata);
     }
 
     internal static void ReceiveDamageResult(MsgDamageResult message)
@@ -1014,7 +1016,7 @@ public static class LeviathanCombat
             return;
 
         CombatResultMetadata metadata;
-        if (!LeviathanNetwork.TryGetCombatResultMetadata(message, out metadata) ||
+        if (!CoreNetwork.TryGetCombatResultMetadata(message, out metadata) ||
             metadata.EventId == 0U)
         {
             return;
@@ -1356,7 +1358,7 @@ public static class LeviathanCombat
         {
             warnedGuaranteedOutcomeUnsupported = true;
             Debug.LogWarning(
-                "[LeviathanCombat] GuaranteedOutcome is reserved but not yet " +
+                "[CoreCombat] GuaranteedOutcome is reserved but not yet " +
                 "implemented. Downgrading requests to NativeResult until a " +
                 "native-safe synthetic acknowledgement path is verified.");
         }
@@ -1441,8 +1443,8 @@ public static class LeviathanCombat
         // intentional here and never occurs on the ordinary damage hot path.
         InvalidatePendingForTarget(target);
 
-        LeviathanCombatHistory.ResetTarget(target);
-        LeviathanCombatState.ResetTarget(target);
+        CoreCombatHistory.ResetTarget(target);
+        CoreCombatState.ResetTarget(target);
     }
 
     private static void InvalidatePendingForTarget(CombatEntityKey target)
@@ -1474,7 +1476,7 @@ public static class LeviathanCombat
 
     private static void RunLifecycleMaintenance(float nowUnscaled, bool force)
     {
-        LeviathanCombatHistory.RunMaintenance(force);
+        CoreCombatHistory.RunMaintenance(force);
 
         if (!force && nowUnscaled < nextLifecycleMaintenanceAt)
             return;
@@ -1503,8 +1505,8 @@ public static class LeviathanCombat
             // target lifetime and must be invalidated before state/history are
             // reclaimed. An ultra-late result then fails lookup harmlessly.
             InvalidatePendingForTarget(target);
-            LeviathanCombatHistory.ResetTarget(target);
-            LeviathanCombatState.ResetTarget(target);
+            CoreCombatHistory.ResetTarget(target);
+            CoreCombatState.ResetTarget(target);
             DeferredTargetCleanups.Remove(target);
         }
         DeferredTargetScratch.Clear();
@@ -1596,7 +1598,7 @@ public static class LeviathanCombat
         ReceivedContext context = default(ReceivedContext);
         CombatEventMetadata metadata;
         if (message != null && !message.isHeal &&
-            LeviathanNetwork.TryGetCombatEventMetadata(message, out metadata) &&
+            CoreNetwork.TryGetCombatEventMetadata(message, out metadata) &&
             metadata.Semantic.IsValid)
         {
             context.Valid = true;
@@ -1616,7 +1618,7 @@ public static class LeviathanCombat
         {
             if (receivedOverflowDepth > 0)
                 receivedOverflowDepth--;
-            LeviathanNetwork.ReleaseCombatEventMetadata(message);
+            CoreNetwork.ReleaseCombatEventMetadata(message);
             return;
         }
 
@@ -1631,7 +1633,7 @@ public static class LeviathanCombat
             receivedOverflowDepth = 0;
         }
 
-        LeviathanNetwork.ReleaseCombatEventMetadata(message);
+        CoreNetwork.ReleaseCombatEventMetadata(message);
     }
 
     internal static AuthorityPatchState BeginAuthorityDamage(
@@ -1702,7 +1704,7 @@ public static class LeviathanCombat
 
                 // Match the freshness guarantee native ApplyDamageEvent gives
                 // remote-authority damage.  This is scoped only to a claimed
-                // Leviathan local transaction, so an immune/dead/invisible
+                // Core local transaction, so an immune/dead/invisible
                 // early return cannot leave a previous attack looking current.
                 target.lastHealthDamage = 0f;
                 target.lastShieldDamage = 0f;
@@ -1941,7 +1943,7 @@ public static class LeviathanCombat
             metadata.Outcomes |= OutcomeFlags.StatusInflicted;
         metadata.AttachedAtUnscaled = Time.unscaledTime;
 
-        LeviathanNetwork.SetCombatResultMetadata(result, metadata);
+        CoreNetwork.SetCombatResultMetadata(result, metadata);
     }
 
     private static void CommitOutcome(CombatOutcome outcome, TrackingFlags tracking)
@@ -1956,7 +1958,7 @@ public static class LeviathanCombat
         commitDepth++;
         try
         {
-            LeviathanCombatHistory.RecordOutcome(
+            CoreCombatHistory.RecordOutcome(
                 outcome, recordSummary, retainMeaningful);
         }
         finally
@@ -1971,7 +1973,7 @@ public static class LeviathanCombat
 
     /// <summary>
     /// Invalidates one skill runtime for an owner without disturbing other
-    /// Leviathan skills owned by the same player. EventIds remain session-
+    /// Core skills owned by the same player. EventIds remain session-
     /// monotonic; removing the old pending records is sufficient to make any
     /// delayed results harmless because those ids are never reused this session.
     /// This is a lifecycle path and may scan the bounded pending table.
@@ -2016,8 +2018,8 @@ public static class LeviathanCombat
             RemovePending(PendingScratch[i]);
         PendingScratch.Clear();
 
-        LeviathanCombatState.ResetOwnerSkill(ownerKey, skillId);
-        LeviathanCombatHistory.ResetOwnerSkill(ownerKey, skillId);
+        CoreCombatState.ResetOwnerSkill(ownerKey, skillId);
+        CoreCombatHistory.ResetOwnerSkill(ownerKey, skillId);
     }
 
     public static void ResetOwnerRuntime(GameShip sourceOwner)
@@ -2049,8 +2051,8 @@ public static class LeviathanCombat
         // EventId is on the wire but OwnerGeneration is not, so reusing low ids
         // here could let a delayed result from the old runtime consume a new
         // pending transaction with the same owner/target/source-slot identity.
-        LeviathanCombatState.ResetOwner(ownerKey);
-        LeviathanCombatHistory.ResetOwner(ownerKey);
+        CoreCombatState.ResetOwner(ownerKey);
+        CoreCombatHistory.ResetOwner(ownerKey);
     }
 
     public static void Reset()
@@ -2096,8 +2098,8 @@ public static class LeviathanCombat
         DeferredTargetScratch.Clear();
         nextLifecycleMaintenanceAt = 0f;
 
-        LeviathanCombatState.Reset();
-        LeviathanCombatHistory.Reset();
+        CoreCombatState.Reset();
+        CoreCombatHistory.Reset();
     }
 
     private static uint NextEventId(CombatEntityKey owner)
@@ -2132,7 +2134,7 @@ public static class LeviathanCombat
 /// The internal IDamageable type is intentionally not named in the patch method.
 /// </summary>
 [HarmonyPatch]
-public static class LeviathanCombatRouteDamagePatch
+public static class CoreCombatRouteDamagePatch
 {
     public static MethodBase TargetMethod()
     {
@@ -2156,144 +2158,144 @@ public static class LeviathanCombatRouteDamagePatch
         object __0,
         GameShip __6,
         Activatable __9,
-        out LeviathanCombat.RoutePatchState __state)
+        out CoreCombat.RoutePatchState __state)
     {
-        __state = LeviathanCombat.BeginRouteDamage(__0, __6, __9);
+        __state = CoreCombat.BeginRouteDamage(__0, __6, __9);
     }
 
     public static Exception Finalizer(
         Exception __exception,
-        LeviathanCombat.RoutePatchState __state)
+        CoreCombat.RoutePatchState __state)
     {
-        LeviathanCombat.EndRouteDamage(__state);
+        CoreCombat.EndRouteDamage(__state);
         return __exception;
     }
 }
 
 [HarmonyPatch(typeof(NetSession), "SendDamageEvent")]
-public static class LeviathanCombatSendDamageEventPatch
+public static class CoreCombatSendDamageEventPatch
 {
     public static void Prefix(MsgDamageEvent __0)
     {
-        LeviathanCombat.AttachOutgoingDamageEvent(__0);
+        CoreCombat.AttachOutgoingDamageEvent(__0);
     }
 }
 
 [HarmonyPatch(typeof(NetCombat), "ApplyDamageEvent")]
-public static class LeviathanCombatApplyDamageEventPatch
+public static class CoreCombatApplyDamageEventPatch
 {
     public static void Prefix(
         MsgDamageEvent __0,
         object __1,
         GameShip __2,
-        out LeviathanCombat.ReceivedPatchState __state)
+        out CoreCombat.ReceivedPatchState __state)
     {
-        __state = LeviathanCombat.BeginReceivedDamage(__0, __2);
+        __state = CoreCombat.BeginReceivedDamage(__0, __2);
     }
 
     public static Exception Finalizer(
         Exception __exception,
         MsgDamageEvent __0,
-        LeviathanCombat.ReceivedPatchState __state)
+        CoreCombat.ReceivedPatchState __state)
     {
-        LeviathanCombat.EndReceivedDamage(__state, __0);
+        CoreCombat.EndReceivedDamage(__state, __0);
         return __exception;
     }
 }
 
 [HarmonyPatch(typeof(GameShip), "Damage")]
-public static class LeviathanCombatGameShipDamagePatch
+public static class CoreCombatGameShipDamagePatch
 {
     public static void Prefix(
         GameShip __instance,
         GameShip __5,
-        out LeviathanCombat.AuthorityPatchState __state)
+        out CoreCombat.AuthorityPatchState __state)
     {
-        __state = LeviathanCombat.BeginAuthorityDamage(__instance, __5);
+        __state = CoreCombat.BeginAuthorityDamage(__instance, __5);
     }
 
     public static void Postfix(
         GameShip __instance,
         bool __result,
-        LeviathanCombat.AuthorityPatchState __state)
+        CoreCombat.AuthorityPatchState __state)
     {
-        LeviathanCombat.CompleteAuthorityDamage(__state, __instance, __result);
+        CoreCombat.CompleteAuthorityDamage(__state, __instance, __result);
     }
 
     public static Exception Finalizer(
         Exception __exception,
-        LeviathanCombat.AuthorityPatchState __state)
+        CoreCombat.AuthorityPatchState __state)
     {
-        LeviathanCombat.EndAuthorityDamage(__state);
+        CoreCombat.EndAuthorityDamage(__state);
         return __exception;
     }
 }
 
 [HarmonyPatch(typeof(StatusEffect), "GetEffectForDamageType")]
-public static class LeviathanCombatDirectStatusCreatePatch
+public static class CoreCombatDirectStatusCreatePatch
 {
     public static void Postfix(GameShip __2, StatusEffect __result)
     {
-        LeviathanCombat.CaptureGeneratedDirectStatus(__result, __2);
+        CoreCombat.CaptureGeneratedDirectStatus(__result, __2);
     }
 }
 
 [HarmonyPatch(typeof(GameShip), "AddStatusEffect")]
-public static class LeviathanCombatDirectStatusAddPatch
+public static class CoreCombatDirectStatusAddPatch
 {
     public static void Prefix(
         GameShip __instance,
         StatusEffect __0,
-        out LeviathanCombat.DirectStatusAddState __state)
+        out CoreCombat.DirectStatusAddState __state)
     {
-        __state = LeviathanCombat.BeginDirectStatusAdd(__instance, __0);
+        __state = CoreCombat.BeginDirectStatusAdd(__instance, __0);
     }
 
     public static void Postfix(
         GameShip __instance,
         StatusEffect __0,
-        LeviathanCombat.DirectStatusAddState __state)
+        CoreCombat.DirectStatusAddState __state)
     {
-        LeviathanCombat.CompleteDirectStatusAdd(__instance, __0, __state);
+        CoreCombat.CompleteDirectStatusAdd(__instance, __0, __state);
     }
 }
 
 [HarmonyPatch(typeof(NetSession), "SendDamageResult")]
-public static class LeviathanCombatSendDamageResultPatch
+public static class CoreCombatSendDamageResultPatch
 {
     public static void Prefix(MsgDamageResult __0)
     {
-        LeviathanCombat.AttachOutgoingDamageResult(__0);
+        CoreCombat.AttachOutgoingDamageResult(__0);
     }
 }
 
 [HarmonyPatch(typeof(NetWorldBridge), "OnDamageResult")]
-public static class LeviathanCombatDamageResultPatch
+public static class CoreCombatDamageResultPatch
 {
     public static void Postfix(MsgDamageResult __0)
     {
         try
         {
-            LeviathanCombat.ReceiveDamageResult(__0);
+            CoreCombat.ReceiveDamageResult(__0);
         }
         finally
         {
-            LeviathanNetwork.ReleaseCombatResultMetadata(__0);
+            CoreNetwork.ReleaseCombatResultMetadata(__0);
         }
     }
 }
 
 /// <summary>
 /// Capture the target identity before native destruction tears down or replaces
-/// the runtime object. Cleanup is deferred by LeviathanCombat so the lethal
+/// the runtime object. Cleanup is deferred by CoreCombat so the lethal
 /// transaction and any in-flight native result can finish first.
 /// </summary>
 [HarmonyPatch(typeof(GameShip), "Destroyed")]
-public static class LeviathanCombatTargetDestroyedLifecyclePatch
+public static class CoreCombatTargetDestroyedLifecyclePatch
 {
     public static void Prefix(GameShip __instance)
     {
-        LeviathanCombat.NotifyTargetLifecycleEnd(__instance);
+        CoreCombat.NotifyTargetLifecycleEnd(__instance);
     }
 }
 
@@ -2302,10 +2304,10 @@ public static class LeviathanCombatTargetDestroyedLifecyclePatch
 /// through gameplay death. Duplicate notifications are coalesced by target key.
 /// </summary>
 [HarmonyPatch(typeof(GameShip), "OnDestroy")]
-public static class LeviathanCombatTargetOnDestroyLifecyclePatch
+public static class CoreCombatTargetOnDestroyLifecyclePatch
 {
     public static void Prefix(GameShip __instance)
     {
-        LeviathanCombat.NotifyTargetLifecycleEnd(__instance);
+        CoreCombat.NotifyTargetLifecycleEnd(__instance);
     }
 }

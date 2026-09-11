@@ -1,4 +1,4 @@
-using static LeviathanTreeDsl;
+using static CoreTreeDsl;
 
 // Evolution is the root specialization tree. Native Evolution ranks grant Evolution
 // Points. Rank 1 automatically activates the Leviathan chassis and Growth tree;
@@ -8,9 +8,9 @@ public static class LeviathanEvolutionTree
     public const string TreeId = "evolution";
     public const string RootNodeId = "evolution";
 
-    public static LeviathanSpecializationTree Create()
+    public static CoreSpecializationTree Create()
     {
-        LeviathanSpecializationTree tree = NativeTree(
+        CoreSpecializationTree tree = NativeTree(
             TreeId,
             "Evolution",
             RootNodeId,

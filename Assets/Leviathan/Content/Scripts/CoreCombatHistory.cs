@@ -11,7 +11,7 @@ using UnityEngine;
 /// Only explicitly meaningful discrete outcomes/semantic events use the fixed
 /// per-owner ring.
 /// </summary>
-public static class LeviathanCombatHistory
+public static class CoreCombatHistory
 {
     public enum SemanticObservationKind : byte
     {
@@ -55,7 +55,7 @@ public static class LeviathanCombatHistory
         public uint LastKillEventId;
         public float LastEventTime;
         public uint LastEventId;
-        public LeviathanCombat.ContributorKey LastContributor;
+        public CoreCombat.ContributorKey LastContributor;
         public byte LastNativeStatusType;
         public SemanticObservationKind LastObservationKind;
 
@@ -69,7 +69,7 @@ public static class LeviathanCombatHistory
 
     public struct OwnerSemanticSummary
     {
-        public LeviathanCombat.CombatEntityKey LastTarget;
+        public CoreCombat.CombatEntityKey LastTarget;
         public float LastAttemptTime;
         public float LastProcessedTime;
         public float LastConfirmedTime;
@@ -103,26 +103,26 @@ public static class LeviathanCombatHistory
         public ulong Sequence;
         public MeaningfulEventKind Kind;
         public SemanticObservationKind ObservationKind;
-        public LeviathanCombat.SemanticKey Semantic;
-        public LeviathanCombat.CombatEntityKey SourceOwner;
-        public LeviathanCombat.CombatEntityKey Target;
-        public LeviathanCombat.ContributorKey Contributor;
+        public CoreCombat.SemanticKey Semantic;
+        public CoreCombat.CombatEntityKey SourceOwner;
+        public CoreCombat.CombatEntityKey Target;
+        public CoreCombat.ContributorKey Contributor;
         public uint EventId;
         public ushort AttackInstanceId;
         public float OccurredAt;
         public float ConfirmedAt;
-        public LeviathanCombat.OutcomeFlags Outcomes;
+        public CoreCombat.OutcomeFlags Outcomes;
         public float HealthDamage;
         public float ShieldDamage;
         public byte NativeStatusType;
-        public LeviathanCombat.StatusDisposition StatusDisposition;
+        public CoreCombat.StatusDisposition StatusDisposition;
     }
 
     private struct RelationshipKey : IEquatable<RelationshipKey>
     {
-        public LeviathanCombat.CombatEntityKey SourceOwner;
-        public LeviathanCombat.CombatEntityKey Target;
-        public LeviathanCombat.SemanticKey Semantic;
+        public CoreCombat.CombatEntityKey SourceOwner;
+        public CoreCombat.CombatEntityKey Target;
+        public CoreCombat.SemanticKey Semantic;
 
         public bool Equals(RelationshipKey other)
         {
@@ -150,8 +150,8 @@ public static class LeviathanCombatHistory
 
     private struct OwnerSemanticKey : IEquatable<OwnerSemanticKey>
     {
-        public LeviathanCombat.CombatEntityKey SourceOwner;
-        public LeviathanCombat.SemanticKey Semantic;
+        public CoreCombat.CombatEntityKey SourceOwner;
+        public CoreCombat.SemanticKey Semantic;
 
         public bool Equals(OwnerSemanticKey other)
         {
@@ -184,7 +184,7 @@ public static class LeviathanCombatHistory
 
     private struct ContributorStamp
     {
-        public LeviathanCombat.ContributorKey Contributor;
+        public CoreCombat.ContributorKey Contributor;
         public float LastConfirmedDamageOccurredAt;
     }
 
@@ -228,8 +228,8 @@ public static class LeviathanCombatHistory
     private static readonly Dictionary<OwnerSemanticKey, OwnerSemanticSummary>
         OwnerSummaries = new Dictionary<OwnerSemanticKey, OwnerSemanticSummary>(128);
 
-    private static readonly Dictionary<LeviathanCombat.CombatEntityKey, OwnerRing>
-        Rings = new Dictionary<LeviathanCombat.CombatEntityKey, OwnerRing>(8);
+    private static readonly Dictionary<CoreCombat.CombatEntityKey, OwnerRing>
+        Rings = new Dictionary<CoreCombat.CombatEntityKey, OwnerRing>(8);
 
     private static readonly Dictionary<RelationshipKey, UniqueContributorTracker>
         ContributorTrackers = new Dictionary<RelationshipKey, UniqueContributorTracker>(32);
@@ -251,8 +251,8 @@ public static class LeviathanCombatHistory
         new List<RelationshipKey>(128);
     private static readonly List<OwnerSemanticKey> OwnerSummaryScratch =
         new List<OwnerSemanticKey>(64);
-    private static readonly List<LeviathanCombat.CombatEntityKey> OwnerScratch =
-        new List<LeviathanCombat.CombatEntityKey>(16);
+    private static readonly List<CoreCombat.CombatEntityKey> OwnerScratch =
+        new List<CoreCombat.CombatEntityKey>(16);
 
     private static float nextMaintenanceAt;
 
@@ -260,14 +260,14 @@ public static class LeviathanCombatHistory
     public static int UniqueContributorTrackerCount { get { return ContributorTrackers.Count; } }
 
     // ---------------------------------------------------------------------
-    // Recording - called by LeviathanCombat
+    // Recording - called by CoreCombat
     // ---------------------------------------------------------------------
 
     internal static void RecordAttempt(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
-        LeviathanCombat.ContributorKey contributor,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
+        CoreCombat.ContributorKey contributor,
         uint eventId,
         float occurredAt)
     {
@@ -308,7 +308,7 @@ public static class LeviathanCombatHistory
     }
 
     internal static void RecordOutcome(
-        LeviathanCombat.CombatOutcome outcome,
+        CoreCombat.CombatOutcome outcome,
         bool recordSummary,
         bool retainMeaningful)
     {
@@ -328,7 +328,7 @@ public static class LeviathanCombatHistory
             RelationshipSummary relation;
             if (TryGetOrCreateRelationship(relationKey, out relation))
             {
-                if ((outcome.Outcomes & LeviathanCombat.OutcomeFlags.Processed) != 0)
+                if ((outcome.Outcomes & CoreCombat.OutcomeFlags.Processed) != 0)
                 {
                     relation.TotalProcessedCount =
                         SaturatingIncrement(relation.TotalProcessedCount);
@@ -343,7 +343,7 @@ public static class LeviathanCombatHistory
                 relation.LastConfirmedTime =
                     Mathf.Max(relation.LastConfirmedTime, outcome.ConfirmedAt);
 
-                if ((outcome.Outcomes & LeviathanCombat.OutcomeFlags.Damaged) != 0)
+                if ((outcome.Outcomes & CoreCombat.OutcomeFlags.Damaged) != 0)
                 {
                     relation.TotalDamageCount =
                         SaturatingIncrement(relation.TotalDamageCount);
@@ -357,7 +357,7 @@ public static class LeviathanCombatHistory
                         relationKey, outcome.Contributor, outcome.OccurredAt);
                 }
 
-                if ((outcome.Outcomes & LeviathanCombat.OutcomeFlags.Destroyed) != 0)
+                if ((outcome.Outcomes & CoreCombat.OutcomeFlags.Destroyed) != 0)
                 {
                     relation.TotalKillCount =
                         SaturatingIncrement(relation.TotalKillCount);
@@ -369,7 +369,7 @@ public static class LeviathanCombatHistory
                     }
                 }
 
-                if ((outcome.Outcomes & LeviathanCombat.OutcomeFlags.StatusInflicted) != 0)
+                if ((outcome.Outcomes & CoreCombat.OutcomeFlags.StatusInflicted) != 0)
                 {
                     relation.TotalStatusCount =
                         SaturatingIncrement(relation.TotalStatusCount);
@@ -392,7 +392,7 @@ public static class LeviathanCombatHistory
             OwnerSemanticSummary owner;
             if (TryGetOrCreateOwnerSummary(ownerKey, out owner))
             {
-                if ((outcome.Outcomes & LeviathanCombat.OutcomeFlags.Processed) != 0)
+                if ((outcome.Outcomes & CoreCombat.OutcomeFlags.Processed) != 0)
                 {
                     owner.TotalProcessedCount =
                         SaturatingIncrement(owner.TotalProcessedCount);
@@ -407,7 +407,7 @@ public static class LeviathanCombatHistory
                 owner.LastConfirmedTime =
                     Mathf.Max(owner.LastConfirmedTime, outcome.ConfirmedAt);
 
-                if ((outcome.Outcomes & LeviathanCombat.OutcomeFlags.Damaged) != 0)
+                if ((outcome.Outcomes & CoreCombat.OutcomeFlags.Damaged) != 0)
                 {
                     owner.TotalDamageCount =
                         SaturatingIncrement(owner.TotalDamageCount);
@@ -419,7 +419,7 @@ public static class LeviathanCombatHistory
                     }
                 }
 
-                if ((outcome.Outcomes & LeviathanCombat.OutcomeFlags.Destroyed) != 0)
+                if ((outcome.Outcomes & CoreCombat.OutcomeFlags.Destroyed) != 0)
                 {
                     owner.TotalKillCount =
                         SaturatingIncrement(owner.TotalKillCount);
@@ -431,7 +431,7 @@ public static class LeviathanCombatHistory
                     }
                 }
 
-                if ((outcome.Outcomes & LeviathanCombat.OutcomeFlags.StatusInflicted) != 0)
+                if ((outcome.Outcomes & CoreCombat.OutcomeFlags.StatusInflicted) != 0)
                 {
                     owner.TotalStatusCount =
                         SaturatingIncrement(owner.TotalStatusCount);
@@ -455,10 +455,10 @@ public static class LeviathanCombatHistory
     }
 
     internal static void RecordObservation(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
-        LeviathanCombat.ContributorKey contributor,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
+        CoreCombat.ContributorKey contributor,
         SemanticObservationKind kind,
         float occurredAt,
         bool retainMeaningful)
@@ -517,9 +517,9 @@ public static class LeviathanCombatHistory
     /// enters the meaningful ring.
     /// </summary>
     public static void RecordSemanticMarker(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         float occurredAt,
         bool retainMeaningful)
     {
@@ -527,7 +527,7 @@ public static class LeviathanCombatHistory
         // physical-contact observation.  It still participates in the cheap
         // relationship/owner summaries, but retains its own ring vocabulary.
         RecordObservation(sourceOwner, target, semantic,
-            default(LeviathanCombat.ContributorKey),
+            default(CoreCombat.ContributorKey),
             SemanticObservationKind.Applied, occurredAt, false);
 
         if (retainMeaningful)
@@ -549,9 +549,9 @@ public static class LeviathanCombatHistory
     // ---------------------------------------------------------------------
 
     public static bool TryGetRelationshipSummary(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         out RelationshipSummary summary)
     {
         return Relationships.TryGetValue(
@@ -561,14 +561,14 @@ public static class LeviathanCombatHistory
     public static bool TryGetRelationshipSummary(
         GameShip sourceOwner,
         GameShip target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.SemanticKey semantic,
         out RelationshipSummary summary)
     {
         summary = default(RelationshipSummary);
-        LeviathanCombat.CombatEntityKey ownerKey;
-        LeviathanCombat.CombatEntityKey targetKey;
-        if (!LeviathanCombat.TryGetEntityKey(sourceOwner, out ownerKey) ||
-            !LeviathanCombat.TryGetEntityKey(target, out targetKey))
+        CoreCombat.CombatEntityKey ownerKey;
+        CoreCombat.CombatEntityKey targetKey;
+        if (!CoreCombat.TryGetEntityKey(sourceOwner, out ownerKey) ||
+            !CoreCombat.TryGetEntityKey(target, out targetKey))
         {
             return false;
         }
@@ -577,17 +577,17 @@ public static class LeviathanCombatHistory
     }
 
     public static bool TryGetOwnerSummary(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.SemanticKey semantic,
         out OwnerSemanticSummary summary)
     {
         return OwnerSummaries.TryGetValue(MakeOwnerKey(sourceOwner, semantic), out summary);
     }
 
     public static uint GetAttemptCount(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic)
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic)
     {
         RelationshipSummary summary;
         return TryGetRelationshipSummary(sourceOwner, target, semantic, out summary)
@@ -595,9 +595,9 @@ public static class LeviathanCombatHistory
     }
 
     public static uint GetDamageCount(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic)
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic)
     {
         RelationshipSummary summary;
         return TryGetRelationshipSummary(sourceOwner, target, semantic, out summary)
@@ -605,9 +605,9 @@ public static class LeviathanCombatHistory
     }
 
     public static float GetLastDamageTime(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic)
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic)
     {
         RelationshipSummary summary;
         return TryGetRelationshipSummary(sourceOwner, target, semantic, out summary)
@@ -615,28 +615,28 @@ public static class LeviathanCombatHistory
     }
 
     public static float GetLastObservationTime(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic)
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic)
     {
         RelationshipSummary summary;
         return TryGetRelationshipSummary(sourceOwner, target, semantic, out summary)
             ? summary.LastObservationTime : 0f;
     }
 
-    public static LeviathanCombat.CombatEntityKey GetLastTarget(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.SemanticKey semantic)
+    public static CoreCombat.CombatEntityKey GetLastTarget(
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.SemanticKey semantic)
     {
         OwnerSemanticSummary summary;
         return TryGetOwnerSummary(sourceOwner, semantic, out summary)
-            ? summary.LastTarget : default(LeviathanCombat.CombatEntityKey);
+            ? summary.LastTarget : default(CoreCombat.CombatEntityKey);
     }
 
     public static bool WasObservedSince(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         float occurredAtInclusive)
     {
         RelationshipSummary summary;
@@ -649,7 +649,7 @@ public static class LeviathanCombatHistory
     // ---------------------------------------------------------------------
 
     public static bool TryReadNextMeaningfulEvent(
-        LeviathanCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey sourceOwner,
         ref ulong cursor,
         out MeaningfulEvent evt)
     {
@@ -690,9 +690,9 @@ public static class LeviathanCombatHistory
     // ---------------------------------------------------------------------
 
     public static bool EnableUniqueContributorWindow(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         float expectedWindowSeconds = 1f)
     {
         if (!ValidRelationship(sourceOwner, target, semantic))
@@ -731,9 +731,9 @@ public static class LeviathanCombatHistory
     }
 
     public static void DisableUniqueContributorWindow(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic)
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic)
     {
         RelationshipKey key = MakeRelationshipKey(sourceOwner, target, semantic);
         ReleaseContributorTracker(key);
@@ -741,9 +741,9 @@ public static class LeviathanCombatHistory
     }
 
     public static int CountUniqueContributors(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic,
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic,
         float windowSeconds,
         float nowOccurredAt)
     {
@@ -794,10 +794,10 @@ public static class LeviathanCombatHistory
     /// own cursor at the current tail and therefore cannot consume old events.
     /// </summary>
     public static void ResetOwnerSkill(
-        LeviathanCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey sourceOwner,
         byte skillId)
     {
-        if (!sourceOwner.IsValid || skillId == LeviathanCombat.SkillIds.None)
+        if (!sourceOwner.IsValid || skillId == CoreCombat.SkillIds.None)
             return;
 
         RelationshipScratch.Clear();
@@ -831,7 +831,7 @@ public static class LeviathanCombatHistory
         OwnerSummaryScratch.Clear();
     }
 
-    public static void ResetOwner(LeviathanCombat.CombatEntityKey sourceOwner)
+    public static void ResetOwner(CoreCombat.CombatEntityKey sourceOwner)
     {
         if (!sourceOwner.IsValid)
             return;
@@ -857,7 +857,7 @@ public static class LeviathanCombatHistory
         Rings.Remove(sourceOwner);
     }
 
-    public static void ResetTarget(LeviathanCombat.CombatEntityKey target)
+    public static void ResetTarget(CoreCombat.CombatEntityKey target)
     {
         if (!target.IsValid)
             return;
@@ -939,17 +939,17 @@ public static class LeviathanCombatHistory
     // ---------------------------------------------------------------------
 
     private static bool ValidRelationship(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic)
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic)
     {
         return sourceOwner.IsValid && target.IsValid && semantic.IsValid;
     }
 
     private static RelationshipKey MakeRelationshipKey(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.CombatEntityKey target,
-        LeviathanCombat.SemanticKey semantic)
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey target,
+        CoreCombat.SemanticKey semantic)
     {
         RelationshipKey key = new RelationshipKey();
         key.SourceOwner = sourceOwner;
@@ -959,8 +959,8 @@ public static class LeviathanCombatHistory
     }
 
     private static OwnerSemanticKey MakeOwnerKey(
-        LeviathanCombat.CombatEntityKey sourceOwner,
-        LeviathanCombat.SemanticKey semantic)
+        CoreCombat.CombatEntityKey sourceOwner,
+        CoreCombat.SemanticKey semantic)
     {
         OwnerSemanticKey key = new OwnerSemanticKey();
         key.SourceOwner = sourceOwner;
@@ -1013,7 +1013,7 @@ public static class LeviathanCombatHistory
         ref RelationshipSummary summary,
         float occurredAt,
         uint eventId,
-        LeviathanCombat.ContributorKey contributor)
+        CoreCombat.ContributorKey contributor)
     {
         if (eventId == 0U)
             return;
@@ -1029,7 +1029,7 @@ public static class LeviathanCombatHistory
 
     private static void UpdateOwnerLastTarget(
         ref OwnerSemanticSummary summary,
-        LeviathanCombat.CombatEntityKey target,
+        CoreCombat.CombatEntityKey target,
         float occurredAt,
         uint eventId)
     {
@@ -1078,7 +1078,7 @@ public static class LeviathanCombatHistory
         return value == uint.MaxValue ? uint.MaxValue : value + 1U;
     }
 
-    private static void AppendOutcome(LeviathanCombat.CombatOutcome outcome)
+    private static void AppendOutcome(CoreCombat.CombatOutcome outcome)
     {
         MeaningfulEvent evt = new MeaningfulEvent();
         evt.Kind = MeaningfulEventKind.CombatOutcome;
@@ -1099,7 +1099,7 @@ public static class LeviathanCombatHistory
     }
 
     private static void AppendMeaningful(
-        LeviathanCombat.CombatEntityKey sourceOwner,
+        CoreCombat.CombatEntityKey sourceOwner,
         ref MeaningfulEvent evt)
     {
         RunMaintenance(false);
@@ -1132,7 +1132,7 @@ public static class LeviathanCombatHistory
     private static void PruneIdleOwnerRings(float nowUnscaled)
     {
         OwnerScratch.Clear();
-        foreach (KeyValuePair<LeviathanCombat.CombatEntityKey, OwnerRing> pair in Rings)
+        foreach (KeyValuePair<CoreCombat.CombatEntityKey, OwnerRing> pair in Rings)
         {
             OwnerRing ring = pair.Value;
             if (ring == null ||
@@ -1149,7 +1149,7 @@ public static class LeviathanCombatHistory
 
     private static void UpdateContributorTracker(
         RelationshipKey key,
-        LeviathanCombat.ContributorKey contributor,
+        CoreCombat.ContributorKey contributor,
         float occurredAt)
     {
         if (!contributor.IsValid)
