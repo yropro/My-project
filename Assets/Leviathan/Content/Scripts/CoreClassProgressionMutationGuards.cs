@@ -33,3 +33,35 @@ public static class CoreCustomClassBuyMutationGuardPatch
         return false;
     }
 }
+
+/// <summary>
+/// Native full-upgrade resets must also clear the currently effective custom
+/// class specialization build before native ranks disappear. This is Core-owned
+/// because the same rule applies to every registered standalone custom class.
+/// </summary>
+[HarmonyPatch(typeof(Pilot), "ResetUpgrades")]
+public static class CoreSpecializationResetWithNativePatch
+{
+    public static void Prefix(Pilot __instance)
+    {
+        if (__instance == null)
+            return;
+
+        CoreClassId classId = CoreSpecializationRuntime.GetEffectiveClass(__instance);
+        if (classId == CoreClassId.None)
+            return;
+
+        string reason;
+        CoreSpecializationRuntime.ResetClassBuild(
+            __instance,
+            classId,
+            out reason);
+
+        if (!string.IsNullOrEmpty(reason))
+        {
+            Debug.LogWarning(
+                "[CoreClassProgression] Could not persist specialization reset: " +
+                reason);
+        }
+    }
+}
