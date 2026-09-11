@@ -1,48 +1,13 @@
 name: Core Foundation V2 Migration
 
 on:
-  push:
-    branches:
-      - chatgpt/core-foundation-v2
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  migrate:
-    if: github.actor != 'github-actions[bot]'
+  archived:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Normalize stale shared comments
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          preserved_anchor = '// Nothing to say if this player is not a Leviathan.'
-          for name in ('LeviathanCombat.cs', 'LeviathanNetwork.cs'):
-              p = Path('Assets/Leviathan/Content/Scripts') / name
-              lines = p.read_text(encoding='utf-8-sig').splitlines(True)
-              out = []
-              for line in lines:
-                  stripped = line.lstrip().rstrip('\r\n')
-                  if stripped.startswith('//') and stripped != preserved_anchor:
-                      line = line.replace('Leviathan', 'Core')
-                  out.append(line)
-              p.write_text(''.join(out), encoding='utf-8')
-          PY
-
-      - name: Run Core foundation migration
-        run: python3 tools/core_foundation_migrate_v2.py
-
-      - name: Commit migrated foundation
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git status --short
-          git commit -m "Promote shared foundation to Core v2"
-          git push origin HEAD:chatgpt/core-foundation-v2
+      - run: echo "Core foundation migration completed; workflow retained temporarily for audit history."
