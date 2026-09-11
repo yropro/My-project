@@ -6,7 +6,7 @@ using System;
 /// specialization engine. Backend accounting remains generic Specialization
 /// Points; the player-facing currency is Evolution Points.
 /// </summary>
-public sealed class LeviathanSpecializationPolicy : ICoreSpecializationPolicy
+public sealed class LeviathanSpecializationPolicy : ICoreSpecializationPolicy, ICoreProgressionRankPolicy
 {
     public CoreClassId ClassId
     {
@@ -21,6 +21,16 @@ public sealed class LeviathanSpecializationPolicy : ICoreSpecializationPolicy
     public string PointCurrencyName
     {
         get { return LeviathanSpecializationCurrency.CurrencyName; }
+    }
+
+    public Upgrade.Key ProgressionUpgradeKey
+    {
+        get { return LeviathanSpecializationCurrency.UpgradeKey; }
+    }
+
+    public Upgrade.Category ClassCategory
+    {
+        get { return LeviathanMod.LeviathanCategory; }
     }
 
     public void EnsurePrerequisitesRegistered()
@@ -41,7 +51,14 @@ public sealed class LeviathanSpecializationPolicy : ICoreSpecializationPolicy
 
     public int GetGrantedPoints(Pilot pilot)
     {
-        return GetProgressionRank(pilot) *
+        return GetGrantedPointsForProgressionRank(
+            pilot,
+            GetProgressionRank(pilot));
+    }
+
+    public int GetGrantedPointsForProgressionRank(Pilot pilot, int progressionRank)
+    {
+        return Math.Max(0, progressionRank) *
             LeviathanSpecializationCurrency.PointsPerRank;
     }
 
