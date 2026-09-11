@@ -22,13 +22,14 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
+          preserved_anchor = '// Nothing to say if this player is not a Leviathan.'
           for name in ('LeviathanCombat.cs', 'LeviathanNetwork.cs'):
               p = Path('Assets/Leviathan/Content/Scripts') / name
               lines = p.read_text(encoding='utf-8-sig').splitlines(True)
               out = []
               for line in lines:
-                  stripped = line.lstrip()
-                  if stripped.startswith('//'):
+                  stripped = line.lstrip().rstrip('\r\n')
+                  if stripped.startswith('//') and stripped != preserved_anchor:
                       line = line.replace('Leviathan', 'Core')
                   out.append(line)
               p.write_text(''.join(out), encoding='utf-8')
