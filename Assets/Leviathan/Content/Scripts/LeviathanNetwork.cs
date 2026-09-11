@@ -356,6 +356,502 @@ public static class LeviathanNetwork
     private static readonly FieldInfo ActiveBridgeField =
         AccessTools.Field(typeof(NetSession), "activeBridge");
 
+
+    // =========================================================================
+    // GENERIC COMBAT DAMAGE FRAMING
+    // =========================================================================
+
+    /// <summary>
+    /// Damage provenance has its own protocol version.  It is independent from
+    /// the 20 Hz ShipState presentation protocol above.
+    /// </summary>
+    public const byte CombatProtocolVersion = 1;
+
+    // Trailer layout:
+    //
+    //   payload...
+    //   uint magic       "LVCT"
+    //   byte protocol
+    //   byte kind        1 DamageEvent, 2 DamageResult
+    //   byte payloadLen
+    //
+    // The footer is at the end of the native message, so parsing never needs to
+    // know or hard-code the native DamageEvent/DamageResult byte length.
+    private const uint CombatTrailerMagic = 0x5443564CU; // L V C T
+    private const byte CombatTrailerEvent = 1;
+    private const byte CombatTrailerResult = 2;
+    private const int CombatTrailerFooterBytes = 7;
+    private const int MaxCombatPayloadBytes = 12;
+    private const int MaxCombatMessageAssociations = 4096;
+    private const float CombatAssociationTimeoutSeconds = 10f;
+    private const float CombatAssociationPruneIntervalSeconds = 1f;
+
+    private const byte CombatEventFlagAckMask = 0x03;
+    private const byte CombatEventFlagHasAttackInstance = 1 << 2;
+
+    private static readonly Dictionary<MsgDamageEvent, LeviathanCombat.CombatEventMetadata>
+        combatEventMetadata =
+            new Dictionary<MsgDamageEvent, LeviathanCombat.CombatEventMetadata>(256);
+
+    private static readonly Dictionary<MsgDamageResult, LeviathanCombat.CombatResultMetadata>
+        combatResultMetadata =
+            new Dictionary<MsgDamageResult, LeviathanCombat.CombatResultMetadata>(256);
+
+    private static readonly List<MsgDamageEvent> combatEventPruneScratch =
+        new List<MsgDamageEvent>(128);
+    private static readonly List<MsgDamageResult> combatResultPruneScratch =
+        new List<MsgDamageResult>(128);
+
+    private static float nextCombatAssociationPruneAt;
+
+    internal static void SetCombatEventMetadata(
+        MsgDamageEvent message,
+        LeviathanCombat.CombatEventMetadata metadata)
+    {
+        if (message == null || !metadata.Semantic.IsValid)
+            return;
+
+        PruneCombatAssociations(false);
+        if (!combatEventMetadata.ContainsKey(message) &&
+            combatEventMetadata.Count >= MaxCombatMessageAssociations)
+        {
+            PruneCombatAssociations(true);
+            if (combatEventMetadata.Count >= MaxCombatMessageAssociations)
+                return;
+        }
+
+        metadata.AttachedAtUnscaled = Time.unscaledTime;
+        combatEventMetadata[message] = metadata;
+    }
+
+    internal static bool TryGetCombatEventMetadata(
+        MsgDamageEvent message,
+        out LeviathanCombat.CombatEventMetadata metadata)
+    {
+        if (message == null)
+        {
+            metadata = default(LeviathanCombat.CombatEventMetadata);
+            return false;
+        }
+
+        return combatEventMetadata.TryGetValue(message, out metadata);
+    }
+
+    internal static void ReleaseCombatEventMetadata(MsgDamageEvent message)
+    {
+        if (message != null)
+            combatEventMetadata.Remove(message);
+    }
+
+    internal static void SetCombatResultMetadata(
+        MsgDamageResult message,
+        LeviathanCombat.CombatResultMetadata metadata)
+    {
+        if (message == null || metadata.EventId == 0U)
+            return;
+
+        PruneCombatAssociations(false);
+        if (!combatResultMetadata.ContainsKey(message) &&
+            combatResultMetadata.Count >= MaxCombatMessageAssociations)
+        {
+            PruneCombatAssociations(true);
+            if (combatResultMetadata.Count >= MaxCombatMessageAssociations)
+                return;
+        }
+
+        metadata.AttachedAtUnscaled = Time.unscaledTime;
+        combatResultMetadata[message] = metadata;
+    }
+
+    internal static bool TryGetCombatResultMetadata(
+        MsgDamageResult message,
+        out LeviathanCombat.CombatResultMetadata metadata)
+    {
+        if (message == null)
+        {
+            metadata = default(LeviathanCombat.CombatResultMetadata);
+            return false;
+        }
+
+        return combatResultMetadata.TryGetValue(message, out metadata);
+    }
+
+    internal static void ReleaseCombatResultMetadata(MsgDamageResult message)
+    {
+        if (message != null)
+            combatResultMetadata.Remove(message);
+    }
+
+    internal static void AppendCombatEventTrailer(
+        NetSerializer serializer,
+        MsgDamageEvent message)
+    {
+        if (serializer == null || serializer.writer == null || message == null)
+            return;
+
+        LeviathanCombat.CombatEventMetadata metadata;
+        if (!combatEventMetadata.TryGetValue(message, out metadata))
+            return;
+
+        BinaryWriter writer = serializer.writer;
+        long payloadStart = writer.BaseStream.Position;
+        try
+        {
+            writer.Write(metadata.EventId);
+            writer.Write(metadata.Semantic.Value);
+
+            byte flags = (byte)((byte)metadata.Acknowledgement &
+                CombatEventFlagAckMask);
+            if (metadata.HasAttackInstance)
+                flags |= CombatEventFlagHasAttackInstance;
+
+            writer.Write(flags);
+            if (metadata.HasAttackInstance)
+                writer.Write(metadata.AttackInstanceId);
+
+            int payloadLength =
+                (int)(writer.BaseStream.Position - payloadStart);
+
+            if (payloadLength <= 0 || payloadLength > MaxCombatPayloadBytes)
+            {
+                // Should never happen with the fixed v1 layout.  Restore the
+                // native message rather than emitting malformed combat framing.
+                writer.BaseStream.Position = payloadStart;
+                writer.BaseStream.SetLength(payloadStart);
+                return;
+            }
+
+            writer.Write(CombatTrailerMagic);
+            writer.Write(CombatProtocolVersion);
+            writer.Write(CombatTrailerEvent);
+            writer.Write((byte)payloadLength);
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                writer.BaseStream.Position = payloadStart;
+                writer.BaseStream.SetLength(payloadStart);
+            }
+            catch (Exception)
+            {
+            }
+
+            Debug.LogWarning(
+                "[LeviathanNetwork] Combat DamageEvent trailer failed: " +
+                ex.Message);
+        }
+        finally
+        {
+            // Source serialization and host relay both finish with this message
+            // object here. Host requests waiting for authority are not written
+            // until they are actually dispatched, so their metadata remains.
+            combatEventMetadata.Remove(message);
+        }
+    }
+
+    internal static void AppendCombatResultTrailer(
+        NetSerializer serializer,
+        MsgDamageResult message)
+    {
+        if (serializer == null || serializer.writer == null || message == null)
+            return;
+
+        LeviathanCombat.CombatResultMetadata metadata;
+        if (!combatResultMetadata.TryGetValue(message, out metadata))
+            return;
+
+        BinaryWriter writer = serializer.writer;
+        long payloadStart = writer.BaseStream.Position;
+        try
+        {
+            writer.Write(metadata.EventId);
+            writer.Write((byte)metadata.Outcomes);
+
+            if ((metadata.Outcomes &
+                 LeviathanCombat.OutcomeFlags.StatusInflicted) != 0 &&
+                metadata.StatusDisposition !=
+                    LeviathanCombat.StatusDisposition.None)
+            {
+                writer.Write(metadata.NativeStatusType);
+                writer.Write((byte)metadata.StatusDisposition);
+            }
+
+            int payloadLength =
+                (int)(writer.BaseStream.Position - payloadStart);
+
+            if (payloadLength <= 0 || payloadLength > MaxCombatPayloadBytes)
+            {
+                writer.BaseStream.Position = payloadStart;
+                writer.BaseStream.SetLength(payloadStart);
+                return;
+            }
+
+            writer.Write(CombatTrailerMagic);
+            writer.Write(CombatProtocolVersion);
+            writer.Write(CombatTrailerResult);
+            writer.Write((byte)payloadLength);
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                writer.BaseStream.Position = payloadStart;
+                writer.BaseStream.SetLength(payloadStart);
+            }
+            catch (Exception)
+            {
+            }
+
+            Debug.LogWarning(
+                "[LeviathanNetwork] Combat DamageResult trailer failed: " +
+                ex.Message);
+        }
+        finally
+        {
+            combatResultMetadata.Remove(message);
+        }
+    }
+
+    internal static void ParseCombatEventTrailer(
+        byte[] buffer,
+        int length,
+        MsgDamageEvent message)
+    {
+        if (message == null)
+            return;
+
+        int payloadOffset;
+        int payloadLength;
+        if (!TryLocateCombatTrailer(
+            buffer, length, CombatTrailerEvent,
+            out payloadOffset, out payloadLength))
+        {
+            return;
+        }
+
+        // v1 event core: uint EventId + ushort SemanticKey + byte flags.
+        if (payloadLength != 7 && payloadLength != 9)
+            return;
+
+        try
+        {
+            uint eventId = ReadUInt32(buffer, payloadOffset);
+            ushort semanticValue = ReadUInt16(buffer, payloadOffset + 4);
+            byte flags = buffer[payloadOffset + 6];
+
+            bool hasAttackInstance =
+                (flags & CombatEventFlagHasAttackInstance) != 0;
+            if (hasAttackInstance != (payloadLength == 9))
+                return;
+
+            LeviathanCombat.AcknowledgementMode acknowledgement =
+                (LeviathanCombat.AcknowledgementMode)
+                    (flags & CombatEventFlagAckMask);
+
+            byte acknowledgementValue = (byte)acknowledgement;
+            if (acknowledgementValue >
+                (byte)LeviathanCombat.AcknowledgementMode.GuaranteedOutcome)
+            {
+                return;
+            }
+
+            LeviathanCombat.CombatEventMetadata metadata =
+                new LeviathanCombat.CombatEventMetadata();
+            metadata.EventId = eventId;
+            metadata.Semantic =
+                LeviathanCombat.SemanticKey.FromPacked(semanticValue);
+            metadata.Acknowledgement = acknowledgement;
+            metadata.HasAttackInstance = hasAttackInstance;
+            metadata.AttackInstanceId = hasAttackInstance
+                ? ReadUInt16(buffer, payloadOffset + 7)
+                : (ushort)0;
+            metadata.AttachedAtUnscaled = Time.unscaledTime;
+
+            if (metadata.Semantic.IsValid)
+                SetCombatEventMetadata(message, metadata);
+        }
+        catch (Exception)
+        {
+            // Native decoding already succeeded. A malformed optional trailer
+            // must never turn valid native damage into a malformed packet.
+        }
+    }
+
+    internal static void ParseCombatResultTrailer(
+        byte[] buffer,
+        int length,
+        MsgDamageResult message)
+    {
+        if (message == null)
+            return;
+
+        int payloadOffset;
+        int payloadLength;
+        if (!TryLocateCombatTrailer(
+            buffer, length, CombatTrailerResult,
+            out payloadOffset, out payloadLength))
+        {
+            return;
+        }
+
+        // v1 result core: uint EventId + byte OutcomeFlags.
+        // Accepted direct native status adds two bytes.
+        if (payloadLength != 5 && payloadLength != 7)
+            return;
+
+        try
+        {
+            LeviathanCombat.CombatResultMetadata metadata =
+                new LeviathanCombat.CombatResultMetadata();
+            metadata.EventId = ReadUInt32(buffer, payloadOffset);
+            byte outcomeBits = buffer[payloadOffset + 4];
+            const byte knownOutcomeBits =
+                (byte)(LeviathanCombat.OutcomeFlags.Processed |
+                       LeviathanCombat.OutcomeFlags.Damaged |
+                       LeviathanCombat.OutcomeFlags.Destroyed |
+                       LeviathanCombat.OutcomeFlags.StatusInflicted);
+            if ((outcomeBits & ~knownOutcomeBits) != 0)
+                return;
+
+            metadata.Outcomes =
+                (LeviathanCombat.OutcomeFlags)outcomeBits;
+            metadata.AttachedAtUnscaled = Time.unscaledTime;
+
+            bool hasStatus =
+                (metadata.Outcomes &
+                 LeviathanCombat.OutcomeFlags.StatusInflicted) != 0;
+
+            if (hasStatus != (payloadLength == 7))
+                return;
+
+            if (hasStatus)
+            {
+                metadata.NativeStatusType = buffer[payloadOffset + 5];
+                metadata.StatusDisposition =
+                    (LeviathanCombat.StatusDisposition)
+                        buffer[payloadOffset + 6];
+
+                if (metadata.StatusDisposition !=
+                        LeviathanCombat.StatusDisposition.New &&
+                    metadata.StatusDisposition !=
+                        LeviathanCombat.StatusDisposition.Merged)
+                {
+                    return;
+                }
+            }
+
+            if (metadata.EventId != 0U)
+                SetCombatResultMetadata(message, metadata);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private static bool TryLocateCombatTrailer(
+        byte[] buffer,
+        int length,
+        byte expectedKind,
+        out int payloadOffset,
+        out int payloadLength)
+    {
+        payloadOffset = 0;
+        payloadLength = 0;
+
+        if (buffer == null || length <= CombatTrailerFooterBytes ||
+            length > buffer.Length)
+        {
+            return false;
+        }
+
+        int footer = length - CombatTrailerFooterBytes;
+        if (footer < 1)
+            return false;
+
+        if (ReadUInt32(buffer, footer) != CombatTrailerMagic ||
+            buffer[footer + 4] != CombatProtocolVersion ||
+            buffer[footer + 5] != expectedKind)
+        {
+            return false;
+        }
+
+        payloadLength = buffer[footer + 6];
+        if (payloadLength <= 0 ||
+            payloadLength > MaxCombatPayloadBytes ||
+            payloadLength > footer - 1)
+        {
+            return false;
+        }
+
+        payloadOffset = footer - payloadLength;
+        return payloadOffset >= 1;
+    }
+
+    private static ushort ReadUInt16(byte[] buffer, int offset)
+    {
+        return (ushort)(buffer[offset] | (buffer[offset + 1] << 8));
+    }
+
+    private static uint ReadUInt32(byte[] buffer, int offset)
+    {
+        return (uint)buffer[offset] |
+               ((uint)buffer[offset + 1] << 8) |
+               ((uint)buffer[offset + 2] << 16) |
+               ((uint)buffer[offset + 3] << 24);
+    }
+
+    private static void PruneCombatAssociations(bool force)
+    {
+        float now = Time.unscaledTime;
+        if (!force && now < nextCombatAssociationPruneAt)
+            return;
+
+        nextCombatAssociationPruneAt =
+            now + CombatAssociationPruneIntervalSeconds;
+
+        combatEventPruneScratch.Clear();
+        foreach (KeyValuePair<MsgDamageEvent, LeviathanCombat.CombatEventMetadata>
+            pair in combatEventMetadata)
+        {
+            if (pair.Key == null ||
+                now - pair.Value.AttachedAtUnscaled >=
+                    CombatAssociationTimeoutSeconds)
+            {
+                combatEventPruneScratch.Add(pair.Key);
+            }
+        }
+
+        for (int i = 0; i < combatEventPruneScratch.Count; i++)
+            combatEventMetadata.Remove(combatEventPruneScratch[i]);
+        combatEventPruneScratch.Clear();
+
+        combatResultPruneScratch.Clear();
+        foreach (KeyValuePair<MsgDamageResult, LeviathanCombat.CombatResultMetadata>
+            pair in combatResultMetadata)
+        {
+            if (pair.Key == null ||
+                now - pair.Value.AttachedAtUnscaled >=
+                    CombatAssociationTimeoutSeconds)
+            {
+                combatResultPruneScratch.Add(pair.Key);
+            }
+        }
+
+        for (int i = 0; i < combatResultPruneScratch.Count; i++)
+            combatResultMetadata.Remove(combatResultPruneScratch[i]);
+        combatResultPruneScratch.Clear();
+    }
+
+    private static void ResetCombatTransport()
+    {
+        combatEventMetadata.Clear();
+        combatResultMetadata.Clear();
+        combatEventPruneScratch.Clear();
+        combatResultPruneScratch.Clear();
+        nextCombatAssociationPruneAt = 0f;
+    }
+
     // =========================================================================
     // PUBLIC API - OWNER SIDE
     // =========================================================================
@@ -747,6 +1243,9 @@ public static class LeviathanNetwork
         lastSeenRegistryRevision = int.MinValue;
         localSpecPacked = null;
         localSpecContentHash = 0u;
+
+        ResetCombatTransport();
+        LeviathanCombat.Reset();
     }
 
     /// <summary>Drop one player's replicated state.</summary>
@@ -1659,6 +2158,54 @@ public static class LeviathanNetwork
             return null;
 
         return RepsField.GetValue(bridge) as Dictionary<int, RemoteShipDriver>;
+    }
+}
+
+// =============================================================================
+// GENERIC COMBAT DAMAGE CODEC PATCHES
+// =============================================================================
+
+[HarmonyPatch(typeof(NetDamageCodec), "Write",
+    new Type[] { typeof(NetSerializer), typeof(MsgDamageEvent) })]
+public static class LeviathanNetworkCombatDamageEventWritePatch
+{
+    public static void Postfix(NetSerializer __0, MsgDamageEvent __1)
+    {
+        LeviathanNetwork.AppendCombatEventTrailer(__0, __1);
+    }
+}
+
+[HarmonyPatch(typeof(NetDamageCodec), "ReadDamageEvent")]
+public static class LeviathanNetworkCombatDamageEventReadPatch
+{
+    public static void Postfix(
+        byte[] __0,
+        int __1,
+        MsgDamageEvent __result)
+    {
+        LeviathanNetwork.ParseCombatEventTrailer(__0, __1, __result);
+    }
+}
+
+[HarmonyPatch(typeof(NetDamageCodec), "Write",
+    new Type[] { typeof(NetSerializer), typeof(MsgDamageResult) })]
+public static class LeviathanNetworkCombatDamageResultWritePatch
+{
+    public static void Postfix(NetSerializer __0, MsgDamageResult __1)
+    {
+        LeviathanNetwork.AppendCombatResultTrailer(__0, __1);
+    }
+}
+
+[HarmonyPatch(typeof(NetDamageCodec), "ReadDamageResult")]
+public static class LeviathanNetworkCombatDamageResultReadPatch
+{
+    public static void Postfix(
+        byte[] __0,
+        int __1,
+        MsgDamageResult __result)
+    {
+        LeviathanNetwork.ParseCombatResultTrailer(__0, __1, __result);
     }
 }
 
