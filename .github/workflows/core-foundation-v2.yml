@@ -23,9 +23,9 @@ jobs:
           from pathlib import Path
           p = Path('Assets/Leviathan/Content/Scripts/LeviathanCombat.cs')
           t = p.read_text(encoding='utf-8-sig')
-          t = t.replace('player / Leviathan owner', 'player / class owner')
-          t = t.replace('claimed Leviathan local transaction', 'claimed local authored transaction')
-          t = t.replace('other Leviathan skills owned by the same player', 'other semantic skills owned by the same player')
+          t = t.replace('Leviathan owner', 'class owner')
+          t = t.replace('Leviathan local transaction', 'local authored transaction')
+          t = t.replace('Leviathan skills owned by the same player', 'semantic skills owned by the same player')
           p.write_text(t, encoding='utf-8')
           PY
 
