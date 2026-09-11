@@ -24,11 +24,11 @@ public static class LeviathanTemporalDive
     {
         // Test convenience requested for the current iteration. Set false when
         // the keystone should be the only activation gate.
-        public const bool ForceTransformPlayerTemporalDriveForTesting = true;
+        public static bool ForceTransformPlayerTemporalDriveForTesting = true;
 
         // Testing-only short cooldown. Set false alongside the force-transform
         // switch for balance testing/release behavior.
-        public const bool ShortCooldownForTesting = true;
+        public static bool ShortCooldownForTesting = true;
         public const float TestingCooldownSeconds = 2f;
 
         public const float NetworkMarkerTimeScale = 1.0f;
@@ -76,6 +76,8 @@ public static class LeviathanTemporalDive
         AccessTools.FieldRefAccess<Beam, GameShip>("parentShip");
     private static readonly AccessTools.FieldRef<BlackHole, GameShip> BlackHoleParentShip =
         AccessTools.FieldRefAccess<BlackHole, GameShip>("parentShip");
+    private static readonly AccessTools.FieldRef<Projectile, string> ProjectileFaction =
+        AccessTools.FieldRefAccess<Projectile, string>("cachedFaction");
 
     public static bool AnyActive { get { return dives.Count > 0; } }
     public static int ActiveDiveCount { get { return dives.Count; } }
@@ -156,8 +158,8 @@ public static class LeviathanTemporalDive
         if (drive == null || !ShouldTransform(drive))
             return;
 
-        // Vanilla already applied TimeWarped/global time inside AddEffect.
-        // Remove that immediately and replace it with the local field.
+        // AddEffect runs with a neutral native timeScale for transformed drives.
+        // Remove its carrier status and replace it with the local field.
         drive.parentShip.RemoveStatusEffect(StatusEffect.Type.TimeWarped);
         Activate(-1, drive.parentShip, Mathf.Max(0.05f, drive.Duration));
     }
@@ -382,12 +384,20 @@ public static class LeviathanTemporalDive
         if (!subjectOwner)
             return 1f;
 
+        return EvaluateFaction(dive, position, subjectOwner.faction);
+    }
+
+    private static float EvaluateFaction(Dive dive, Vector2 position, string faction)
+    {
+        if (string.IsNullOrEmpty(faction))
+            return 1f;
+
         Vector2 delta = position - (Vector2)dive.Owner.transform.position;
         float distanceSqr = delta.sqrMagnitude;
         if (distanceSqr >= dive.OuterRadiusSqr)
             return 1f;
 
-        bool hostile = Faction.IsHostile(dive.Owner.faction, subjectOwner.faction);
+        bool hostile = Faction.IsHostile(dive.Owner.faction, faction);
         float floor = hostile ? dive.EnemyFloor : dive.AllyFloor;
 
         float innerSqr = dive.InnerRadius * dive.InnerRadius;
@@ -444,6 +454,9 @@ public static class LeviathanTemporalDive
     private static void ApplyShipFactor(GameShip ship, float target)
     {
         target = Mathf.Clamp(target, Tuning.MinimumFactor, 1f);
+        // Never discard tracking while leaving a small residual slowdown behind.
+        if (target >= Tuning.RestoreThreshold)
+            target = 1f;
 
         ShipState state;
         bool tracked = shipStates.TryGetValue(ship, out state);
@@ -523,9 +536,7 @@ public static class LeviathanTemporalDive
 
         Projectile projectile = instance as Projectile;
         if (projectile)
-            return projectile.netRendered
-                ? dt
-                : dt * GetEffectFactor(projectile.transform.position, projectile.GetParentShip());
+            return dt * GetProjectileFactor(projectile);
 
         Beam beamInstance = instance as Beam;
         if (beamInstance != null)
@@ -591,9 +602,7 @@ public static class LeviathanTemporalDive
         if (!state.Body)
             return;
 
-        float target = dives.Count == 0
-            ? 1f
-            : GetEffectFactor(projectile.transform.position, projectile.GetParentShip());
+        float target = GetProjectileFactor(projectile);
         float old = Mathf.Clamp(state.Factor, Tuning.MinimumFactor, 1f);
         target = Mathf.Clamp(target, Tuning.MinimumFactor, 1f);
 
@@ -611,7 +620,10 @@ public static class LeviathanTemporalDive
         LeviathanTemporalProjectileState state =
             projectile.GetComponent<LeviathanTemporalProjectileState>();
         if (state != null)
+        {
             state.Factor = 1f;
+            state.FuzzyStartFactor = 1f;
+        }
     }
 
     public static void ClampMissile(Missile missile)
@@ -624,7 +636,7 @@ public static class LeviathanTemporalDive
         if (state == null || !state.Body)
             return;
 
-        float factor = GetEffectFactor(missile.transform.position, missile.GetParentShip());
+        float factor = GetProjectileFactor(missile);
         float max = Mathf.Max(0f, missile.MaxVelocity * factor);
         if (state.Body.velocity.sqrMagnitude > max * max)
             state.Body.velocity = Vector2.ClampMagnitude(state.Body.velocity, max);
@@ -635,11 +647,26 @@ public static class LeviathanTemporalDive
         if (!projectile || projectile.netRendered || dives.Count == 0)
             return 1f;
 
-        return Mathf.Clamp(
-            GetEffectFactor(projectile.transform.position, projectile.GetParentShip()),
-            Tuning.MinimumFactor,
-            1f
-        );
+        GameShip source = GetLogicalOwner(projectile.GetParentShip());
+        // Native Init and reflection refresh this cache, including pooled shots.
+        // It remains valid when the firing ship's Unity object is destroyed.
+        string faction = source ? source.faction : ProjectileFaction(projectile);
+        float result = 1f;
+        for (int i = 0; i < dives.Count; i++)
+        {
+            Dive dive = dives[i];
+            if (dive.Owner)
+                result = Mathf.Min(result, EvaluateFaction(dive, projectile.transform.position, faction));
+        }
+        return Mathf.Clamp(result, Tuning.MinimumFactor, 1f);
+    }
+
+    public static float ScaleMissileAccelerationDelta(float dt, object instance)
+    {
+        float factor = GetProjectileFactor(instance as Projectile);
+        // World velocity already includes one factor; its local acceleration
+        // needs another for the slowed clock (dv/dt = a * factor squared).
+        return dt * factor * factor;
     }
 
     // ---------------------------------------------------------------------
@@ -711,6 +738,7 @@ public static class LeviathanTemporalDive
 public sealed class LeviathanTemporalProjectileState : MonoBehaviour
 {
     public float Factor = 1f;
+    public float FuzzyStartFactor = 1f;
     public Rigidbody2D Body;
     private void Awake() { Body = GetComponent<Rigidbody2D>(); }
 }
@@ -722,21 +750,37 @@ public sealed class LeviathanTemporalProjectileState : MonoBehaviour
 [HarmonyPatch(typeof(TemporalDrive), "AddEffect")]
 public static class LeviathanTemporalDiveAddEffectPatch
 {
-    public static void Prefix(TemporalDrive __instance, out bool __state)
+    public struct ActivationState
     {
-        __state = LeviathanTemporalDive.BeginActivation(__instance);
+        public bool Transformed;
+        public float NativeTimeScale;
     }
 
-    public static void Postfix(TemporalDrive __instance, bool __state)
+    public static void Prefix(TemporalDrive __instance, out ActivationState __state)
     {
-        if (!__state)
-            return;
-        try
+        __state = new ActivationState
         {
-            if (!NetSession.InSession)
-                LeviathanTemporalDive.HandleSinglePlayerStart(__instance);
-        }
-        finally { LeviathanTemporalDive.EndActivation(__instance); }
+            Transformed = LeviathanTemporalDive.BeginActivation(__instance),
+            NativeTimeScale = __instance.timeScale
+        };
+        // Applying then removing vanilla TimeWarped does not undo its velocity
+        // multiplication. Prevent that multiplication in the first place.
+        if (__state.Transformed && !NetSession.InSession)
+            __instance.timeScale = 1f;
+    }
+
+    public static void Postfix(TemporalDrive __instance, ActivationState __state)
+    {
+        if (__state.Transformed && !NetSession.InSession)
+            LeviathanTemporalDive.HandleSinglePlayerStart(__instance);
+    }
+
+    public static void Finalizer(TemporalDrive __instance, ActivationState __state)
+    {
+        if (!__state.Transformed)
+            return;
+        __instance.timeScale = __state.NativeTimeScale;
+        LeviathanTemporalDive.EndActivation(__instance);
     }
 }
 
@@ -892,7 +936,6 @@ public static class LeviathanTemporalDiveDeltaTimePatch
             TM(typeof(Launcher), "UpdateMuzzleFlash"),
             TM(typeof(Shield), "FixedUpdate"),
             TM(typeof(AutoDestroy), "Update"),
-            TM(typeof(Missile), "UpdateVelocity"),
             TM(typeof(HomingMissile), "ResetTurn"),
             TM(typeof(HomingMissile), "UpdateHoming"),
             TM(typeof(HomingMissile), "UpdateRotation"),
@@ -904,12 +947,12 @@ public static class LeviathanTemporalDiveDeltaTimePatch
             TM(typeof(LauncherProjectile), "FixedUpdate"),
             TM(typeof(LauncherProjectile), "UpdateRotation"),
             TM(typeof(LauncherProjectile), "UpdateLauncher"),
-            TM(typeof(FuzzyProjectile), "UpdateCollision"),
+            // Fuzzy collision sweeps use velocity * hitInterval. Keep the
+            // sampling interval in world time so consecutive sweeps still meet.
             TM(typeof(LaserProjectile), "UpdateRotation"),
             TM(typeof(LaserProjectile), "ResetTurn"),
             TM(typeof(LaserProjectile), "UpdateHoming"),
             TM(typeof(LaserProjectile), "UpdateTargets"),
-            TM(typeof(CapturedProjectile), "UpdateVelocity"),
             TM(typeof(CapturedProjectile), "UpdateTractorBeam"),
             TM(typeof(CapturedProjectile), "UpdateOrbitMotion"),
             TM(typeof(CapturedProjectile), "UpdateDrawMotion"),
@@ -1002,6 +1045,9 @@ public static class LeviathanTemporalDiveProjectileResetPatch
 [HarmonyPatch]
 public static class LeviathanTemporalDiveMissileCapPatch
 {
+    private static readonly MethodInfo ScaleAcceleration = AccessTools.Method(
+        typeof(LeviathanTemporalDive), "ScaleMissileAccelerationDelta");
+
     public static IEnumerable<MethodBase> TargetMethods()
     {
         MethodBase missile = AccessTools.DeclaredMethod(typeof(Missile), "UpdateVelocity");
@@ -1019,6 +1065,38 @@ public static class LeviathanTemporalDiveMissileCapPatch
     public static void Postfix(Missile __instance)
     {
         LeviathanTemporalDive.ClampMissile(__instance);
+    }
+
+    public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        return LeviathanTemporalIL.ScaleDeltaReads(instructions, ScaleAcceleration, 0, true);
+    }
+}
+
+[HarmonyPatch(typeof(FuzzyProjectile), "UpdateEndOfLife")]
+public static class LeviathanTemporalDiveFuzzyVelocityPatch
+{
+    private static readonly AccessTools.FieldRef<FuzzyProjectile, bool> Slowing =
+        AccessTools.FieldRefAccess<FuzzyProjectile, bool>("slowing");
+    private static readonly AccessTools.FieldRef<FuzzyProjectile, Vector2> StartVelocity =
+        AccessTools.FieldRefAccess<FuzzyProjectile, Vector2>("slowStartVelocity");
+
+    public static void Prefix(FuzzyProjectile __instance)
+    {
+        if (__instance.netRendered)
+            return;
+        LeviathanTemporalProjectileState state =
+            __instance.GetComponent<LeviathanTemporalProjectileState>();
+        if (state == null)
+            return;
+
+        // Native decay rewrites body velocity from this cached vector. Carry
+        // field transitions into the cache as well as the body, exactly once.
+        float factor = state.Factor;
+        if (Slowing(__instance))
+            StartVelocity(__instance) *= factor / Mathf.Max(
+                LeviathanTemporalDive.Tuning.MinimumFactor, state.FuzzyStartFactor);
+        state.FuzzyStartFactor = factor;
     }
 }
 
