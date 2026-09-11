@@ -13,9 +13,8 @@ public interface ICoreProgressionRankPolicy
     Upgrade.Category ClassCategory { get; }
 
     /// <summary>
-    /// Return the total specialization points that would be available if this
-    /// progression upgrade were exactly progressionRank. The current Pilot is
-    /// provided so future classes may use other stable Pilot facts if needed.
+    /// Return the total specialization points available if this progression
+    /// upgrade were exactly progressionRank.
     /// </summary>
     int GetGrantedPointsForProgressionRank(Pilot pilot, int progressionRank);
 }
@@ -119,7 +118,8 @@ public static class CoreClassProgressionRules
 
     /// <summary>
     /// Custom standalone classes are mutually exclusive at the native class
-    /// ownership level. A class must be refunded before another can be bought.
+    /// ownership level. A class must be fully refunded before another can be
+    /// bought. Re-asserting the category already owned is harmless.
     /// </summary>
     public static bool CanUnlockClass(
         Pilot pilot,
@@ -140,8 +140,7 @@ public static class CoreClassProgressionRules
             return true;
         }
 
-        // Re-asserting the category already held by this Pilot is harmless.
-        if (IsClassPresent(pilot, requestedCategory))
+        if (IsClassPresent(pilot, requestedProgression))
             return true;
 
         var policies = CoreSpecializationPolicies.All();
@@ -155,7 +154,7 @@ public static class CoreClassProgressionRules
                 continue;
             }
 
-            if (!IsClassPresent(pilot, candidate.ClassCategory))
+            if (!IsClassPresent(pilot, candidate))
                 continue;
 
             reason =
@@ -168,6 +167,11 @@ public static class CoreClassProgressionRules
         return true;
     }
 
+    /// <summary>
+    /// Core's specialization state must be empty and the class progression rank
+    /// must be zero before native class refund is allowed. Native Star Vortex
+    /// still enforces its own remaining-upgrades-in-category rule as well.
+    /// </summary>
     public static bool CanRefundClass(
         Pilot pilot,
         Upgrade.Category category,
@@ -207,18 +211,21 @@ public static class CoreClassProgressionRules
 
     private static bool IsClassPresent(
         Pilot pilot,
-        Upgrade.Category category)
+        ICoreProgressionRankPolicy progression)
     {
-        if (pilot == null)
+        if (pilot == null || progression == null)
             return false;
 
         if (pilot.unlockedSecondaryClasses != null &&
-            pilot.unlockedSecondaryClasses.Contains(category))
+            pilot.unlockedSecondaryClasses.Contains(progression.ClassCategory))
         {
             return true;
         }
 
-        return pilot.HasUpgradeInCategory(category);
+        // Also treat a positive progression rank as owned. This protects old or
+        // temporarily inconsistent saves without depending on Star Vortex's
+        // non-public HasUpgradeInCategory helper.
+        return pilot.GetUpgradeLevel(progression.ProgressionUpgradeKey) > 0;
     }
 }
 
@@ -226,25 +233,28 @@ public static class CoreClassProgressionRules
 // Native UI + authoritative mutation guards
 // -----------------------------------------------------------------------------
 
-[HarmonyPatch(typeof(SciencePanel), nameof(SciencePanel.CanDowngradeTooltip))]
+// These native methods are intentionally patched by string name. Existing
+// Leviathan integration accesses them reflectively, so Core must not require
+// them to be public merely to compile.
+[HarmonyPatch(typeof(SciencePanel), "CanDowngradeTooltip")]
 public static class CoreScienceProgressionDowngradePatch
 {
     public static void Postfix(
-        Upgrade upgrade,
+        Upgrade __0,
         GameShip ___ship,
         ref string __result)
     {
-        if (__result != null || upgrade == null || ___ship == null)
+        if (__result != null || __0 == null || ___ship == null || ___ship.pilot == null)
             return;
 
-        int current = ___ship.pilot.GetUpgradeLevel(upgrade.key);
+        int current = ___ship.pilot.GetUpgradeLevel(__0.key);
         if (current <= 0)
             return;
 
         string reason;
         if (!CoreClassProgressionRules.CanSetProgressionRank(
                 ___ship.pilot,
-                upgrade.key,
+                __0.key,
                 current - 1,
                 out reason))
         {
@@ -253,25 +263,25 @@ public static class CoreScienceProgressionDowngradePatch
     }
 }
 
-[HarmonyPatch(typeof(CoreUpgrades), nameof(CoreUpgrades.CanDowngradeTooltip))]
+[HarmonyPatch(typeof(CoreUpgrades), "CanDowngradeTooltip")]
 public static class CoreUpgradesProgressionDowngradePatch
 {
     public static void Postfix(
-        Upgrade upgrade,
+        Upgrade __0,
         GameShip ___ship,
         ref string __result)
     {
-        if (__result != null || upgrade == null || ___ship == null)
+        if (__result != null || __0 == null || ___ship == null || ___ship.pilot == null)
             return;
 
-        int current = ___ship.pilot.GetUpgradeLevel(upgrade.key);
+        int current = ___ship.pilot.GetUpgradeLevel(__0.key);
         if (current <= 0)
             return;
 
         string reason;
         if (!CoreClassProgressionRules.CanSetProgressionRank(
                 ___ship.pilot,
-                upgrade.key,
+                __0.key,
                 current - 1,
                 out reason))
         {
@@ -280,16 +290,22 @@ public static class CoreUpgradesProgressionDowngradePatch
     }
 }
 
-[HarmonyPatch(typeof(Pilot), nameof(Pilot.SetUpgrade))]
+[HarmonyPatch(typeof(Pilot), "SetUpgrade")]
 public static class CoreProgressionRankMutationGuardPatch
 {
-    public static bool Prefix(Pilot __instance, Upgrade.Key key, int level)
+    public static bool Prefix(
+        Pilot __instance,
+        Upgrade.Key __0,
+        int __1)
     {
+        if (__instance == null)
+            return true;
+
         string reason;
         if (!CoreClassProgressionRules.CanSetProgressionRank(
                 __instance,
-                key,
-                level,
+                __0,
+                __1,
                 out reason))
         {
             UnityEngine.Debug.LogWarning(
@@ -299,9 +315,9 @@ public static class CoreProgressionRankMutationGuardPatch
 
         ICoreSpecializationPolicy policy;
         ICoreProgressionRankPolicy progression;
-        if (level > __instance.GetUpgradeLevel(key) &&
+        if (__1 > __instance.GetUpgradeLevel(__0) &&
             CoreClassProgressionRules.TryGetProgressionPolicy(
-                key,
+                __0,
                 out policy,
                 out progression) &&
             !CoreClassProgressionRules.CanUnlockClass(
@@ -319,15 +335,15 @@ public static class CoreProgressionRankMutationGuardPatch
     }
 }
 
-[HarmonyPatch(typeof(Pilot), nameof(Pilot.UnlockSecondaryClass))]
+[HarmonyPatch(typeof(Pilot), "UnlockSecondaryClass")]
 public static class CoreMutuallyExclusiveClassUnlockPatch
 {
-    public static bool Prefix(Pilot __instance, Upgrade.Category category)
+    public static bool Prefix(Pilot __instance, Upgrade.Category __0)
     {
         string reason;
         if (CoreClassProgressionRules.CanUnlockClass(
                 __instance,
-                category,
+                __0,
                 out reason))
         {
             return true;
@@ -339,18 +355,18 @@ public static class CoreMutuallyExclusiveClassUnlockPatch
     }
 }
 
-[HarmonyPatch(typeof(Pilot), nameof(Pilot.RemoveSecondaryClass))]
+[HarmonyPatch(typeof(Pilot), "RemoveSecondaryClass")]
 public static class CoreClassRefundGuardPatch
 {
     public static bool Prefix(
         Pilot __instance,
-        Upgrade.Category category,
+        Upgrade.Category __0,
         ref bool __result)
     {
         string reason;
         if (CoreClassProgressionRules.CanRefundClass(
                 __instance,
-                category,
+                __0,
                 out reason))
         {
             return true;
@@ -363,15 +379,15 @@ public static class CoreClassRefundGuardPatch
     }
 }
 
-[HarmonyPatch(typeof(UpgradeClassDisplay), nameof(UpgradeClassDisplay.ShowBuyButton))]
+[HarmonyPatch(typeof(UpgradeClassDisplay), "ShowBuyButton")]
 public static class CoreClassBuyButtonGuardPatch
 {
     public static void Prefix(
         Upgrade.Category ___category,
         GameShip ___ship,
-        ref bool interactable)
+        ref bool __0)
     {
-        if (!interactable || ___ship == null)
+        if (!__0 || ___ship == null || ___ship.pilot == null)
             return;
 
         string reason;
@@ -380,20 +396,20 @@ public static class CoreClassBuyButtonGuardPatch
                 ___category,
                 out reason))
         {
-            interactable = false;
+            __0 = false;
         }
     }
 }
 
-[HarmonyPatch(typeof(UpgradeClassDisplay), nameof(UpgradeClassDisplay.ShowSellButton))]
+[HarmonyPatch(typeof(UpgradeClassDisplay), "ShowSellButton")]
 public static class CoreClassSellButtonGuardPatch
 {
     public static void Prefix(
         Upgrade.Category ___category,
         GameShip ___ship,
-        ref bool interactable)
+        ref bool __0)
     {
-        if (!interactable || ___ship == null)
+        if (!__0 || ___ship == null || ___ship.pilot == null)
             return;
 
         string reason;
@@ -402,7 +418,7 @@ public static class CoreClassSellButtonGuardPatch
                 ___category,
                 out reason))
         {
-            interactable = false;
+            __0 = false;
         }
     }
 }
