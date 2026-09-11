@@ -33,7 +33,14 @@ public static class CoreClassRuntime
     private static int contextRevision;
     private static bool warnedClassConflict;
 
-    public static event Action<CoreClassId, CoreClassId> LocalClassChanged;
+    private static readonly Dictionary<CoreClassId, CoreClassLifecycle> lifecycles =
+        new Dictionary<CoreClassId, CoreClassLifecycle>();
+    private static CoreOwnerContext context;
+    private static ulong generation;
+    private static bool transitioning;
+    private static bool worldExiting;
+    public static CoreOwnerContext CurrentContext { get { EnsureInitialized(); return context; } }
+
 
     public static CoreClassId ActiveLocalClass
     {
@@ -78,15 +85,19 @@ public static class CoreClassRuntime
 
     public static void RegisterLocalClass(
         CoreClassId classId,
-        Func<Pilot, bool> resolver)
+        Func<Pilot, bool> resolver, CoreClassLifecycle lifecycle = null)
     {
         if (classId == CoreClassId.None)
             throw new ArgumentException("None cannot own a class resolver.", "classId");
         if (resolver == null)
             throw new ArgumentNullException("resolver");
 
-        resolvers[classId] = resolver;
-        Refresh();
+        if (resolvers.ContainsKey(classId))
+            throw new InvalidOperationException("Duplicate class resolver: " + classId);
+        if (CoreSpecializationPolicies.Get(classId) == null)
+            throw new InvalidOperationException("Register the class catalog before its resolver.");
+        resolvers.Add(classId, resolver);
+        if (lifecycle != null) lifecycles.Add(classId, lifecycle);
     }
 
     public static void UnregisterLocalClass(CoreClassId classId)
@@ -95,7 +106,10 @@ public static class CoreClassRuntime
             return;
 
         if (resolvers.Remove(classId))
+        {
             Refresh();
+            lifecycles.Remove(classId);
+        }
     }
 
     public static bool IsLocalClassActive(CoreClassId classId)
@@ -178,67 +192,66 @@ public static class CoreClassRuntime
             return;
         }
 
-        Pilot nextPilot = current ?? mutationPilot;
-        CoreClassId nextClass = ResolveClass(nextPilot);
-        bool pilotChanged = !ReferenceEquals(activeLocalPilot, nextPilot);
-        bool classChanged = nextClass != activeLocalClass;
+        if (transitioning || worldExiting) return;
+        Pilot nextPilot = current;
+        GameShip ship = WorldController.instance == null ? null :
+            WorldController.instance.GetCurrentPlayerShip();
+        Transition(nextPilot, ship, ResolveClass(nextPilot));
+    }
 
-        if (initialized && !pilotChanged && !classChanged)
-            return;
-
-        CoreClassId previousClass = activeLocalClass;
-
-        activeLocalPilot = nextPilot;
-        activeLocalClass = nextClass;
-        initialized = true;
-
-        unchecked
+    internal static void Transition(Pilot pilot, GameShip ship, CoreClassId classId)
+    {
+        if (transitioning) return;
+        if (initialized && ReferenceEquals(activeLocalPilot, pilot) &&
+            activeLocalClass == classId && context != null && ReferenceEquals(context.Ship, ship)) return;
+        transitioning = true;
+        CoreOwnerContext old = context;
+        CoreClassId previous = activeLocalClass;
+        try
         {
-            contextRevision++;
-            if (classChanged)
-                transitionRevision++;
+            if (old != null) old.Invalidate();
+            // Lifetime validity changes before cancellation callbacks run.
+            CoreAbilityRuntime.CancelOwner(old);
+            CoreClassEntities.ReleaseOwner(old);
+            CoreClassLifecycle lifecycle;
+            if (old != null && lifecycles.TryGetValue(old.ClassId, out lifecycle))
+                InvokeSafely(lifecycle.Exit, old);
+            CoreNetwork.ClearLocalSlots();
+            activeLocalPilot = pilot;
+            activeLocalClass = classId;
+            context = new CoreOwnerContext(pilot, ship, classId, ++generation);
+            initialized = true;
+            unchecked { contextRevision++; if (previous != classId) transitionRevision++; }
+            CoreSpecializationRuntime.InvalidateConfiguration();
+            CoreNetwork.InvalidateLocalSpecialization();
+            if (ship != null && classId != CoreClassId.None && lifecycles.TryGetValue(classId, out lifecycle))
+                InvokeSafely(lifecycle.Enter, context);
         }
+        finally { transitioning = false; }
+    }
 
-        if (classChanged)
-        {
-            Action<CoreClassId, CoreClassId> handler = LocalClassChanged;
-            if (handler != null)
-                handler(previousClass, nextClass);
-        }
+    private static void InvokeSafely(Action<CoreOwnerContext> callback, CoreOwnerContext value)
+    {
+        try { if (callback != null) callback(value); }
+        catch (Exception ex) { Debug.LogError("[CoreClassRuntime] Lifecycle failed: " + ex); }
     }
 
     public static void Reset()
     {
-        CoreClassId previousClass = activeLocalClass;
-        bool hadContext = initialized || activeLocalPilot != null ||
-            previousClass != CoreClassId.None;
-
-        activeLocalPilot = null;
-        activeLocalClass = CoreClassId.None;
-        initialized = false;
+        worldExiting = true;
+        Transition(null, null, CoreClassId.None);
         warnedClassConflict = false;
+    }
 
-        if (!hadContext)
-            return;
-
-        unchecked
-        {
-            contextRevision++;
-            if (previousClass != CoreClassId.None)
-                transitionRevision++;
-        }
-
-        if (previousClass != CoreClassId.None)
-        {
-            Action<CoreClassId, CoreClassId> handler = LocalClassChanged;
-            if (handler != null)
-                handler(previousClass, CoreClassId.None);
-        }
+    internal static void WorldEntered()
+    {
+        worldExiting = false;
+        Refresh();
     }
 
     private static void EnsureInitialized()
     {
-        if (!initialized)
+        if (!initialized && !worldExiting)
             Refresh();
     }
 
@@ -289,7 +302,7 @@ public static class CoreClassRuntimeWorldPostInitPatch
 {
     public static void Postfix()
     {
-        CoreClassRuntime.Refresh();
+        CoreClassRuntime.WorldEntered();
     }
 }
 

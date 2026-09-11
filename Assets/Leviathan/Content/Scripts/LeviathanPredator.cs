@@ -251,6 +251,7 @@ public static class LeviathanPredatorRuntime
 
     public static class Flags
     {
+        public static readonly CoreSpecializationFlag ResetCooldownOnPreyDamage = Flag("prey_damage.reset_cooldown", "Reset Cooldown On Prey Damage");
         public static readonly CoreSpecializationFlag ThrillOfTheHunt = Flag("thrill.enabled", "Thrill of the Hunt");
         public static readonly CoreSpecializationFlag MassExtinction = Flag("mass.enabled", "Mass Extinction");
         public static readonly CoreSpecializationFlag HoldPrey = Flag("hold.enabled", "Hold Prey");
@@ -474,7 +475,7 @@ public static class LeviathanPredatorRuntime
         bool local = WorldController.instance != null &&
             ReferenceEquals(WorldController.instance.GetCurrentPlayerShip(), owner);
         bool remote = owner.IsRemotePlayer() &&
-            CoreNetwork.HasSynchronizedSpecialization(owner);
+            CoreNetwork.HasSynchronizedSpecialization(owner, CoreClassId.Leviathan);
 
         return (local || remote) &&
             CoreSpecializationRuntime.IsTreeActive(
@@ -860,7 +861,7 @@ public static class LeviathanPredatorRuntime
             return false;
 
         GetRuntime(owner);
-        return CoreCombatState.Apply(
+        bool applied = CoreCombatState.Apply(
             owner,
             target,
             CoreCombat.Semantics.PredatorPrey,
@@ -1704,7 +1705,7 @@ public static class LeviathanPredatorRuntime
         if (player != null && player.IsRemotePlayer())
         {
             CoreNetwork.SlotReader reader;
-            return CoreNetwork.HasSynchronizedSpecialization(player) &&
+            return CoreNetwork.HasSynchronizedSpecialization(player, CoreClassId.Leviathan) &&
                 CoreNetwork.TryReadSlot(player, CoreNetwork.SlotPredator, out reader) && reader.Bool();
         }
         RuntimeState runtime;

@@ -148,7 +148,9 @@ public static class OrrerySpellRegistry
             return false;
         }
 
-        return definition.Executor(owner, invocation, definition);
+        if (invocation.Execution == null || !invocation.Execution.IsValid ||
+            !ReferenceEquals(invocation.Execution.Owner.Ship, owner)) return false;
+        return invocation.Execution.TryCommit(() => definition.Executor(owner, invocation, definition));
     }
 
     public static CoreCombat.SemanticKey GetCombatSemantic(

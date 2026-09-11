@@ -1868,7 +1868,8 @@ public static class CoreSpecializationRegistry
             throw new ArgumentNullException("tree");
 
         tree.Validate();
-        trees[tree.Id] = tree;
+        if (trees.ContainsKey(tree.Id)) throw new InvalidOperationException("Duplicate tree: " + tree.Id);
+        trees.Add(tree.Id, tree);
         MarkStructureChanged();
     }
 
@@ -1955,6 +1956,9 @@ public sealed class CorePilotSpecializationData
     // Network replicas use transient specialization state supplied by
     // CoreNetwork. It must never load from or write to local persistence.
     internal bool IsRemoteTransient;
+    internal CoreClassId RemoteClass;
+    internal CoreClassId PendingRemoteClass;
+    internal CoreClassId CacheClass;
     internal bool RemoteUpdateInProgress;
 
     internal readonly Dictionary<string, CoreSpecializationState>
@@ -2017,6 +2021,24 @@ public static class CoreSpecializationRuntime
         }
     }
 
+    public static CoreClassId GetEffectiveClass(Pilot pilot)
+    {
+        if (pilot == null) return CoreClassId.None;
+        CorePilotSpecializationData value;
+        if (data.TryGetValue(pilot, out value) && value.IsRemoteTransient) return value.RemoteClass;
+        return ReferenceEquals(GetCurrentPilot(), pilot) ? CoreClassRuntime.ResolveClass(pilot) : CoreClassId.None;
+    }
+
+    private static IList<CoreSpecializationTree> EffectiveTrees(Pilot pilot)
+    { return CoreSpecializationPolicies.GetTrees(GetEffectiveClass(pilot)); }
+
+    public static int GetStoredNodeRank(Pilot pilot, CoreClassId classId, string treeId, string nodeId)
+    {
+        if (classId == CoreClassId.None || CoreSpecializationPolicies.GetOwnerClass(treeId) != classId) return 0;
+        CoreSpecializationState state = GetRawState(pilot, treeId);
+        return state == null ? 0 : state.GetRank(nodeId);
+    }
+
     public static void RegisterDefaults()
     {
         if (registeredDefaults)
@@ -2031,7 +2053,7 @@ public static class CoreSpecializationRuntime
     /// replica Pilot. Remote state is transient: it never participates in local
     /// persistence and is replaced wholesale by each received spec block.
     /// </summary>
-    public static void BeginRemoteSpecialization(Pilot pilot)
+    public static void BeginRemoteSpecialization(Pilot pilot, CoreClassId classId)
     {
         RegisterDefaults();
 
@@ -2053,6 +2075,9 @@ public static class CoreSpecializationRuntime
             data.Add(pilot, playerData);
         }
 
+        if (classId != CoreClassId.None && CoreSpecializationPolicies.Get(classId) == null)
+            throw new InvalidOperationException("Unknown remote class.");
+        playerData.PendingRemoteClass = classId;
         playerData.IsRemoteTransient = true;
         playerData.PersistenceReady = true;
         playerData.PersistenceReason = string.Empty;
@@ -2103,6 +2128,9 @@ public static class CoreSpecializationRuntime
             );
         }
 
+        if (CoreSpecializationPolicies.GetOwnerClass(treeId) != playerData.PendingRemoteClass)
+            throw new InvalidOperationException("Rank belongs to another remote class.");
+        if (rank < 0 || rank > node.MaxRank) throw new InvalidOperationException("Invalid remote rank.");
         if (node.AutoGranted)
             return;
 
@@ -2138,6 +2166,7 @@ public static class CoreSpecializationRuntime
             );
         }
 
+        playerData.RemoteClass = playerData.PendingRemoteClass;
         playerData.Trees.Clear();
 
         foreach (KeyValuePair<string, CoreSpecializationState> pair
@@ -2175,8 +2204,20 @@ public static class CoreSpecializationRuntime
             return;
         }
 
-        data.Remove(pilot);
+        playerData.RemoteClass = CoreClassId.None;
+        playerData.PendingRemoteClass = CoreClassId.None;
+        playerData.Trees.Clear();
+        playerData.RemotePendingTrees.Clear();
+        playerData.RemoteUpdateInProgress = false;
+        playerData.ClearResolutionCaches();
         InvalidateConfiguration();
+    }
+
+    public static void ReleaseRemotePilot(Pilot pilot)
+    {
+        CorePilotSpecializationData value;
+        if (pilot != null && data.TryGetValue(pilot, out value) && value.IsRemoteTransient)
+        { data.Remove(pilot); InvalidateConfiguration(); }
     }
 
     // Rebuilds tree definitions from the currently compiled *Tree.cs files.
@@ -2293,7 +2334,7 @@ public static class CoreSpecializationRuntime
         {
             int hash = 17;
             IList<CoreSpecializationTree> trees =
-                CoreSpecializationRegistry.All();
+                EffectiveTrees(pilot);
 
             for (int i = 0; i < trees.Count; i++)
             {
@@ -2315,13 +2356,13 @@ public static class CoreSpecializationRuntime
     }
 
     private static int ComputeStateRevisionStamp(
-        CorePilotSpecializationData playerData)
+        Pilot pilot, CorePilotSpecializationData playerData)
     {
         unchecked
         {
             int hash = 17;
             IList<CoreSpecializationTree> trees =
-                CoreSpecializationRegistry.All();
+                EffectiveTrees(pilot);
 
             for (int i = 0; i < trees.Count; i++)
             {
@@ -2348,9 +2389,10 @@ public static class CoreSpecializationRuntime
 
         int registryRevision = CoreSpecializationRegistry.Revision;
         int nativeUnlockStamp = ComputeNativeUnlockStamp(pilot);
-        int stateRevisionStamp = ComputeStateRevisionStamp(playerData);
+        int stateRevisionStamp = ComputeStateRevisionStamp(pilot, playerData);
 
-        if (playerData.CacheConfigurationRevision == configurationRevision &&
+        CoreClassId effectiveClass = GetEffectiveClass(pilot);
+        if (playerData.CacheClass == effectiveClass && playerData.CacheConfigurationRevision == configurationRevision &&
             playerData.CacheRegistryRevision == registryRevision &&
             playerData.CacheNativeUnlockStamp == nativeUnlockStamp &&
             playerData.CacheStateRevisionStamp == stateRevisionStamp)
@@ -2358,6 +2400,7 @@ public static class CoreSpecializationRuntime
             return;
         }
 
+        playerData.CacheClass = effectiveClass;
         playerData.CacheConfigurationRevision = configurationRevision;
         playerData.CacheRegistryRevision = registryRevision;
         playerData.CacheNativeUnlockStamp = nativeUnlockStamp;
@@ -2371,6 +2414,8 @@ public static class CoreSpecializationRuntime
     {
         RegisterDefaults();
         CoreSpecializationTree tree = CoreSpecializationRegistry.Get(treeId);
+        if (tree == null || GetEffectiveClass(pilot) == CoreClassId.None ||
+            CoreSpecializationPolicies.GetOwnerClass(treeId) != GetEffectiveClass(pilot)) return null;
         CoreSpecializationState state = GetRawState(pilot, treeId);
 
         if (tree != null && state != null)
@@ -2382,13 +2427,13 @@ public static class CoreSpecializationRuntime
     private static void SynchronizeAllAutoGrantedNodes(Pilot pilot)
     {
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         if (policy == null)
             return;
 
         CoreClassId ownerClass = policy.ClassId;
         IList<CoreSpecializationTree> trees =
-            CoreSpecializationRegistry.All();
+            EffectiveTrees(pilot);
 
         for (int i = 0; i < trees.Count; i++)
         {
@@ -2469,6 +2514,7 @@ public static class CoreSpecializationRuntime
         if (pilot == null || tree == null || playerData == null)
             return false;
 
+        if (GetEffectiveClass(pilot) == CoreClassId.None || CoreSpecializationPolicies.GetOwnerClass(tree.Id) != GetEffectiveClass(pilot)) return false;
         bool cached;
         if (playerData.TreeUnlockCache.TryGetValue(tree.Id, out cached))
             return cached;
@@ -2487,6 +2533,7 @@ public static class CoreSpecializationRuntime
         CorePilotSpecializationData playerData,
         HashSet<string> path)
     {
+        if (GetEffectiveClass(pilot) == CoreClassId.None || CoreSpecializationPolicies.GetOwnerClass(tree.Id) != GetEffectiveClass(pilot)) return false;
         bool cached;
         if (playerData.TreeUnlockCache.TryGetValue(tree.Id, out cached))
             return cached;
@@ -2496,7 +2543,7 @@ public static class CoreSpecializationRuntime
 
         CoreClassId targetOwner =
             CoreSpecializationPolicies.GetOwnerClass(tree.Id);
-        if (targetOwner == CoreClassId.None)
+        if (targetOwner == CoreClassId.None || targetOwner != GetEffectiveClass(pilot))
             return false;
 
         bool result = false;
@@ -2516,7 +2563,7 @@ public static class CoreSpecializationRuntime
             else
             {
                 IList<CoreSpecializationTree> all =
-                    CoreSpecializationRegistry.All();
+                    EffectiveTrees(pilot);
 
                 for (int i = 0; i < all.Count; i++)
                 {
@@ -2604,7 +2651,7 @@ public static class CoreSpecializationRuntime
         }
 
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         if (policy == null ||
             CoreSpecializationPolicies.GetOwnerClass(tree.Id) !=
                 policy.ClassId)
@@ -2705,7 +2752,7 @@ public static class CoreSpecializationRuntime
         }
 
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         if (policy == null ||
             CoreSpecializationPolicies.GetOwnerClass(tree.Id) !=
                 policy.ClassId)
@@ -2779,7 +2826,7 @@ public static class CoreSpecializationRuntime
     {
         reason = string.Empty;
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         if (policy == null)
         {
             reason = "No specialization policy is available for this Pilot.";
@@ -2788,7 +2835,7 @@ public static class CoreSpecializationRuntime
 
         CoreClassId ownerClass = policy.ClassId;
         IList<CoreSpecializationTree> trees =
-            CoreSpecializationRegistry.All();
+            EffectiveTrees(pilot);
 
         for (int i = 0; i < trees.Count; i++)
         {
@@ -2832,11 +2879,10 @@ public static class CoreSpecializationRuntime
             return 0;
 
         RegisterDefaults();
-        SynchronizeAllAutoGrantedNodes(pilot);
 
         int spent = 0;
         IList<CoreSpecializationTree> trees =
-            CoreSpecializationRegistry.All();
+            CoreSpecializationPolicies.GetTrees(classId);
 
         for (int i = 0; i < trees.Count; i++)
         {
@@ -2854,7 +2900,7 @@ public static class CoreSpecializationRuntime
     public static int GetTotalSpentPoints(Pilot pilot)
     {
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         return policy == null
             ? 0
             : GetSpentPointsForClass(pilot, policy.ClassId);
@@ -2885,39 +2931,24 @@ public static class CoreSpecializationRuntime
         return CoreSpecializationPoints.GetProgressionRank(pilot);
     }
 
-    public static bool ResetAll(Pilot pilot, out string reason)
+    public static bool ResetClassBuild(Pilot pilot, CoreClassId classId, out string reason)
     {
         reason = string.Empty;
-        if (pilot == null)
-            return false;
-
-        RegisterDefaults();
+        if (classId == CoreClassId.None) return true;
+        if (!CanSafelySpend(pilot, out reason)) return false;
         CorePilotSpecializationData playerData = GetPilotData(pilot);
-        if (playerData == null)
-            return false;
-
+        if (playerData == null || playerData.IsRemoteTransient) return false;
+        var replacement = new Dictionary<string, CoreSpecializationState>(playerData.Trees, StringComparer.Ordinal);
+        foreach (CoreSpecializationTree tree in CoreSpecializationPolicies.GetTrees(classId)) replacement.Remove(tree.Id);
+        if (!CoreSpecializationPersistence.Save(pilot, replacement, out reason)) return false;
         playerData.Trees.Clear();
-
-        IList<CoreSpecializationTree> trees =
-            CoreSpecializationRegistry.All();
-        for (int i = 0; i < trees.Count; i++)
-            playerData.Trees[trees[i].Id] = new CoreSpecializationState();
-
+        foreach (var pair in replacement) playerData.Trees.Add(pair.Key, pair.Value);
+        InvalidateConfiguration();
         SynchronizeAllAutoGrantedNodes(pilot);
-
-        bool saved = CoreSpecializationPersistence.Save(
-            pilot,
-            playerData.Trees,
-            out reason
-        );
-
-        if (saved)
-            InvalidateConfiguration();
-
-        return saved;
+        return true;
     }
 
-    public static int GetNodeRank(
+    public static int GetEffectiveNodeRank(
         Pilot pilot,
         string treeId,
         string nodeId)
@@ -2928,7 +2959,7 @@ public static class CoreSpecializationRuntime
 
         return tree == null ||
             state == null ||
-            tree.GetNode(nodeId) == null
+            tree.GetNode(nodeId) == null || !IsTreeUnlockedRaw(pilot, tree)
                 ? 0
                 : state.GetRank(nodeId);
     }
@@ -2938,7 +2969,7 @@ public static class CoreSpecializationRuntime
         string treeId,
         string nodeId)
     {
-        return GetNodeRank(pilot, treeId, nodeId) > 0;
+        return GetEffectiveNodeRank(pilot, treeId, nodeId) > 0;
     }
 
     // Legacy tree-specific lookup retained for current bridges.
@@ -3031,7 +3062,7 @@ public static class CoreSpecializationRuntime
         }
 
         IList<CoreSpecializationTree> trees =
-            CoreSpecializationRegistry.All();
+            EffectiveTrees(pilot);
 
         for (int i = 0; i < trees.Count; i++)
         {
@@ -3096,7 +3127,7 @@ public static class CoreSpecializationRuntime
 
         bool enabled = false;
         IList<CoreSpecializationTree> trees =
-            CoreSpecializationRegistry.All();
+            EffectiveTrees(pilot);
 
         for (int i = 0; i < trees.Count; i++)
         {

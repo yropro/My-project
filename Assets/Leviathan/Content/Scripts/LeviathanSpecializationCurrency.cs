@@ -501,7 +501,7 @@ public static class LeviathanSpecializationResetWithNativePatch
             return;
 
         string reason;
-        CoreSpecializationRuntime.ResetAll(__instance, out reason);
+        CoreSpecializationRuntime.ResetClassBuild(__instance, CoreSpecializationRuntime.GetEffectiveClass(__instance), out reason);
 
         if (!string.IsNullOrEmpty(reason))
         {

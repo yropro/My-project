@@ -75,6 +75,8 @@ public static class OrrerySatellites
 
     public sealed class SatelliteContext
     {
+        public CoreClassEntity Identity { get; internal set; }
+        public bool IsValid { get { return Identity != null && Identity.IsValid; } }
         public GameShip Owner { get; internal set; }
         public GameShip Ship { get; internal set; }
         public byte SatelliteId { get; internal set; }
@@ -197,7 +199,21 @@ public static class OrrerySatellites
 
         idValidation.Clear();
         shipValidation.Clear();
+        CoreOwnerContext lifetime = CoreClassRuntime.CurrentContext;
+        if (lifetime == null || !lifetime.IsValid || lifetime.ClassId != CoreClassId.Orrery || !ReferenceEquals(lifetime.Ship, owner)) return false;
+        OrreryCasting.Cancel(owner);
         RemoveSatelliteMappings(owner);
+        snapshotsByOwner.Remove(owner);
+        try
+        {
+            for (int i = 0; i < next.Length; i++)
+                next[i].Identity = CoreClassEntities.Register(lifetime, 1, next[i].SatelliteId, next[i].Ship);
+        }
+        catch
+        {
+            for (int i = 0; i < next.Length; i++) CoreClassEntities.Release(next[i].Identity);
+            throw;
+        }
         revision++;
         SatelliteSnapshot snapshot = new SatelliteSnapshot(owner, revision, next);
         snapshotsByOwner[owner] = snapshot;
@@ -221,7 +237,7 @@ public static class OrrerySatellites
         owner = null;
         context = null;
         if (ship == null || !contextBySatellite.TryGetValue(ship, out context) ||
-            context == null)
+            context == null || !context.IsValid)
         {
             context = null;
             return false;
@@ -245,7 +261,7 @@ public static class OrrerySatellites
         for (int i = 0; i < snapshot.Count; i++)
         {
             SatelliteContext candidate = snapshot.Get(i);
-            if (candidate != null && candidate.SatelliteId == satelliteId)
+            if (candidate != null && candidate.IsValid && candidate.SatelliteId == satelliteId)
             {
                 context = candidate;
                 return true;
@@ -326,6 +342,7 @@ public static class OrrerySatellites
     {
         if (owner == null)
             return;
+        OrreryCasting.Cancel(owner);
         bool removed = snapshotsByOwner.ContainsKey(owner);
         RemoveSatelliteMappings(owner);
         snapshotsByOwner.Remove(owner);
@@ -335,6 +352,8 @@ public static class OrrerySatellites
 
     public static void Reset()
     {
+        foreach (SatelliteSnapshot snapshot in snapshotsByOwner.Values)
+            for (int i = 0; i < snapshot.Count; i++) CoreClassEntities.Release(snapshot.Get(i).Identity);
         intentsByOwner.Clear();
         snapshotsByOwner.Clear();
         contextBySatellite.Clear();
@@ -352,8 +371,9 @@ public static class OrrerySatellites
         for (int i = 0; i < existing.Count; i++)
         {
             SatelliteContext context = existing.Get(i);
-            if (context == null || context.Ship == null)
-                continue;
+            if (context == null) continue;
+            CoreClassEntities.Release(context.Identity);
+            if (ReferenceEquals(context.Ship, null)) continue;
             contextBySatellite.Remove(context.Ship);
             CoreCombat.ReleaseContributorObject(context.Ship);
         }

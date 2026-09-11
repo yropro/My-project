@@ -966,7 +966,7 @@ public static class LeviathanStellarConverter
 
         bool synchronizedRemote =
             player.IsRemotePlayer() &&
-            CoreNetwork.HasSynchronizedSpecialization(player);
+            CoreNetwork.HasSynchronizedSpecialization(player, CoreClassId.Leviathan);
 
         return (localOwner || synchronizedRemote) &&
             CoreSpecializationRuntime.IsTreeActive(

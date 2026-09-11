@@ -326,7 +326,7 @@ public static class LeviathanConstrictor
             return InactiveState;
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(ship);
-        if (pilot == null)
+        if (pilot == null || CoreSpecializationRuntime.GetEffectiveClass(pilot) != CoreClassId.Leviathan)
             return InactiveState;
 
         bool local = IsCurrentPlayer(ship);
@@ -334,7 +334,7 @@ public static class LeviathanConstrictor
         // Remote specialization is transient and belongs to the exact current
         // replica. Until synchronized, fail closed to native presentation.
         if (!local && ship.IsAnyPlayerShip() &&
-            !CoreNetwork.HasSynchronizedSpecialization(ship))
+            !CoreNetwork.HasSynchronizedSpecialization(ship, CoreClassId.Leviathan))
         {
             return InactiveState;
         }
@@ -1247,7 +1247,7 @@ public static class LeviathanConstrictor
             return false;
 
         if (!IsCurrentPlayer(owner) && owner.IsAnyPlayerShip() &&
-            !CoreNetwork.HasSynchronizedSpecialization(owner))
+            !CoreNetwork.HasSynchronizedSpecialization(owner, CoreClassId.Leviathan))
         {
             return false;
         }

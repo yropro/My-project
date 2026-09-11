@@ -44,17 +44,22 @@ public class LeviathanMod : IStarVortexMod
         // Upgrade's key lookup before any UI or Pilot code can request them.
         LeviathanSkillSystem.Register();
 
-        CoreClassRuntime.RegisterLocalClass(
-            CoreClassId.Leviathan,
-            delegate(Pilot pilot)
-            {
-                return pilot != null &&
-                    pilot.GetUpgradeLevel(
-                        LeviathanSpecializationCurrency.UpgradeKey) >= 1;
-            });
-
-        CoreSpecializationPolicies.Register(
-            new LeviathanSpecializationPolicy());
+        // Catalogs and slot identities must exist before any lifecycle callback.
+        if (CoreSpecializationPolicies.Get(CoreClassId.Leviathan) == null)
+        {
+            CoreSpecializationPolicies.Register(new LeviathanSpecializationPolicy());
+            CoreSpecializationPolicies.Register(new OrrerySpecializationPolicy());
+            CoreNetwork.RegisterDefaultSlots();
+            CoreClassRuntime.RegisterLocalClass(CoreClassId.Leviathan,
+                pilot => pilot != null && pilot.GetUpgradeLevel(LeviathanSpecializationCurrency.UpgradeKey) >= 1,
+                new CoreClassLifecycle(
+                    context => { if (Controller != null) Controller.SetPlayerShip(context.Ship); },
+                    context => { if (Controller != null) Controller.ClearPlayerShip(); }));
+            CoreClassRuntime.RegisterLocalClass(CoreClassId.Orrery,
+                pilot => pilot != null && pilot.GetUpgradeLevel(OrrerySpecializationPolicy.UpgradeKey) >= 1,
+                new CoreClassLifecycle(context => OrreryRuntime.Activate(context.Ship),
+                    context => OrreryRuntime.Deactivate(context.Ship)));
+        }
 
         harmony.PatchAll();
 
@@ -66,6 +71,7 @@ public class LeviathanMod : IStarVortexMod
 
         Controller = controllerObject.AddComponent<LeviathanController>();
 
+        CoreClassRuntime.Refresh();
         Debug.Log("[Leviathan] Runtime controller created.");
     }
 
@@ -112,9 +118,7 @@ public static class LeviathanWorldPostInitPatch
 {
     public static void Postfix(WorldController __instance)
     {
-        LeviathanMod.Controller?.SetPlayerShip(
-            __instance.GetCurrentPlayerShip()
-        );
+        CoreClassRuntime.WorldEntered();
     }
 }
 
@@ -123,7 +127,7 @@ public static class LeviathanPlayerShipChangedPatch
 {
     public static void Postfix(GameShip __0)
     {
-        LeviathanMod.Controller?.SetPlayerShip(__0);
+        CoreClassRuntime.Refresh();
     }
 }
 
@@ -132,7 +136,7 @@ public static class LeviathanWorldDestroyedPatch
 {
     public static void Prefix()
     {
-        LeviathanMod.Controller?.ClearPlayerShip();
+        CoreClassRuntime.Reset();
         LeviathanSegmentStatusProtection.Reset();
         LeviathanSegmentDamageLimiter.Reset();
         LeviathanSegmentTransferProtection.Reset();

@@ -2625,7 +2625,7 @@ public static class LeviathanStarfireRuntime
         for (int i = 0; i < nodes.Count; i++)
         {
             CoreSpecializationNode node = nodes[i];
-            int rank = CoreSpecializationRuntime.GetNodeRank(
+            int rank = CoreSpecializationRuntime.GetEffectiveNodeRank(
                 pilot,
                 LeviathanStarfireTree.TreeId,
                 node.Id
@@ -2654,7 +2654,7 @@ public static class LeviathanStarfireRuntime
                 continue;
             }
 
-            int rank = CoreSpecializationRuntime.GetNodeRank(
+            int rank = CoreSpecializationRuntime.GetEffectiveNodeRank(
                 pilot,
                 LeviathanStarfireTree.TreeId,
                 definition.NodeId

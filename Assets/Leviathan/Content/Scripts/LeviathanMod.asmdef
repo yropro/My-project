@@ -1,7 +1,9 @@
 {
     "name": "LeviathanMod",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "Unity.TextMeshPro"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

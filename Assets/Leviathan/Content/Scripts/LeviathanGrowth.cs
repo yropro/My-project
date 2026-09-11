@@ -1297,8 +1297,8 @@ public static class LeviathanGrowth
         if (pilot == null)
             return false;
 
-        return IsLocalOwner(ship) ||
-            CoreNetwork.HasSynchronizedSpecialization(ship);
+        return CoreSpecializationRuntime.GetEffectiveClass(pilot) == CoreClassId.Leviathan &&
+            (IsLocalOwner(ship) || CoreNetwork.HasSynchronizedSpecialization(ship, CoreClassId.Leviathan));
     }
 
     // ---------------------------------------------------------------------

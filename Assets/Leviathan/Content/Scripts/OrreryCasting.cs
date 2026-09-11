@@ -104,6 +104,7 @@ public struct OrreryRecipeKey : IEquatable<OrreryRecipeKey>
 
 public struct OrreryCastInvocation
 {
+    public CoreAbilityExecution Execution;
     public GameShip Owner;
     public OrreryRecipeKey Recipe;
     public int Sequence;
@@ -125,6 +126,8 @@ public static class OrreryCasting
 
     private sealed class RuntimeState
     {
+        public CoreOwnerContext Lifetime;
+        public CoreAbilityExecution Execution;
         public readonly byte[] LockedSatelliteIds = new byte[MaxFormulaSatellites];
         public readonly OrreryElement[] Elements = new OrreryElement[MaxFormulaSatellites];
         public int RequiredCount;
@@ -151,6 +154,11 @@ public static class OrreryCasting
             states[owner] = state;
         }
 
+        if (state.Execution != null) state.Execution.End(CoreExecutionEndReason.Cancelled);
+        state.Execution = null;
+        state.Lifetime = CoreClassRuntime.CurrentContext;
+        if (state.Lifetime == null || !state.Lifetime.IsValid || state.Lifetime.ClassId != CoreClassId.Orrery || !ReferenceEquals(state.Lifetime.Ship, owner))
+        { states.Remove(owner); return; }
         state.RequiredCount = Math.Max(
             1,
             Math.Min(MaxFormulaSatellites, requiredFormulaPieces));
@@ -181,6 +189,7 @@ public static class OrreryCasting
             return false;
         }
 
+        if (state.Lifetime == null || !state.Lifetime.IsValid) return false;
         if (state.Phase == OrreryCastPhase.Invoking ||
             state.LockedCount >= state.RequiredCount)
         {
@@ -242,10 +251,14 @@ public static class OrreryCasting
             return false;
         }
 
+        if (state.Lifetime == null || !state.Lifetime.IsValid) return false;
         bool complete = state.LockedCount >= state.RequiredCount;
         if (!complete && !allowPartial)
             return false;
 
+        state.Execution = CoreAbilityRuntime.Begin(state.Lifetime, 0);
+        if (state.Execution == null) return false;
+        invocation.Execution = state.Execution;
         state.Sequence++;
         if (state.Sequence <= 0)
             state.Sequence = 1;
@@ -275,12 +288,15 @@ public static class OrreryCasting
     /// retained satellite. Passing 0 implements baseline V0; Continuity can later
     /// retain exactly one without changing recipe assembly internals.
     /// </summary>
-    public static void CompleteInvocation(GameShip owner, byte retainedSatelliteId)
+    public static void CompleteInvocation(GameShip owner, CoreAbilityExecution execution, byte retainedSatelliteId)
     {
         RuntimeState state;
         if (owner == null || !states.TryGetValue(owner, out state) || state == null)
             return;
 
+        if (execution == null || !ReferenceEquals(state.Execution, execution) || !execution.IsValid) return;
+        execution.End(CoreExecutionEndReason.Completed);
+        state.Execution = null;
         if (retainedSatelliteId == 0 || !IsLocked(state, retainedSatelliteId))
         {
             ReleaseAllLocks(owner, state);
@@ -319,6 +335,8 @@ public static class OrreryCasting
         if (owner == null || !states.TryGetValue(owner, out state) || state == null)
             return;
 
+        if (state.Execution != null) state.Execution.End(CoreExecutionEndReason.Cancelled);
+        state.Execution = null;
         ReleaseAllLocks(owner, state);
         state.Phase = OrreryCastPhase.Assembling;
     }
@@ -420,7 +438,10 @@ public static class OrreryCasting
     {
         RuntimeState state;
         if (owner != null && states.TryGetValue(owner, out state) && state != null)
+        {
+            if (state.Execution != null) state.Execution.End(CoreExecutionEndReason.Cancelled);
             ReleaseAllLocks(owner, state);
+        }
 
         if (owner != null)
             states.Remove(owner);
@@ -428,6 +449,11 @@ public static class OrreryCasting
 
     public static void Reset()
     {
+        foreach (var pair in states)
+        {
+            if (pair.Value.Execution != null) pair.Value.Execution.End(CoreExecutionEndReason.Cancelled);
+            ReleaseAllLocks(pair.Key, pair.Value);
+        }
         states.Clear();
     }
 

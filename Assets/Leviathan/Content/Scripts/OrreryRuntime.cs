@@ -195,7 +195,9 @@ public static class OrreryRuntime
     public static bool IsActive(GameShip owner)
     {
         OwnerState state;
-        return owner != null &&
+        CoreOwnerContext context = CoreClassRuntime.CurrentContext;
+        return owner != null && context != null && context.IsValid && context.ClassId == CoreClassId.Orrery &&
+            ReferenceEquals(context.Ship, owner) &&
             owners.TryGetValue(owner, out state) &&
             state != null &&
             state.Resolved != null &&
@@ -205,7 +207,7 @@ public static class OrreryRuntime
     public static ResolvedState GetResolvedState(GameShip owner)
     {
         OwnerState state;
-        if (owner != null && owners.TryGetValue(owner, out state) &&
+        if (IsActive(owner) && owners.TryGetValue(owner, out state) &&
             state != null && state.Resolved != null)
         {
             return state.Resolved;

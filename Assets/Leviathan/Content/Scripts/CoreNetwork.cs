@@ -70,8 +70,8 @@ using UnityEngine;
 ///   offset 1    byte    magic1        0x56 'V'
 ///   offset 2    byte    protocol      ProtocolVersion
 ///   offset 3    byte    blockFlags    bit0 dynamic present, bit1 spec present
-///   offset 4    byte    payloadLength bytes following this header (<= MaxPayload)
-///   offset 5..  payload
+///   offset 4..  ushort  payloadLength bytes following this header (<= MaxPayload)
+///   offset 6..  payload
 ///
 /// blockFlags and every count inside the payload describe what was actually
 /// serialised, never what was intended. The builder writes the payload first and
@@ -81,28 +81,25 @@ using UnityEngine;
 /// Dynamic block, a TLV list so unknown slots can be skipped and inactive
 /// skills cost nothing:
 ///
+///   byte    classId (None means the class is being cleared)
 ///   byte    slotCount
 ///   repeat slotCount times:
 ///       byte    slotId
 ///       byte    slotLength
 ///       bytes   slotLength bytes of slot data
 ///
-/// Every packet a Core sends carries this block, including when it holds
-/// zero slots. That costs six bytes (header plus a zero count), about 120 bytes
-/// per second per player, and it buys exact transition timing: a received block
-/// with no slot for a skill is an authoritative statement that the skill is
-/// idle right now, applied on the next packet rather than after a timeout.
-/// Without it, "stopped publishing" and "packets stopped arriving" would be
-/// indistinguishable and every skill would go idle only once the freshness
-/// window expired - half a second of stale charge or firing visuals on every
-/// normal transition. DynamicStaleSeconds is therefore reserved for genuine
-/// stream loss and plays no part in ordinary state changes.
+/// A dynamic block is emitted whenever the packet budget permits it, including
+/// with zero slots for an explicit idle/clear state. A spec-only packet may be
+/// emitted when a large specialization schema would otherwise crowd out the
+/// dynamic streams; in that case the receiver retains its last valid dynamic
+/// snapshot. DynamicStaleSeconds remains reserved for genuine stream loss.
 ///
 /// Spec block (present when bit1 set):
 ///
+///   byte    classId
 ///   ushort  schemaHash     identity of the node ordering this build compiled
 ///   uint    contentHash    identity of this particular rank set
-///   byte    nodeCount
+///   ushort  nodeCount
 ///   bytes   ceil(nodeCount / 2) packed ranks, 4 bits each, low nibble first
 ///
 /// A receiver that does not recognise schemaHash discards the spec block rather
@@ -110,7 +107,7 @@ using UnityEngine;
 /// fire; it exists so a schema desync fails loudly instead of silently.
 ///
 /// contentHash is the identity of one particular rank set, and a receiver skips
-/// re-applying a tree whose hash it already holds. It is 32-bit rather than
+/// re-applying a class/schema/content tuple it already holds. It is 32-bit rather than
 /// folded to 16, because a collision between two legitimate rank sets would
 /// leave a remote silently presenting the owner's previous build after a respec
 /// - a rare fault with no visible cause. Two bytes on an occasional packet is
@@ -158,15 +155,15 @@ public static class CoreNetwork
     /// identical builds this is diagnostic rather than a negotiation mechanism:
     /// it makes a stale dev build fail visibly instead of misparsing.
     /// </summary>
-    public const byte ProtocolVersion = 2;
+    public const byte ProtocolVersion = 3;
 
-    private const int HeaderBytes = 5;
+    private const int HeaderBytes = 6;
 
     private const byte BlockFlagDynamic = 1 << 0;
     private const byte BlockFlagSpec = 1 << 1;
 
     /// <summary>Upper bound on bytes following the header.</summary>
-    private const int MaxPayloadBytes = 192;
+    private const int MaxPayloadBytes = 384;
 
     /// <summary>
     /// Refuse to append if the finished packet would exceed this. Chosen well
@@ -179,13 +176,33 @@ public static class CoreNetwork
     private const int MaxPackedRank = 15;
 
     /// <summary>Largest packed spec array the parser will accept.</summary>
-    private const int MaxPackedSpecBytes = 128;
+    public const int MaxClassNodes = 512;
+    private const int MaxPackedSpecBytes = MaxClassNodes / 2;
 
     /// <summary>schemaHash (2) + contentHash (4) + nodeCount (1).</summary>
-    private const int SpecBlockHeaderBytes = 7;
+    private const int SpecBlockHeaderBytes = 9;
 
     // Skill slot ids for the dynamic block. Stable forever once shipped; a
     // receiver skips ids it does not know, so new skills append new ids.
+    private sealed class SlotRegistration
+    { public CoreClassId Owner; public string Purpose; }
+    private static readonly Dictionary<byte, SlotRegistration> slots = new Dictionary<byte, SlotRegistration>();
+    public static void RegisterSlot(byte id, CoreClassId ownerClass, string purpose)
+    {
+        if (id == 0 || string.IsNullOrWhiteSpace(purpose) || slots.ContainsKey(id))
+            throw new InvalidOperationException("Invalid/duplicate network slot: " + id);
+        slots.Add(id, new SlotRegistration { Owner = ownerClass, Purpose = purpose });
+    }
+    public static void RegisterDefaultSlots()
+    {
+        RegisterSlot(SlotStellarConverter, CoreClassId.Leviathan, "Stellar Converter");
+        RegisterSlot(SlotStarfire, CoreClassId.Leviathan, "Starfire");
+        RegisterSlot(SlotPredator, CoreClassId.Leviathan, "Predator");
+        RegisterSlot(SlotConstrictor, CoreClassId.Leviathan, "Constrictor");
+        RegisterSlot(SlotBehemoth, CoreClassId.Leviathan, "Behemoth");
+        RegisterSlot(SlotOrrery, CoreClassId.Orrery, "Orrery casting");
+    }
+
     public const byte SlotStellarConverter = 1;
     public const byte SlotStarfire = 2;
     public const byte SlotPredator = 3;
@@ -238,8 +255,9 @@ public static class CoreNetwork
 
     private static int packetCounter;
     private static int specBurstRemaining;
-    private static int classClearBurstRemaining;
-    private static int lastSeenClassTransitionRevision = int.MinValue;
+    private static bool localSpecDirty = true;
+    private static bool sentSpecLastPacket;
+
     private static int lastSeenConfigurationRevision = int.MinValue;
     private static int lastSeenRegistryRevision = int.MinValue;
 
@@ -267,9 +285,16 @@ public static class CoreNetwork
         public int MaxRank;
     }
 
+    private sealed class ClassSchema
+    {
+        public SchemaEntry[] Entries;
+        public ushort Hash;
+        public int Revision;
+    }
+    private static readonly Dictionary<CoreClassId, ClassSchema> schemas = new Dictionary<CoreClassId, ClassSchema>();
+    private static CoreClassId localSpecClass;
     private static SchemaEntry[] schema;
     private static ushort schemaHash;
-    private static int schemaBuiltForRegistryRevision = int.MinValue;
 
     private static byte[] localSpecPacked;
     private static uint localSpecContentHash;
@@ -287,6 +312,12 @@ public static class CoreNetwork
 
         /// <summary>contentHash of the spec set currently applied to a Pilot.</summary>
         public uint AppliedSpecHash;
+        public bool SpecApplied;
+        public ushort AppliedSchemaHash;
+        public CoreClassId AppliedClass;
+        public CoreClassId PendingClass;
+        public ushort PendingSchemaHash;
+        public CoreClassId DynamicClass;
 
         /// <summary>contentHash received but not yet pushed into the runtime.</summary>
         public uint PendingSpecHash;
@@ -319,6 +350,8 @@ public static class CoreNetwork
         public void ResetSpec()
         {
             AppliedSpecHash = 0u;
+            SpecApplied = false;
+            AppliedClass = CoreClassId.None;
             PendingSpecHash = 0u;
             PendingSpecLength = 0;
             HasPendingSpec = false;
@@ -344,6 +377,11 @@ public static class CoreNetwork
     // main-thread only and does not need [ThreadStatic]. All buffers are
     // preallocated; the read path performs no steady-state allocation.
     private static bool pendingValid;
+    private static bool pendingHasDynamic;
+    private static bool pendingInvalidSpec;
+    private static CoreClassId pendingClass;
+    private static CoreClassId pendingDynamicClass;
+    private static ushort pendingSchemaHash;
     private static int pendingSlotCount;
     private static readonly byte[] pendingSlotData = new byte[MaxSlots * MaxSlotBytes];
     private static readonly byte[] pendingSlotIds = new byte[MaxSlots];
@@ -527,7 +565,7 @@ public static class CoreNetwork
             writer.Write(CombatTrailerMagic);
             writer.Write(CombatProtocolVersion);
             writer.Write(CombatTrailerEvent);
-            writer.Write((byte)payloadLength);
+            writer.Write((ushort)payloadLength);
         }
         catch (Exception ex)
         {
@@ -593,7 +631,7 @@ public static class CoreNetwork
             writer.Write(CombatTrailerMagic);
             writer.Write(CombatProtocolVersion);
             writer.Write(CombatTrailerResult);
-            writer.Write((byte)payloadLength);
+            writer.Write((ushort)payloadLength);
         }
         catch (Exception ex)
         {
@@ -944,6 +982,10 @@ public static class CoreNetwork
     /// </summary>
     public static SlotWriter BeginSlot(byte slotId)
     {
+        SlotRegistration registration;
+        if (!slots.TryGetValue(slotId, out registration)) throw new InvalidOperationException("Unregistered network slot.");
+        if (registration.Owner != CoreClassId.None && registration.Owner != CoreClassRuntime.ActiveLocalClass)
+            return default(SlotWriter);
         SlotWriter writer = default(SlotWriter);
 
         if (openSlotIndex >= 0)
@@ -1113,6 +1155,10 @@ public static class CoreNetwork
         if (!remoteSnapshots.TryGetValue(playerId, out snapshot))
             return false;
 
+        SlotRegistration registration;
+        if (!slots.TryGetValue(slotId, out registration) ||
+            !snapshot.SpecApplied || snapshot.AppliedClass != snapshot.DynamicClass ||
+            (registration.Owner != CoreClassId.None && registration.Owner != snapshot.AppliedClass)) return false;
         if (Time.unscaledTime - snapshot.LastReceived > DynamicStaleSeconds)
             return false;
 
@@ -1157,12 +1203,25 @@ public static class CoreNetwork
     /// behaviour should gate on this: until it returns true the replicated tree
     /// is not yet available and legacy fallback remains the correct answer.
     /// </summary>
+    public static bool HasSynchronizedSpecialization(GameShip ship, CoreClassId classId)
+    {
+        int playerId; RemoteSnapshot snapshot;
+        return HasSynchronizedSpecialization(ship) && TryGetPlayerId(ship, out playerId) &&
+            remoteSnapshots.TryGetValue(playerId, out snapshot) && snapshot.AppliedClass == classId;
+    }
+
+    public static void InvalidateLocalSpecialization()
+    {
+        localSpecDirty = true;
+        specBurstRemaining = SpecBurstPackets;
+    }
+
     public static bool HasSynchronizedSpecialization(int playerId)
     {
         RemoteSnapshot snapshot;
 
         return remoteSnapshots.TryGetValue(playerId, out snapshot) &&
-               snapshot.AppliedSpecHash != 0u &&
+               snapshot.SpecApplied &&
                snapshot.RepShip != null &&
                snapshot.AppliedPilot != null;
     }
@@ -1183,7 +1242,7 @@ public static class CoreNetwork
         Pilot pilot = GameShip.GetPlayerSourcePilot(remoteShip);
 
         return pilot != null &&
-               snapshot.AppliedSpecHash != 0u &&
+               snapshot.SpecApplied &&
                ReferenceEquals(snapshot.RepShip, remoteShip) &&
                ReferenceEquals(snapshot.AppliedPilot, pilot);
     }
@@ -1316,7 +1375,7 @@ public static class CoreNetwork
 
         if (snapshot.AppliedPilot != null)
         {
-            CoreSpecializationRuntime.ClearRemoteSpecialization(
+            CoreSpecializationRuntime.ReleaseRemotePilot(
                 snapshot.AppliedPilot);
         }
 
@@ -1401,38 +1460,17 @@ public static class CoreNetwork
             }
 
             bool hasActiveClass = CoreClassRuntime.HasActiveLocalClass;
-            int classTransitionRevision = CoreClassRuntime.TransitionRevision;
-
-            if (lastSeenClassTransitionRevision == int.MinValue)
-            {
-                // Establish the initial baseline without manufacturing a clear
-                // burst before a real custom-class transition occurs.
-                lastSeenClassTransitionRevision = classTransitionRevision;
-            }
-            else if (classTransitionRevision != lastSeenClassTransitionRevision)
-            {
-                lastSeenClassTransitionRevision = classTransitionRevision;
-                classClearBurstRemaining = hasActiveClass ? 0 : SpecBurstPackets;
-            }
-
-            bool publishingClassClear =
-                !hasActiveClass && classClearBurstRemaining > 0;
-
-            if (!hasActiveClass && !publishingClassClear)
-                return;
-
-            if (publishingClassClear)
-                ClearLocalSlots();
-
-            bool wantSpec = hasActiveClass && ShouldSendSpecBlock();
-
+            bool wantSpec = ShouldSendSpecBlock();
+            if (!hasActiveClass) ClearLocalSlots();
+            if (!hasActiveClass && !wantSpec) return;
+            long nativeLength = writer.BaseStream.Position;
+            int budget = Math.Min(MaxPayloadBytes, MaxCombinedBytes - HeaderBytes - (int)nativeLength);
             byte blockFlags;
-            int payloadLength = BuildPayload(wantSpec, out blockFlags);
+            int payloadLength = BuildPayload(wantSpec, budget, out blockFlags);
 
             if (payloadLength <= 0 || blockFlags == 0)
                 return;
 
-            long nativeLength = writer.BaseStream.Position;
             int total = HeaderBytes + payloadLength;
 
             // Native ShipStateSample is variable length. Rather than risk
@@ -1455,12 +1493,8 @@ public static class CoreNetwork
             if ((blockFlags & BlockFlagSpec) != 0 && specBurstRemaining > 0)
                 specBurstRemaining--;
 
-            if (publishingClassClear &&
-                (blockFlags & BlockFlagDynamic) != 0 &&
-                classClearBurstRemaining > 0)
-            {
-                classClearBurstRemaining--;
-            }
+            sentSpecLastPacket = (blockFlags & BlockFlagSpec) != 0;
+
         }
         catch (Exception ex)
         {
@@ -1478,74 +1512,47 @@ public static class CoreNetwork
     /// never from intent, so truncation produces a smaller valid packet instead
     /// of one the receiver rejects.
     /// </summary>
-    private static int BuildPayload(bool wantSpec, out byte blockFlags)
+    private static int BuildPayload(bool wantSpec, int budget, out byte blockFlags)
     {
         blockFlags = 0;
-
+        int dynamicLength = 2;
+        for (int i = 0; i < localSlotCount; i++) dynamicLength += 2 + localSlotLengths[i];
+        int specLength = SpecBlockHeaderBytes + (localSpecPacked == null ? 0 : localSpecPacked.Length);
+        // Alternate control-only bursts with presentation when both cannot fit.
+        // Absent dynamic BLOCK means unchanged; a present zero-slot block means clear.
+        bool sendSpec = wantSpec && localSpecPacked != null && specLength <= budget;
+        if (sendSpec && sentSpecLastPacket && dynamicLength + specLength > budget && localSlotCount > 0)
+            sendSpec = false;
+        bool sendDynamic = dynamicLength <= budget - (sendSpec ? specLength : 0);
         int position = 0;
-        int writtenSlots = 0;
-
-        // The dynamic block is always emitted, even with zero slots. A received
-        // block is an authoritative statement of which skills are active right
-        // now, so a skill that stopped publishing goes idle on the receiver's
-        // next packet instead of waiting out the freshness window.
-        int slotCountOffset = position;
-        position++; // backfilled below
-
-        for (int i = 0; i < localSlotCount; i++)
+        if (sendDynamic)
         {
-            int slotLength = localSlotLengths[i];
-
-            if (position + 2 + slotLength > MaxPayloadBytes)
-                break;
-
-            scratch[position++] = localSlotIds[i];
-            scratch[position++] = (byte)slotLength;
-
-            if (slotLength > 0)
+            scratch[position++] = (byte)CoreClassRuntime.ActiveLocalClass;
+            scratch[position++] = (byte)localSlotCount;
+            for (int i = 0; i < localSlotCount; i++)
             {
-                Buffer.BlockCopy(
-                    localSlotBuffer,
-                    i * MaxSlotBytes,
-                    scratch,
-                    position,
-                    slotLength);
-
-                position += slotLength;
+                scratch[position++] = localSlotIds[i];
+                scratch[position++] = (byte)localSlotLengths[i];
+                Buffer.BlockCopy(localSlotBuffer, i * MaxSlotBytes, scratch, position, localSlotLengths[i]);
+                position += localSlotLengths[i];
             }
-
-            writtenSlots++;
+            blockFlags |= BlockFlagDynamic;
         }
-
-        scratch[slotCountOffset] = (byte)writtenSlots;
-        blockFlags |= BlockFlagDynamic;
-
-        if (wantSpec && localSpecPacked != null && schema != null)
+        if (sendSpec)
         {
-            int specLength = SpecBlockHeaderBytes + localSpecPacked.Length;
-
-            if (position + specLength <= MaxPayloadBytes)
-            {
-                scratch[position++] = (byte)(schemaHash & 0xFF);
-                scratch[position++] = (byte)((schemaHash >> 8) & 0xFF);
-                scratch[position++] = (byte)(localSpecContentHash & 0xFF);
-                scratch[position++] = (byte)((localSpecContentHash >> 8) & 0xFF);
-                scratch[position++] = (byte)((localSpecContentHash >> 16) & 0xFF);
-                scratch[position++] = (byte)((localSpecContentHash >> 24) & 0xFF);
-                scratch[position++] = (byte)schema.Length;
-
-                Buffer.BlockCopy(
-                    localSpecPacked,
-                    0,
-                    scratch,
-                    position,
-                    localSpecPacked.Length);
-
-                position += localSpecPacked.Length;
-                blockFlags |= BlockFlagSpec;
-            }
+            scratch[position++] = (byte)localSpecClass;
+            scratch[position++] = (byte)schemaHash;
+            scratch[position++] = (byte)(schemaHash >> 8);
+            scratch[position++] = (byte)localSpecContentHash;
+            scratch[position++] = (byte)(localSpecContentHash >> 8);
+            scratch[position++] = (byte)(localSpecContentHash >> 16);
+            scratch[position++] = (byte)(localSpecContentHash >> 24);
+            scratch[position++] = (byte)schema.Length;
+            scratch[position++] = (byte)(schema.Length >> 8);
+            Buffer.BlockCopy(localSpecPacked, 0, scratch, position, localSpecPacked.Length);
+            position += localSpecPacked.Length;
+            blockFlags |= BlockFlagSpec;
         }
-
         return position;
     }
 
@@ -1557,23 +1564,23 @@ public static class CoreNetwork
     {
         EnsureSchema();
 
-        if (schema == null || schema.Length == 0)
-            return false;
+        if (schema == null) return false;
 
         int configurationRevision =
             CoreSpecializationRuntime.ConfigurationRevision;
 
         int registryRevision = CoreSpecializationRegistry.Revision;
 
-        if (configurationRevision != lastSeenConfigurationRevision ||
+        if (localSpecDirty || configurationRevision != lastSeenConfigurationRevision ||
             registryRevision != lastSeenRegistryRevision ||
             localSpecPacked == null)
         {
             lastSeenConfigurationRevision = configurationRevision;
             lastSeenRegistryRevision = registryRevision;
 
-            if (RebuildLocalSpec())
-                specBurstRemaining = SpecBurstPackets;
+            bool force = localSpecDirty;
+            localSpecDirty = false;
+            if (RebuildLocalSpec() || force) specBurstRemaining = SpecBurstPackets;
         }
 
         if (localSpecPacked == null)
@@ -1592,9 +1599,6 @@ public static class CoreNetwork
     private static bool RebuildLocalSpec()
     {
         Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
-        if (pilot == null)
-            return false;
-
         int packedLength = (schema.Length + 1) / 2;
 
         if (packedLength > MaxPackedSpecBytes)
@@ -1620,7 +1624,8 @@ public static class CoreNetwork
                 CoreSpecializationRuntime.GetState(pilot, entry.TreeId);
 
             int rank = state == null ? 0 : state.GetRank(entry.NodeId);
-            rank = Mathf.Clamp(rank, 0, MaxPackedRank);
+            if (rank < 0 || rank > entry.MaxRank || rank > MaxPackedRank)
+                throw new InvalidOperationException("Unrepresentable specialization rank.");
 
             if ((i & 1) == 0)
                 localSpecPacked[i >> 1] |= (byte)(rank & 0x0F);
@@ -1689,7 +1694,7 @@ public static class CoreNetwork
             }
 
             byte blockFlags = reader.ReadByte();
-            int payloadLength = reader.ReadByte();
+            int payloadLength = reader.ReadUInt16();
 
             if (payloadLength <= 0 ||
                 payloadLength > MaxPayloadBytes ||
@@ -1712,8 +1717,9 @@ public static class CoreNetwork
                 }
             }
 
-            if ((blockFlags & BlockFlagSpec) != 0)
-                ReadSpecBlock(reader, payloadEnd);
+            if ((blockFlags & BlockFlagSpec) != 0 && !ReadSpecBlock(reader, payloadEnd))
+            { pendingInvalidSpec = true; pendingValid = true; return; }
+            if (reader.BaseStream.Position != payloadEnd) { ClearPending(); return; }
 
             pendingValid = true;
         }
@@ -1738,9 +1744,10 @@ public static class CoreNetwork
     {
         Stream stream = reader.BaseStream;
 
-        if (stream.Position >= payloadEnd)
-            return false;
-
+        if (payloadEnd - stream.Position < 2) return false;
+        pendingDynamicClass = (CoreClassId)reader.ReadByte();
+        if (pendingDynamicClass != CoreClassId.None && CoreSpecializationPolicies.Get(pendingDynamicClass) == null) return false;
+        pendingHasDynamic = true;
         int slotCount = reader.ReadByte();
 
         if (slotCount > MaxSlots)
@@ -1754,8 +1761,10 @@ public static class CoreNetwork
             byte slotId = reader.ReadByte();
             int slotLength = reader.ReadByte();
 
-            if (slotLength > MaxSlotBytes)
-                return false;
+            SlotRegistration registration;
+            if (slotLength > MaxSlotBytes || !slots.TryGetValue(slotId, out registration) ||
+                (registration.Owner != CoreClassId.None && registration.Owner != pendingDynamicClass)) return false;
+            for (int previous = 0; previous < i; previous++) if (pendingSlotIds[previous] == slotId) return false;
 
             if (payloadEnd - stream.Position < slotLength)
                 return false;
@@ -1777,53 +1786,23 @@ public static class CoreNetwork
         return true;
     }
 
-    private static void ReadSpecBlock(BinaryReader reader, long payloadEnd)
+    private static bool ReadSpecBlock(BinaryReader reader, long payloadEnd)
     {
-        Stream stream = reader.BaseStream;
-
-        if (payloadEnd - stream.Position < SpecBlockHeaderBytes)
-            return;
-
-        int incomingSchemaHash =
-            reader.ReadByte() |
-            (reader.ReadByte() << 8);
-
-        uint incomingContentHash =
-            (uint)reader.ReadByte() |
-            ((uint)reader.ReadByte() << 8) |
-            ((uint)reader.ReadByte() << 16) |
-            ((uint)reader.ReadByte() << 24);
-
-        int nodeCount = reader.ReadByte();
-
-        EnsureSchema();
-
-        // A schema mismatch means the sender's compiled node ordering differs
-        // from ours. ModsMatch should make this impossible; if it happens,
-        // discarding is the only safe response, because applying these ranks
-        // would assign them to the wrong nodes.
-        if (schema == null ||
-            incomingSchemaHash != schemaHash ||
-            nodeCount != schema.Length)
-        {
-            return;
-        }
-
-        int packedLength = (nodeCount + 1) / 2;
-
-        if (packedLength > MaxPackedSpecBytes)
-            return;
-
-        if (payloadEnd - stream.Position < packedLength)
-            return;
-
-        int read = reader.Read(pendingSpecPacked, 0, packedLength);
-        if (read != packedLength)
-            return;
-
-        pendingHasSpec = true;
-        pendingSpecHash = incomingContentHash;
-        pendingSpecLength = packedLength;
+        if (payloadEnd - reader.BaseStream.Position < SpecBlockHeaderBytes) return false;
+        pendingClass = (CoreClassId)reader.ReadByte();
+        pendingSchemaHash = reader.ReadUInt16();
+        uint hash = reader.ReadUInt32();
+        int count = reader.ReadUInt16();
+        ClassSchema incoming = GetSchema(pendingClass);
+        if (incoming == null || incoming.Hash != pendingSchemaHash || count != incoming.Entries.Length) return false;
+        int length = (count + 1) / 2;
+        if (length > MaxPackedSpecBytes || payloadEnd - reader.BaseStream.Position < length) return false;
+        if (reader.Read(pendingSpecPacked, 0, length) != length || Fnv32(pendingSpecPacked, 0, length) != hash) return false;
+        for (int i = 0; i < count; i++)
+            if (((pendingSpecPacked[i / 2] >> ((i % 2) * 4)) & 15) > incoming.Entries[i].MaxRank) return false;
+        if (pendingHasDynamic && pendingClass != pendingDynamicClass) return false;
+        pendingHasSpec = true; pendingSpecHash = hash; pendingSpecLength = length;
+        return true;
     }
 
     /// <summary>
@@ -1857,38 +1836,42 @@ public static class CoreNetwork
                 remoteSnapshots[playerId] = snapshot;
             }
 
-            snapshot.SlotCount = pendingSlotCount;
-            snapshot.LastReceived = now;
-
-            for (int i = 0; i < pendingSlotCount; i++)
+            if (pendingInvalidSpec)
             {
-                snapshot.SlotIds[i] = pendingSlotIds[i];
-                snapshot.SlotLengths[i] = pendingSlotLengths[i];
-
-                if (pendingSlotLengths[i] > 0)
+                CoreSpecializationRuntime.ClearRemoteSpecialization(snapshot.AppliedPilot);
+                snapshot.SpecApplied = false; snapshot.HasPendingSpec = false;
+                snapshot.SlotCount = 0;
+                return;
+            }
+            if (pendingHasDynamic)
+            {
+                snapshot.SlotCount = pendingSlotCount;
+                snapshot.DynamicClass = pendingDynamicClass;
+                snapshot.LastReceived = now;
+                for (int i = 0; i < pendingSlotCount; i++)
                 {
-                    Buffer.BlockCopy(
-                        pendingSlotData,
-                        i * MaxSlotBytes,
-                        snapshot.SlotData,
-                        i * MaxSlotBytes,
-                        pendingSlotLengths[i]);
+                    snapshot.SlotIds[i] = pendingSlotIds[i];
+                    snapshot.SlotLengths[i] = pendingSlotLengths[i];
+                    Buffer.BlockCopy(pendingSlotData, i * MaxSlotBytes, snapshot.SlotData, i * MaxSlotBytes, pendingSlotLengths[i]);
+                }
+                if (snapshot.SpecApplied && snapshot.AppliedClass != pendingDynamicClass)
+                {
+                    CoreSpecializationRuntime.ClearRemoteSpecialization(snapshot.AppliedPilot);
+                    snapshot.SpecApplied = false;
                 }
             }
-
-            if (pendingHasSpec && pendingSpecHash != snapshot.AppliedSpecHash)
+            if (pendingHasSpec)
             {
-                Buffer.BlockCopy(
-                    pendingSpecPacked,
-                    0,
-                    snapshot.PendingSpecPacked,
-                    0,
-                    pendingSpecLength);
-
+                // Stage even equal hashes: a fresh replica or class transition
+                // can require identical ranks to be applied again.
+                Buffer.BlockCopy(pendingSpecPacked, 0, snapshot.PendingSpecPacked, 0, pendingSpecLength);
                 snapshot.PendingSpecLength = pendingSpecLength;
                 snapshot.PendingSpecHash = pendingSpecHash;
+                snapshot.PendingSchemaHash = pendingSchemaHash;
+                snapshot.PendingClass = pendingClass;
                 snapshot.HasPendingSpec = true;
             }
+
         }
         finally
         {
@@ -1929,12 +1912,13 @@ public static class CoreNetwork
 
             if (snapshot.AppliedPilot != null)
             {
-                CoreSpecializationRuntime.ClearRemoteSpecialization(
+                CoreSpecializationRuntime.ReleaseRemotePilot(
                     snapshot.AppliedPilot);
             }
 
             snapshot.AppliedPilot = null;
             snapshot.AppliedSpecHash = 0u;
+            snapshot.SpecApplied = false;
         }
 
         snapshot.RepShip = repShip;
@@ -1958,9 +1942,17 @@ public static class CoreNetwork
             return;
         }
 
-        EnsureSchema();
-        if (schema == null)
-            return;
+        ClassSchema incoming = GetSchema(snapshot.PendingClass);
+        if (incoming == null || incoming.Hash != snapshot.PendingSchemaHash)
+        {
+            CoreSpecializationRuntime.ClearRemoteSpecialization(pilot);
+            snapshot.SpecApplied = false; snapshot.HasPendingSpec = false; return;
+        }
+        if (snapshot.SpecApplied && ReferenceEquals(snapshot.AppliedPilot, pilot) &&
+            snapshot.AppliedClass == snapshot.PendingClass && snapshot.AppliedSchemaHash == snapshot.PendingSchemaHash &&
+            snapshot.AppliedSpecHash == snapshot.PendingSpecHash)
+        { snapshot.HasPendingSpec = false; return; }
+        SchemaEntry[] schema = incoming.Entries;
 
         try
         {
@@ -1969,13 +1961,15 @@ public static class CoreNetwork
             if (snapshot.AppliedPilot != null &&
                 !ReferenceEquals(snapshot.AppliedPilot, pilot))
             {
-                CoreSpecializationRuntime.ClearRemoteSpecialization(
+                CoreSpecializationRuntime.ReleaseRemotePilot(
                     snapshot.AppliedPilot);
             }
 
             byte[] packed = snapshot.PendingSpecPacked;
 
-            CoreSpecializationRuntime.BeginRemoteSpecialization(pilot);
+            if (!snapshot.SpecApplied || snapshot.AppliedClass != snapshot.PendingClass)
+                CoreSpecializationRuntime.ClearRemoteSpecialization(pilot);
+            CoreSpecializationRuntime.BeginRemoteSpecialization(pilot, snapshot.PendingClass);
 
             for (int i = 0; i < schema.Length; i++)
             {
@@ -1999,6 +1993,9 @@ public static class CoreNetwork
             snapshot.RepShip = repShip;
             snapshot.AppliedPilot = pilot;
             snapshot.AppliedSpecHash = snapshot.PendingSpecHash;
+            snapshot.AppliedClass = snapshot.PendingClass;
+            snapshot.AppliedSchemaHash = snapshot.PendingSchemaHash;
+            snapshot.SpecApplied = true;
             snapshot.HasPendingSpec = false;
         }
         catch (Exception ex)
@@ -2008,12 +2005,16 @@ public static class CoreNetwork
                 playerId + ": " + ex.Message);
 
             snapshot.HasPendingSpec = false;
+            snapshot.SpecApplied = false;
+            CoreSpecializationRuntime.ClearRemoteSpecialization(pilot);
         }
     }
 
     private static void ClearPending()
     {
         pendingValid = false;
+        pendingHasDynamic = false;
+        pendingInvalidSpec = false;
         pendingSlotCount = 0;
         pendingHasSpec = false;
         pendingSpecHash = 0u;
@@ -2033,65 +2034,33 @@ public static class CoreNetwork
     /// </summary>
     private static void EnsureSchema()
     {
-        CoreSpecializationRuntime.RegisterDefaults();
+        CoreClassId classId = CoreClassRuntime.ActiveLocalClass;
+        ClassSchema current = GetSchema(classId);
+        if (current == null) throw new InvalidOperationException("Missing local class schema.");
+        if (localSpecClass == classId && ReferenceEquals(schema, current.Entries)) return;
+        localSpecClass = classId; schema = current.Entries; schemaHash = current.Hash;
+        localSpecPacked = null; localSpecDirty = true;
+    }
 
-        int registryRevision = CoreSpecializationRegistry.Revision;
-
-        if (schema != null && schemaBuiltForRegistryRevision == registryRevision)
-            return;
-
-        List<SchemaEntry> entries = new List<SchemaEntry>();
-        IList<CoreSpecializationTree> trees =
-            CoreSpecializationRegistry.All();
-
-        for (int t = 0; t < trees.Count; t++)
-        {
-            CoreSpecializationTree tree = trees[t];
-            IList<CoreSpecializationNode> nodes = tree.Nodes;
-
-            for (int n = 0; n < nodes.Count; n++)
+    private static ClassSchema GetSchema(CoreClassId classId)
+    {
+        if (classId != CoreClassId.None && CoreSpecializationPolicies.Get(classId) == null) return null;
+        int revision = CoreSpecializationRegistry.Revision;
+        ClassSchema value;
+        if (schemas.TryGetValue(classId, out value) && value.Revision == revision) return value;
+        var entries = new List<SchemaEntry>();
+        foreach (CoreSpecializationTree tree in CoreSpecializationPolicies.GetTrees(classId))
+            foreach (CoreSpecializationNode node in tree.Nodes)
             {
-                // Auto-granted nodes are derived state. The receiver has both
-                // the transmitted player choices and native-replicated unlock
-                // ranks, and EndRemoteSpecialization rebuilds the resulting
-                // roots. Sending them would only be overwritten on arrival.
-                if (nodes[n].AutoGranted)
-                    continue;
-
-                SchemaEntry entry = new SchemaEntry();
-                entry.TreeId = tree.Id;
-                entry.NodeId = nodes[n].Id;
-                entry.MaxRank = nodes[n].MaxRank;
-
-                if (entry.MaxRank > MaxPackedRank)
-                {
-                    Debug.LogError(
-                        "[CoreNetwork] Node " + tree.Id + "/" + entry.NodeId +
-                        " has MaxRank " + entry.MaxRank + ", above the " +
-                        MaxPackedRank + " the 4-bit wire format supports. " +
-                        "Remote clients will see this node capped.");
-                }
-
-                entries.Add(entry);
+                if (node.AutoGranted) continue;
+                if (node.MaxRank > MaxPackedRank) throw new InvalidOperationException("Unsupported node rank: " + node.Id);
+                entries.Add(new SchemaEntry { TreeId = tree.Id, NodeId = node.Id, MaxRank = node.MaxRank });
             }
-        }
-
-        if (entries.Count > 255)
-        {
-            Debug.LogError(
-                "[CoreNetwork] " + entries.Count +
-                " specialization nodes exceeds the 255 the wire format supports.");
-
-            entries.RemoveRange(255, entries.Count - 255);
-        }
-
-        schema = entries.ToArray();
-        schemaBuiltForRegistryRevision = registryRevision;
-        schemaHash = ComputeSchemaHash(schema);
-
-        // Force a spec rebuild against the new ordering.
-        localSpecPacked = null;
-        localSpecContentHash = 0u;
+        if (entries.Count > MaxClassNodes) throw new InvalidOperationException("Class exceeds " + MaxClassNodes + " replicable nodes.");
+        var array = entries.ToArray();
+        value = new ClassSchema { Entries = array, Hash = ComputeSchemaHash(array), Revision = revision };
+        schemas[classId] = value;
+        return value;
     }
 
     private static ushort ComputeSchemaHash(SchemaEntry[] entries)
@@ -2106,6 +2075,7 @@ public static class CoreNetwork
                 hash = HashString(hash, "/");
                 hash = HashString(hash, entries[i].NodeId);
                 hash = HashString(hash, ";");
+                hash ^= (uint)entries[i].MaxRank; hash *= 16777619u;
             }
 
             hash ^= (uint)entries.Length;

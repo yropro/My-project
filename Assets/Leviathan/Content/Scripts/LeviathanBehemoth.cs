@@ -150,7 +150,7 @@ public static class LeviathanBehemoth
             return inactiveState;
 
         Pilot pilot = GameShip.GetPlayerSourcePilot(ship);
-        if (pilot == null)
+        if (pilot == null || CoreSpecializationRuntime.GetEffectiveClass(pilot) != CoreClassId.Leviathan)
             return inactiveState;
 
         int rank = Mathf.Clamp(
@@ -183,7 +183,7 @@ public static class LeviathanBehemoth
         bool specializationReady =
             IsLocalOwner(ship) ||
             !NetSession.InSession ||
-            CoreNetwork.HasSynchronizedSpecialization(ship);
+            CoreNetwork.HasSynchronizedSpecialization(ship, CoreClassId.Leviathan);
 
         ResolvedCacheEntry cached;
         if (resolvedByPilot.TryGetValue(pilot, out cached) &&

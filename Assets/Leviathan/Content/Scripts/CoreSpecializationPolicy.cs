@@ -27,119 +27,116 @@ public interface ICoreSpecializationPolicy
 /// </summary>
 public static class CoreSpecializationPolicies
 {
-    private static readonly Dictionary<CoreClassId, ICoreSpecializationPolicy> policies =
-        new Dictionary<CoreClassId, ICoreSpecializationPolicy>();
-
-    private static readonly Dictionary<string, CoreClassId> treeOwners =
-        new Dictionary<string, CoreClassId>(StringComparer.Ordinal);
-
-    private static readonly List<ICoreSpecializationPolicy> ordered =
-        new List<ICoreSpecializationPolicy>();
+    private static readonly Dictionary<CoreClassId, ICoreSpecializationPolicy> policies = new Dictionary<CoreClassId, ICoreSpecializationPolicy>();
+    private static readonly Dictionary<string, CoreClassId> treeOwners = new Dictionary<string, CoreClassId>(StringComparer.Ordinal);
+    private static readonly Dictionary<CoreClassId, IList<CoreSpecializationTree>> views = new Dictionary<CoreClassId, IList<CoreSpecializationTree>>();
+    private static readonly IList<CoreSpecializationTree> empty = new List<CoreSpecializationTree>().AsReadOnly();
+    private static readonly List<ICoreSpecializationPolicy> ordered = new List<ICoreSpecializationPolicy>();
+    private static Dictionary<string, CoreSpecializationTree> staged;
+    private static Dictionary<string, CoreClassId> stagedOwners;
+    private static CoreClassId registering;
 
     public static void Register(ICoreSpecializationPolicy policy)
     {
-        if (policy == null)
-            throw new ArgumentNullException("policy");
-        if (policy.ClassId == CoreClassId.None)
-            throw new InvalidOperationException(
-                "A specialization policy must own a concrete CoreClassId.");
-
-        ICoreSpecializationPolicy previous;
-        if (policies.TryGetValue(policy.ClassId, out previous))
-            ordered.Remove(previous);
-
-        policies[policy.ClassId] = policy;
-        ordered.Add(policy);
-        ordered.Sort(delegate (
-            ICoreSpecializationPolicy a,
-            ICoreSpecializationPolicy b)
+        if (policy == null || policy.ClassId == CoreClassId.None) throw new ArgumentException("Concrete policy required.");
+        if (policies.ContainsKey(policy.ClassId) || staged != null) throw new InvalidOperationException("Duplicate/reentrant class registration.");
+        staged = new Dictionary<string, CoreSpecializationTree>(StringComparer.Ordinal);
+        stagedOwners = new Dictionary<string, CoreClassId>(treeOwners, StringComparer.Ordinal);
+        try
         {
-            return ((byte)a.ClassId).CompareTo((byte)b.ClassId);
-        });
-
-        policy.EnsurePrerequisitesRegistered();
-        policy.RegisterTrees();
+            registering = policy.ClassId;
+            policy.EnsurePrerequisitesRegistered();
+            policy.RegisterTrees();
+            ValidateStaged();
+            policies.Add(policy.ClassId, policy);
+            ordered.Add(policy);
+            ordered.Sort((a, b) => ((byte)a.ClassId).CompareTo((byte)b.ClassId));
+            PublishStaged(false);
+        }
+        finally { staged = null; stagedOwners = null; registering = CoreClassId.None; }
     }
 
     public static ICoreSpecializationPolicy Get(CoreClassId classId)
-    {
-        ICoreSpecializationPolicy policy;
-        return classId != CoreClassId.None &&
-            policies.TryGetValue(classId, out policy)
-                ? policy
-                : null;
-    }
+    { ICoreSpecializationPolicy policy; return policies.TryGetValue(classId, out policy) ? policy : null; }
 
-    public static ICoreSpecializationPolicy GetForPilotOrSingle(Pilot pilot)
-    {
-        ICoreSpecializationPolicy policy = Get(CoreClassRuntime.ResolveClass(pilot));
-        if (policy != null)
-            return policy;
-
-        // Needed by class-selection / authoring UI before the class root has
-        // actually been purchased. Ambiguous once more than one policy exists.
-        return ordered.Count == 1 ? ordered[0] : null;
-    }
+    public static ICoreSpecializationPolicy GetForPilot(Pilot pilot)
+    { return Get(CoreSpecializationRuntime.GetEffectiveClass(pilot)); }
 
     public static CoreClassId GetOwnerClass(string treeId)
+    { CoreClassId owner; return treeId != null && treeOwners.TryGetValue(treeId, out owner) ? owner : CoreClassId.None; }
+
+    public static ICoreSpecializationPolicy GetForTree(string treeId) { return Get(GetOwnerClass(treeId)); }
+
+    public static IList<CoreSpecializationTree> GetTrees(CoreClassId classId)
     {
-        CoreClassId classId;
-        return treeId != null && treeOwners.TryGetValue(treeId, out classId)
-            ? classId
-            : CoreClassId.None;
+        IList<CoreSpecializationTree> view;
+        if (views.TryGetValue(classId, out view)) return view;
+        if (classId == CoreClassId.None) return empty;
+        List<CoreSpecializationTree> list = new List<CoreSpecializationTree>();
+        foreach (CoreSpecializationTree tree in CoreSpecializationRegistry.All())
+            if (GetOwnerClass(tree.Id) == classId) list.Add(tree);
+        view = list.AsReadOnly(); views.Add(classId, view); return view;
     }
 
-    public static ICoreSpecializationPolicy GetForTree(string treeId)
+    public static void RegisterTree(CoreClassId ownerClass, CoreSpecializationTree tree)
     {
-        return Get(GetOwnerClass(treeId));
+        if (staged == null || ownerClass != registering || tree == null)
+            throw new InvalidOperationException("Trees must be registered by their policy transaction.");
+        if (stagedOwners.ContainsKey(tree.Id)) throw new InvalidOperationException("Duplicate tree: " + tree.Id);
+        tree.Validate();
+        foreach (CoreSpecializationNode node in tree.Nodes)
+            if (node.MaxRank > 15) throw new InvalidOperationException("Node rank exceeds four-bit schema: " + tree.Id + "/" + node.Id);
+        staged.Add(tree.Id, tree); stagedOwners.Add(tree.Id, ownerClass);
     }
 
-    public static void RegisterTree(
-        CoreClassId ownerClass,
-        CoreSpecializationTree tree)
+    private static void ValidateStaged()
     {
-        if (ownerClass == CoreClassId.None)
-            throw new InvalidOperationException("Tree owner class is required.");
-        if (Get(ownerClass) == null)
-            throw new InvalidOperationException(
-                "Cannot register a tree for an unregistered class policy.");
-        if (tree == null)
-            throw new ArgumentNullException("tree");
-
-        CoreClassId existing;
-        if (treeOwners.TryGetValue(tree.Id, out existing) && existing != ownerClass)
+        var counts = new Dictionary<CoreClassId, int>();
+        foreach (CoreSpecializationTree tree in staged.Values)
         {
-            throw new InvalidOperationException(
-                "Specialization tree id '" + tree.Id +
-                "' is already owned by class " + existing + ".");
+            int count; counts.TryGetValue(stagedOwners[tree.Id], out count);
+            foreach (CoreSpecializationNode node in tree.Nodes) if (!node.AutoGranted) count++;
+            if (count > CoreNetwork.MaxClassNodes) throw new InvalidOperationException("Class schema capacity exceeded.");
+            counts[stagedOwners[tree.Id]] = count;
         }
+        foreach (CoreSpecializationTree tree in staged.Values)
+            foreach (CoreSpecializationNode node in tree.Nodes)
+                foreach (CoreSpecializationEffect effect in node.Effects)
+                    if (effect.Type == CoreSpecializationEffectType.UnlockTree)
+                    {
+                        CoreClassId owner;
+                        if (!stagedOwners.TryGetValue(effect.Key, out owner) || owner != stagedOwners[tree.Id])
+                            throw new InvalidOperationException("Unknown or cross-class tree unlock: " + tree.Id + " -> " + effect.Key);
+                    }
+        // Node prerequisites are tree-local and tree.Validate rejects missing nodes.
+    }
 
-        treeOwners[tree.Id] = ownerClass;
-        CoreSpecializationRegistry.Register(tree);
+    private static void PublishStaged(bool rebuild)
+    {
+        if (rebuild) CoreSpecializationRegistry.Clear();
+        foreach (CoreSpecializationTree tree in staged.Values) CoreSpecializationRegistry.Register(tree);
+        treeOwners.Clear(); foreach (var pair in stagedOwners) treeOwners.Add(pair.Key, pair.Value);
+        views.Clear();
     }
 
     public static void EnsurePrerequisitesRegistered()
-    {
-        for (int i = 0; i < ordered.Count; i++)
-            ordered[i].EnsurePrerequisitesRegistered();
-    }
+    { for (int i = 0; i < ordered.Count; i++) ordered[i].EnsurePrerequisitesRegistered(); }
 
     public static void RebuildAllTrees()
     {
-        CoreSpecializationRegistry.Clear();
-        treeOwners.Clear();
-
-        for (int i = 0; i < ordered.Count; i++)
+        if (staged != null) throw new InvalidOperationException("Reentrant catalog rebuild.");
+        staged = new Dictionary<string, CoreSpecializationTree>(StringComparer.Ordinal);
+        stagedOwners = new Dictionary<string, CoreClassId>(StringComparer.Ordinal);
+        try
         {
-            ordered[i].EnsurePrerequisitesRegistered();
-            ordered[i].RegisterTrees();
+            foreach (var policy in ordered)
+            { registering = policy.ClassId; policy.EnsurePrerequisitesRegistered(); policy.RegisterTrees(); }
+            ValidateStaged(); PublishStaged(true);
         }
+        finally { staged = null; stagedOwners = null; registering = CoreClassId.None; }
     }
+    public static IList<ICoreSpecializationPolicy> All() { return ordered.AsReadOnly(); }
 
-    public static IList<ICoreSpecializationPolicy> All()
-    {
-        return ordered.AsReadOnly();
-    }
 }
 
 /// <summary>
@@ -158,7 +155,7 @@ public static class CoreSpecializationPoints
         }
 
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         if (policy == null)
         {
             reason = "No specialization policy is available for this Pilot.";
@@ -172,14 +169,14 @@ public static class CoreSpecializationPoints
     public static int GetGrantedPoints(Pilot pilot)
     {
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         return policy == null ? 0 : Math.Max(0, policy.GetGrantedPoints(pilot));
     }
 
     public static int GetSpentPoints(Pilot pilot)
     {
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         return policy == null
             ? 0
             : CoreSpecializationRuntime.GetSpentPointsForClass(
@@ -195,14 +192,14 @@ public static class CoreSpecializationPoints
     public static int GetProgressionRank(Pilot pilot)
     {
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         return policy == null ? 0 : Math.Max(0, policy.GetProgressionRank(pilot));
     }
 
     public static string GetCurrencyName(Pilot pilot)
     {
         ICoreSpecializationPolicy policy =
-            CoreSpecializationPolicies.GetForPilotOrSingle(pilot);
+            CoreSpecializationPolicies.GetForPilot(pilot);
         return policy == null || string.IsNullOrEmpty(policy.PointCurrencyName)
             ? "Specialization Points"
             : policy.PointCurrencyName;
@@ -253,21 +250,11 @@ public static class CoreSpecializationPersistence
         if (File.Exists(path))
             return LoadCoreFile(path, states, out reason);
 
+        var stagedState = new Dictionary<string, CoreSpecializationState>(StringComparer.Ordinal);
         bool imported;
-        if (!TryImportLegacyLeviathan(pilot, states, out imported, out reason))
-            return false;
-
-        if (imported)
-        {
-            string saveReason;
-            if (!Save(pilot, states, out saveReason))
-            {
-                reason = "Legacy specialization state loaded but Core migration " +
-                    "could not be saved: " + saveReason;
-                return false;
-            }
-        }
-
+        if (!TryImportLegacyLeviathan(pilot, stagedState, out imported, out reason)) return false;
+        if (imported && !Save(pilot, stagedState, out reason)) return false;
+        states.Clear(); foreach (var pair in stagedState) states.Add(pair.Key, pair.Value);
         return true;
     }
 
@@ -283,6 +270,11 @@ public static class CoreSpecializationPersistence
 
         try
         {
+            if (File.Exists(path))
+            {
+                var existing = new Dictionary<string, CoreSpecializationState>(StringComparer.Ordinal);
+                if (!LoadCoreFile(path, existing, out reason)) return false;
+            }
             string folder = Path.GetDirectoryName(path);
             if (!Directory.Exists(folder))
                 Directory.CreateDirectory(folder);
@@ -319,15 +311,32 @@ public static class CoreSpecializationPersistence
                 }
             }
 
-            File.WriteAllLines(path, lines.ToArray());
+            WriteAtomic(path, lines.ToArray());
             return true;
         }
         catch (Exception ex)
         {
             reason = "Failed saving specialization state: " + ex.Message;
-            Debug.LogError("[CoreSpecializations] " + reason);
             return false;
         }
+    }
+
+    private static void WriteAtomic(string path, string[] lines)
+    {
+        if (File.Exists(path))
+        {
+            string[] original = File.ReadAllLines(path);
+            if (original.Length == 0 || original[0].Trim() != "# Core specialization state v" + FormatVersion)
+                throw new InvalidDataException("Unsupported specialization version; save refused.");
+        }
+        string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllLines(temporary, lines);
+            if (File.Exists(path)) File.Replace(temporary, path, null);
+            else File.Move(temporary, path);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     private static bool LoadCoreFile(
@@ -339,40 +348,34 @@ public static class CoreSpecializationPersistence
         try
         {
             string[] lines = File.ReadAllLines(path);
-            for (int i = 0; i < lines.Length; i++)
+            if (lines.Length == 0 || lines[0].Trim() != "# Core specialization state v" + FormatVersion)
+                throw new InvalidDataException("Unsupported specialization format version; original file is protected.");
+            var stagedState = new Dictionary<string, CoreSpecializationState>(StringComparer.Ordinal);
+            for (int i = 1; i < lines.Length; i++)
             {
                 string line = lines[i].Trim();
-                if (line.Length == 0 || line.StartsWith("#"))
-                    continue;
-
+                if (line.Length == 0 || line.StartsWith("#")) continue;
                 string[] parts = line.Split('|');
-                if (parts.Length != 4)
-                    continue;
-
-                byte classByte;
-                int rank;
-                if (!byte.TryParse(parts[0], out classByte) ||
-                    !int.TryParse(parts[3], out rank) || rank <= 0)
-                {
-                    continue;
-                }
-
-                CoreClassId owner = (CoreClassId)classByte;
-                if (owner == CoreClassId.None ||
-                    CoreSpecializationPolicies.GetOwnerClass(parts[1]) != owner)
-                {
-                    continue;
-                }
-
-                InstallRank(states, parts[1], parts[2], rank);
+                byte owner; int rank;
+                if (parts.Length != 4 || !byte.TryParse(parts[0], out owner) ||
+                    !int.TryParse(parts[3], out rank) || rank <= 0 ||
+                    owner == 0 || CoreSpecializationPolicies.GetOwnerClass(parts[1]) != (CoreClassId)owner)
+                    throw new InvalidDataException("Invalid or unregistered class/tree at row " + (i + 1));
+                CoreSpecializationTree tree = CoreSpecializationRegistry.Get(parts[1]);
+                CoreSpecializationNode node = tree == null ? null : tree.GetNode(parts[2]);
+                if (node == null || node.AutoGranted || rank > node.MaxRank)
+                    throw new InvalidDataException("Invalid node/rank at row " + (i + 1));
+                CoreSpecializationState previous;
+                if (stagedState.TryGetValue(tree.Id, out previous) && previous.GetRank(node.Id) != 0)
+                    throw new InvalidDataException("Duplicate persisted rank.");
+                InstallRank(stagedState, tree.Id, node.Id, rank);
             }
-
+            states.Clear(); foreach (var pair in stagedState) states.Add(pair.Key, pair.Value);
             return true;
         }
         catch (Exception ex)
         {
             reason = "Failed loading specialization state: " + ex.Message;
-            Debug.LogError("[CoreSpecializations] " + reason);
             return false;
         }
     }

@@ -189,7 +189,7 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
         Pilot pilot = CoreSpecializationRuntime.GetCurrentPilot();
 
         IList<CoreSpecializationTree> trees =
-            CoreSpecializationRegistry.All();
+            CoreSpecializationPolicies.GetTrees(CoreSpecializationRuntime.GetEffectiveClass(pilot));
 
         if (trees.Count == 0)
             return;
@@ -226,21 +226,20 @@ public sealed class LeviathanSpecializationDebugUI : MonoBehaviour
             ? CoreSpecializationRuntime.GetTotalSpentPoints(pilot)
             : 0;
         int evolutionRank = canSpend
-            ? CoreSpecializationRuntime.GetEvolutionRank(pilot)
+            ? CoreSpecializationRuntime.GetProgressionRank(pilot)
             : 0;
 
         pointsText.text = canSpend
-            ? LeviathanSpecializationCurrency.CurrencyName + ": " +
+            ? CoreSpecializationPoints.GetCurrencyName(pilot) + ": " +
               available.ToString() +
               " available / " + granted.ToString() +
-              " granted   |   Evolution " + evolutionRank.ToString() +
-              "/" + LeviathanSpecializationCurrency.Levels.ToString()
+              " granted   |   Rank " + evolutionRank.ToString()
             : "Spending disabled";
 
         statusText.text = canSpend
             ? spent.ToString() + " " +
-              LeviathanSpecializationCurrency.CurrencyName +
-              " invested. Growth is automatic at Evolution rank 1; unlock other skill trees from Evolution. Granted roots cost 0. F10 closes."
+              CoreSpecializationPoints.GetCurrencyName(pilot) +
+              " invested. Granted roots cost 0. F10 closes."
             : "PERSISTENCE SAFETY MODE: " + pointReason;
 
         bool treeChanged = !string.Equals(

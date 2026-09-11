@@ -2154,7 +2154,7 @@ public static class CoreCombatRouteDamagePatch
         return null;
     }
 
-    public static void Prefix(
+    internal static void Prefix(
         object __0,
         GameShip __6,
         Activatable __9,
@@ -2163,7 +2163,7 @@ public static class CoreCombatRouteDamagePatch
         __state = CoreCombat.BeginRouteDamage(__0, __6, __9);
     }
 
-    public static Exception Finalizer(
+    internal static Exception Finalizer(
         Exception __exception,
         CoreCombat.RoutePatchState __state)
     {
@@ -2175,7 +2175,7 @@ public static class CoreCombatRouteDamagePatch
 [HarmonyPatch(typeof(NetSession), "SendDamageEvent")]
 public static class CoreCombatSendDamageEventPatch
 {
-    public static void Prefix(MsgDamageEvent __0)
+    internal static void Prefix(MsgDamageEvent __0)
     {
         CoreCombat.AttachOutgoingDamageEvent(__0);
     }
@@ -2184,7 +2184,7 @@ public static class CoreCombatSendDamageEventPatch
 [HarmonyPatch(typeof(NetCombat), "ApplyDamageEvent")]
 public static class CoreCombatApplyDamageEventPatch
 {
-    public static void Prefix(
+    internal static void Prefix(
         MsgDamageEvent __0,
         object __1,
         GameShip __2,
@@ -2193,7 +2193,7 @@ public static class CoreCombatApplyDamageEventPatch
         __state = CoreCombat.BeginReceivedDamage(__0, __2);
     }
 
-    public static Exception Finalizer(
+    internal static Exception Finalizer(
         Exception __exception,
         MsgDamageEvent __0,
         CoreCombat.ReceivedPatchState __state)
@@ -2206,7 +2206,7 @@ public static class CoreCombatApplyDamageEventPatch
 [HarmonyPatch(typeof(GameShip), "Damage")]
 public static class CoreCombatGameShipDamagePatch
 {
-    public static void Prefix(
+    internal static void Prefix(
         GameShip __instance,
         GameShip __5,
         out CoreCombat.AuthorityPatchState __state)
@@ -2214,7 +2214,7 @@ public static class CoreCombatGameShipDamagePatch
         __state = CoreCombat.BeginAuthorityDamage(__instance, __5);
     }
 
-    public static void Postfix(
+    internal static void Postfix(
         GameShip __instance,
         bool __result,
         CoreCombat.AuthorityPatchState __state)
@@ -2222,7 +2222,7 @@ public static class CoreCombatGameShipDamagePatch
         CoreCombat.CompleteAuthorityDamage(__state, __instance, __result);
     }
 
-    public static Exception Finalizer(
+    internal static Exception Finalizer(
         Exception __exception,
         CoreCombat.AuthorityPatchState __state)
     {
@@ -2234,7 +2234,7 @@ public static class CoreCombatGameShipDamagePatch
 [HarmonyPatch(typeof(StatusEffect), "GetEffectForDamageType")]
 public static class CoreCombatDirectStatusCreatePatch
 {
-    public static void Postfix(GameShip __2, StatusEffect __result)
+    internal static void Postfix(GameShip __2, StatusEffect __result)
     {
         CoreCombat.CaptureGeneratedDirectStatus(__result, __2);
     }
@@ -2243,7 +2243,7 @@ public static class CoreCombatDirectStatusCreatePatch
 [HarmonyPatch(typeof(GameShip), "AddStatusEffect")]
 public static class CoreCombatDirectStatusAddPatch
 {
-    public static void Prefix(
+    internal static void Prefix(
         GameShip __instance,
         StatusEffect __0,
         out CoreCombat.DirectStatusAddState __state)
@@ -2251,7 +2251,7 @@ public static class CoreCombatDirectStatusAddPatch
         __state = CoreCombat.BeginDirectStatusAdd(__instance, __0);
     }
 
-    public static void Postfix(
+    internal static void Postfix(
         GameShip __instance,
         StatusEffect __0,
         CoreCombat.DirectStatusAddState __state)
@@ -2263,7 +2263,7 @@ public static class CoreCombatDirectStatusAddPatch
 [HarmonyPatch(typeof(NetSession), "SendDamageResult")]
 public static class CoreCombatSendDamageResultPatch
 {
-    public static void Prefix(MsgDamageResult __0)
+    internal static void Prefix(MsgDamageResult __0)
     {
         CoreCombat.AttachOutgoingDamageResult(__0);
     }
@@ -2272,7 +2272,7 @@ public static class CoreCombatSendDamageResultPatch
 [HarmonyPatch(typeof(NetWorldBridge), "OnDamageResult")]
 public static class CoreCombatDamageResultPatch
 {
-    public static void Postfix(MsgDamageResult __0)
+    internal static void Postfix(MsgDamageResult __0)
     {
         try
         {
@@ -2293,7 +2293,7 @@ public static class CoreCombatDamageResultPatch
 [HarmonyPatch(typeof(GameShip), "Destroyed")]
 public static class CoreCombatTargetDestroyedLifecyclePatch
 {
-    public static void Prefix(GameShip __instance)
+    internal static void Prefix(GameShip __instance)
     {
         CoreCombat.NotifyTargetLifecycleEnd(__instance);
     }
@@ -2306,7 +2306,7 @@ public static class CoreCombatTargetDestroyedLifecyclePatch
 [HarmonyPatch(typeof(GameShip), "OnDestroy")]
 public static class CoreCombatTargetOnDestroyLifecyclePatch
 {
-    public static void Prefix(GameShip __instance)
+    internal static void Prefix(GameShip __instance)
     {
         CoreCombat.NotifyTargetLifecycleEnd(__instance);
     }
