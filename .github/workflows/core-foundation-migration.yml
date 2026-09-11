@@ -1,0 +1,30 @@
+name: Core Foundation Migration
+
+on:
+  push:
+    branches:
+      - chatgpt/core-foundation-migration
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Core foundation migration
+        run: python3 tools/core_foundation_migrate.py
+
+      - name: Commit migrated foundation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --short
+          git commit -m "Promote shared foundation to Core"
+          git push origin HEAD:chatgpt/core-foundation-migration
