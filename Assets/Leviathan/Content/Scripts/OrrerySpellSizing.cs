@@ -20,7 +20,7 @@ public static class OrrerySpellSizing
         // coupled by default. Projectile scale is presentation-only and is applied
         // by OrreryFireballLifecycleSafety, which already owns pooled-scale restore.
         public const float FireballExplosionRadiusMeters = 40f;
-        public const float FireballProjectileVisualScaleMultiplier = 1f;
+        public const float FireballProjectileVisualScaleMultiplier = 2f;
 
         // II: mechanical cone range/angle remain OrrerySpellRuntime tuning. These
         // values only make the presentation burst derive from those dimensions.
