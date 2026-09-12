@@ -92,9 +92,9 @@ public static class OrrerySpellRegistry
 
         Register(new SpellDefinition(
             3,
-            "Cryo Gun",
+            "Cone of Cold",
             OrreryRecipeKey.Pure(OrreryElement.Ice, 2),
-            OrrerySpellExecutionKind.RapidProjectileStream,
+            OrrerySpellExecutionKind.Custom,
             OrreryCombat.EffectIds.CryoGun,
             OrrerySpellRuntime.ExecuteCryo));
 
