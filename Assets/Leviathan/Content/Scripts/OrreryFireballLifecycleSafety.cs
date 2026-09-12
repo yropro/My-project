@@ -135,7 +135,8 @@ public static class OrreryFireballLifecycleSafety
                 continue;
 
             managed.Remove(projectile);
-            if (projectile.gameObject != null &&
+            if (!projectile.IsDestroying() &&
+                projectile.gameObject != null &&
                 projectile.gameObject.activeInHierarchy)
             {
                 projectile.CaptureDestroy();
