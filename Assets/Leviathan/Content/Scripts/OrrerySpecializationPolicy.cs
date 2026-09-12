@@ -4,15 +4,18 @@ using System;
 using System.Collections.Generic;
 using static CoreTreeDsl;
 
-/// <summary>Minimal real second class. Content expansion follows the class design.</summary>
+/// <summary>
+/// Orrery class progression policy. The root is real class infrastructure;
+/// player-facing talents are intentionally not invented here before the Orrery
+/// tree is designed.
+/// </summary>
 public sealed class OrrerySpecializationPolicy : ICoreSpecializationPolicy, ICoreProgressionRankPolicy
 {
     public const int UpgradeKeyValue = 88;
     public static readonly Upgrade.Key UpgradeKey = (Upgrade.Key)UpgradeKeyValue;
     public static readonly Upgrade.Category OrreryCategory = (Upgrade.Category)18;
     private static Upgrade nativeUpgrade;
-    public static readonly CoreSpecializationKnob CastPower = CoreSpecializationKnob.Percent("orrery.cast_power", "Spell Power");
-    public static readonly CoreSpecializationFlag Focus = CoreSpecializationFlag.Create("orrery.focus", "Arcane Focus");
+
     public CoreClassId ClassId { get { return CoreClassId.Orrery; } }
     public string ProgressionName { get { return "Orrery"; } }
     public string PointCurrencyName { get { return "Orrery Points"; } }
@@ -75,13 +78,25 @@ public sealed class OrrerySpecializationPolicy : ICoreSpecializationPolicy, ICor
 
     public void RegisterTrees()
     {
-        var tree = new CoreSpecializationTree("orrery.foundation", "Orrery", "orrery.root", 0,
-            CoreTreeUnlockKind.NativeUpgrade, UpgradeKeyValue);
-        tree.Add(new CoreSpecializationNode("orrery.root", "Orrery", 1, CoreSpecializationNodeType.Root,
-            CoreReq.None, "", "Assemble elemental formulas with your satellites.", 0, true));
-        tree.Add(new CoreSpecializationNode("orrery.focus", "Arcane Focus", 1, CoreSpecializationNodeType.Passive,
-            new CoreRankRequirement("orrery.root", 1), "", "Gain 10% spell power and Arcane Focus.",
-            CoreSpecializationEffect.KnobIncrement(CastPower, 10f), CoreSpecializationEffect.Flag(Focus)));
+        var tree = new CoreSpecializationTree(
+            "orrery.foundation",
+            "Orrery",
+            "orrery.root",
+            0,
+            CoreTreeUnlockKind.NativeUpgrade,
+            UpgradeKeyValue);
+
+        tree.Add(new CoreSpecializationNode(
+            "orrery.root",
+            "Orrery",
+            1,
+            CoreSpecializationNodeType.Root,
+            CoreReq.None,
+            "",
+            "Assemble elemental formulas with your satellites.",
+            0,
+            true));
+
         CoreSpecializationPolicies.RegisterTree(ClassId, tree);
     }
 }
