@@ -98,6 +98,34 @@ public static class OrreryOrbit
         if (state == null || satelliteId == 0 || satelliteId > state.ActiveSatelliteCount)
             return false;
 
+        worldAngleDegrees = state.AnglesDegrees[satelliteId - 1];
+        return TryGetDesiredPoseAtAngle(
+            owner,
+            satelliteId,
+            worldAngleDegrees,
+            out worldPosition,
+            out orbitRadiusMeters);
+    }
+
+    /// <summary>
+    /// Computes the owner-relative pose for an explicit orbital phase without
+    /// mutating canonical orbit state. Shuffle uses this so its target remains
+    /// attached to a moving owner while the rolled phase stays fixed.
+    /// </summary>
+    public static bool TryGetDesiredPoseAtAngle(
+        GameShip owner,
+        byte satelliteId,
+        float angleDegrees,
+        out Vector3 worldPosition,
+        out float orbitRadiusMeters)
+    {
+        worldPosition = default(Vector3);
+        orbitRadiusMeters = 0f;
+
+        OrbitState state = GetOrCreate(owner);
+        if (state == null || satelliteId == 0 || satelliteId > state.ActiveSatelliteCount)
+            return false;
+
         OrreryRuntime.ResolvedState resolved = OrreryRuntime.GetResolvedState(owner);
         int index = satelliteId - 1;
         orbitRadiusMeters = Mathf.Max(
@@ -105,9 +133,9 @@ public static class OrreryOrbit
             resolved.BaseOrbitRadiusMeters +
             resolved.OrbitLaneSpacingMeters * index +
             state.Control.RadiusOffsetMeters);
-        worldAngleDegrees = state.AnglesDegrees[index];
 
-        Vector3 radial = Quaternion.Euler(0f, 0f, worldAngleDegrees) *
+        float normalizedAngle = OrreryRuntime.NormalizeDegrees(angleDegrees);
+        Vector3 radial = Quaternion.Euler(0f, 0f, normalizedAngle) *
             (Vector3.right * orbitRadiusMeters);
         worldPosition = owner.transform.position + radial;
         return true;
@@ -119,6 +147,21 @@ public static class OrreryOrbit
         if (state == null || satelliteId == 0 || satelliteId > state.ActiveSatelliteCount)
             return 0f;
         return state.AnglesDegrees[satelliteId - 1];
+    }
+
+    public static bool SetAngleDegrees(
+        GameShip owner,
+        byte satelliteId,
+        float angleDegrees)
+    {
+        OrbitState state = GetOrCreate(owner);
+        if (state == null || satelliteId == 0 || satelliteId > state.ActiveSatelliteCount)
+            return false;
+
+        int index = satelliteId - 1;
+        state.AnglesDegrees[index] = OrreryRuntime.NormalizeDegrees(angleDegrees);
+        state.Initialized[index] = true;
+        return true;
     }
 
     public static void SetControl(
