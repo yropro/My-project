@@ -28,11 +28,11 @@ public static class OrrerySpellRuntime
 
         public const float CryoIntegratedReferenceSeconds = 1f;
         public const float CryoDamageMultiplier = 1f;
-        public const float CryoConeRangeMeters = 7.5f;
-        public const float CryoConeAngleDegrees = 70f;
+        public const float CryoConeRangeMeters = 60f;
+        public const float CryoConeAngleDegrees = 30f;
         public const float CryoFreezeChanceAdditive = 0.50f;
         public const int CryoVisualProjectileCount = 9;
-        public const int CryoVisualSpreadDegrees = 60;
+        public const int CryoVisualSpreadDegrees = 30;
         public const float CryoVisualVelocityMultiplier = 1.30f;
         public const float CryoVisualProjectileScale = 1f;
 
@@ -458,7 +458,7 @@ public static class OrrerySpellRuntime
             !focus.IsValid)
         {
             Debug.LogWarning("[Orrery] " + spell.Name +
-                " requires an equipped " + element + " damage focus.");
+                " could not establish a valid casting context.");
             return false;
         }
 
@@ -667,6 +667,16 @@ public static class OrrerySpellRuntime
             cryo.BaseShotCount = Mathf.Max(1, Tuning.CryoVisualProjectileCount);
             cryo.shotAngle = Mathf.Max(0, Tuning.CryoVisualSpreadDegrees);
             cryo.BaseVelocity *= Tuning.CryoVisualVelocityMultiplier;
+
+            // Spell-specific geometry is authoritative after donor inheritance.
+            // Preserve any longer donor lifetime, but never allow focus state to
+            // make the visual Cryo burst die before the 60 m mechanical cone end.
+            float minimumVisualLifetime =
+                OrreryUnits.MetersToWorld(Tuning.CryoConeRangeMeters) /
+                Mathf.Max(0.01f, cryo.BaseVelocity);
+            cryo.BaseAutoDestroyTime = Mathf.Max(
+                cryo.BaseAutoDestroyTime,
+                minimumVisualLifetime);
         }
     }
 
