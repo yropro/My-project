@@ -43,11 +43,22 @@ public sealed class OrreryController : MonoBehaviour
     private void FixedUpdate()
     {
         SyncOwner();
-        if (currentOwner == null || activeSquadron == null)
+        if (currentOwner == null)
+            return;
+
+        OrrerySpellRuntime.FixedTick(currentOwner, Time.fixedDeltaTime);
+
+        if (activeSquadron == null)
             return;
 
         OrreryOrbit.Tick(currentOwner, Time.fixedDeltaTime);
         ApplyDesiredOrbit(false);
+    }
+
+    private void LateUpdate()
+    {
+        if (currentOwner != null)
+            OrrerySpellRuntime.LateTick(currentOwner);
     }
 
     private void OnDestroy()
@@ -288,6 +299,7 @@ public sealed class OrreryController : MonoBehaviour
         GameShip owner = currentOwner;
         if (owner != null)
         {
+            OrrerySpellRuntime.Forget(owner);
             OrreryCasting.Cancel(owner);
             OrrerySatellites.InvalidateLiveSatellites(owner);
             OrrerySatellites.InvalidateIntent(owner);
