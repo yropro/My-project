@@ -70,10 +70,14 @@ public static class OrrerySpellRegistry
         if (defaultsRegistered)
             return;
 
+        // Baseline Orrery formulas use two satellites. The three pure-element
+        // recipes are the first executable spell families; the mixed recipes are
+        // registered now as stable canonical identities so later unlocks do not
+        // change recipe meaning or network ids.
         Register(new SpellDefinition(
             1,
             "Magma Cannon",
-            OrreryRecipeKey.Pure(OrreryElement.Fire, 3),
+            OrreryRecipeKey.Pure(OrreryElement.Fire, 2),
             OrrerySpellExecutionKind.DiscreteProjectile,
             OrreryCombat.EffectIds.MagmaCannon,
             null));
@@ -81,7 +85,7 @@ public static class OrrerySpellRegistry
         Register(new SpellDefinition(
             2,
             "Tesla Coil",
-            OrreryRecipeKey.Pure(OrreryElement.Lightning, 3),
+            OrreryRecipeKey.Pure(OrreryElement.Lightning, 2),
             OrrerySpellExecutionKind.ContinuousBeam,
             OrreryCombat.EffectIds.TeslaCoil,
             null));
@@ -89,9 +93,33 @@ public static class OrrerySpellRegistry
         Register(new SpellDefinition(
             3,
             "Cryo Gun",
-            OrreryRecipeKey.Pure(OrreryElement.Ice, 3),
+            OrreryRecipeKey.Pure(OrreryElement.Ice, 2),
             OrrerySpellExecutionKind.RapidProjectileStream,
             OrreryCombat.EffectIds.CryoGun,
+            null));
+
+        Register(new SpellDefinition(
+            4,
+            "Fire + Ice",
+            Pair(OrreryElement.Fire, OrreryElement.Ice),
+            OrrerySpellExecutionKind.Custom,
+            0,
+            null));
+
+        Register(new SpellDefinition(
+            5,
+            "Fire + Lightning",
+            Pair(OrreryElement.Fire, OrreryElement.Lightning),
+            OrrerySpellExecutionKind.Custom,
+            0,
+            null));
+
+        Register(new SpellDefinition(
+            6,
+            "Ice + Lightning",
+            Pair(OrreryElement.Ice, OrreryElement.Lightning),
+            OrrerySpellExecutionKind.Custom,
+            0,
             null));
 
         defaultsRegistered = true;
@@ -133,6 +161,12 @@ public static class OrrerySpellRegistry
         return byRecipe.TryGetValue(recipe, out definition) && definition != null;
     }
 
+    public static bool IsKnownRecipe(OrreryRecipeKey recipe)
+    {
+        SpellDefinition definition;
+        return TryResolve(recipe, out definition);
+    }
+
     public static bool TryGet(ushort id, out SpellDefinition definition)
     {
         RegisterDefaults();
@@ -156,8 +190,13 @@ public static class OrrerySpellRegistry
     public static CoreCombat.SemanticKey GetCombatSemantic(
         SpellDefinition definition)
     {
-        return definition == null
+        return definition == null || definition.CombatEffectId == 0
             ? default(CoreCombat.SemanticKey)
             : OrreryCombat.Spell(definition.CombatEffectId);
+    }
+
+    private static OrreryRecipeKey Pair(OrreryElement first, OrreryElement second)
+    {
+        return default(OrreryRecipeKey).Add(first).Add(second);
     }
 }
