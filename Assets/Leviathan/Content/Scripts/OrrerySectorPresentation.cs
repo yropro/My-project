@@ -21,9 +21,9 @@ public static class OrrerySectorPresentation
         // Two copies of each elemental Halo slice give a readable field without
         // making the wheel opaque enough to hide combat underneath it.
         public const float OuterLayerRadiusMultiplier = 1.00f;
-        public const float OuterLayerOpacity = 0.28f;
+        public const float OuterLayerOpacity = 0.32f;
         public const float InnerLayerRadiusMultiplier = 0.84f;
-        public const float InnerLayerOpacity = 0.14f;
+        public const float InnerLayerOpacity = 0.18f;
     }
 
     private const string ThermalHaloPath = "Base/Items/AutoSpecial/Thermal Halo";
@@ -276,7 +276,9 @@ public static class OrrerySectorPresentation
             material.SetTexture("_MainTex", texture);
 
         Color color = source.color;
-        color.a *= Mathf.Clamp01(opacityMultiplier);
+        // Sector readability owns final renderer opacity. Multiplying by a Halo
+        // prefab's already-low alpha can make the wheel disappear entirely.
+        color.a = Mathf.Clamp01(opacityMultiplier);
         if (material.HasProperty("_Color"))
             material.SetColor("_Color", color);
         if (material.HasProperty("_RendererColor"))
