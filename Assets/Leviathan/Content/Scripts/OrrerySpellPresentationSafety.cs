@@ -96,6 +96,24 @@ public static class OrreryPresentationProjectileCapturePatch
 }
 
 /// <summary>
+/// Presentation shards must not consume PDL attention or become Gravity Cannon
+/// capture targets. Both systems consult Projectile.CanBeDamagedBy, so reject the
+/// tagged visual there without changing ordinary projectile lifetime/movement.
+/// </summary>
+[HarmonyPatch(typeof(Projectile), "CanBeDamagedBy")]
+public static class OrreryPresentationProjectileDamageabilityPatch
+{
+    public static bool Prefix(Projectile __instance, ref bool __result)
+    {
+        if (!OrrerySpellPresentationSafety.IsPresentationOnly(__instance))
+            return true;
+
+        __result = false;
+        return false;
+    }
+}
+
+/// <summary>
 /// Shield Ward reflection happens in Projectile.UpdateCollision before
 /// Projectile.HitObject. A presentation-only Cryo shard must not become a real
 /// mechanical reflected projectile, so block only the ward interaction while
