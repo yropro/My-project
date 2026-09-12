@@ -7,7 +7,8 @@ using UnityEngine;
 /// Ice + Lightning mixed Orrery spell.
 ///
 /// A presentation-only Lightning Orb visual physically travels to the hostile
-/// nearest the cursor, then through up to three more chain legs. Each impact owns
+/// nearest the cursor, then through its base chain legs plus inherited Extra
+/// Shot / Extra Chain count. Each impact owns
 /// one Electric direct packet plus one independently expanding Cold explosion.
 /// Chain selection prefers ships not yet directly hit, then permits revisits while
 /// never selecting the ship just struck.
@@ -32,6 +33,12 @@ public static class OrreryShatterbolt
         public Vector2 Impact1;
         public Vector2 Impact2;
         public Vector2 Impact3;
+        public Vector2 Impact4;
+        public Vector2 Impact5;
+        public Vector2 Impact6;
+        public Vector2 Impact7;
+        public Vector2 Impact8;
+        public Vector2 Impact9;
 
         public Vector2 GetImpact(int index)
         {
@@ -41,6 +48,12 @@ public static class OrreryShatterbolt
                 case 1: return Impact1;
                 case 2: return Impact2;
                 case 3: return Impact3;
+                case 4: return Impact4;
+                case 5: return Impact5;
+                case 6: return Impact6;
+                case 7: return Impact7;
+                case 8: return Impact8;
+                case 9: return Impact9;
                 default: return Vector2.zero;
             }
         }
@@ -53,6 +66,12 @@ public static class OrreryShatterbolt
                 case 1: Impact1 = position; break;
                 case 2: Impact2 = position; break;
                 case 3: Impact3 = position; break;
+                case 4: Impact4 = position; break;
+                case 5: Impact5 = position; break;
+                case 6: Impact6 = position; break;
+                case 7: Impact7 = position; break;
+                case 8: Impact8 = position; break;
+                case 9: Impact9 = position; break;
             }
         }
     }
@@ -105,6 +124,7 @@ public static class OrreryShatterbolt
         public Vector2 ProjectilePosition;
         public float LegElapsedSeconds;
         public int ImpactCount;
+        public int ImpactLimit;
         public readonly Vector2[] ImpactPositions =
             new Vector2[OrrerySpellCompendium.Shatterbolt.MaximumImpacts];
         public readonly GameShip[] DirectHistory =
@@ -116,6 +136,8 @@ public static class OrreryShatterbolt
 
         public OrreryFocusResolver.Focus LightningFocus;
         public OrreryFocusResolver.Focus IceFocus;
+        public OrreryFocusProfile.Resolved LightningProfile;
+        public OrreryFocusProfile.Resolved IceProfile;
         public Launcher LightningSource;
         public Launcher IceSource;
         public DamageProfile LightningDamage;
@@ -169,23 +191,23 @@ public static class OrreryShatterbolt
         DisposeSources(state);
         ResetCastFields(state);
 
-        OrreryFocusResolver.Focus lightningFocus =
-            default(OrreryFocusResolver.Focus);
-        OrreryFocusResolver.Focus iceFocus =
-            default(OrreryFocusResolver.Focus);
+        OrreryFocusProfile.Resolved lightningProfile =
+            default(OrreryFocusProfile.Resolved);
+        OrreryFocusProfile.Resolved iceProfile =
+            default(OrreryFocusProfile.Resolved);
         Launcher lightningSource = null;
         Launcher iceSource = null;
         if (!TryCreateSource(
                 owner,
                 OrreryElement.Lightning,
                 LightningOrbPath,
-                out lightningFocus,
+                out lightningProfile,
                 out lightningSource) ||
             !TryCreateSource(
                 owner,
                 OrreryElement.Ice,
                 FrozenOrbPath,
-                out iceFocus,
+                out iceProfile,
                 out iceSource))
         {
             DisposeSource(lightningSource);
@@ -193,16 +215,23 @@ public static class OrreryShatterbolt
             return false;
         }
 
-        state.LightningFocus = lightningFocus;
-        state.IceFocus = iceFocus;
+        state.LightningFocus = lightningProfile.Focus;
+        state.IceFocus = iceProfile.Focus;
+        state.LightningProfile = lightningProfile;
+        state.IceProfile = iceProfile;
         state.LightningSource = lightningSource;
         state.IceSource = iceSource;
+        state.ImpactLimit = Mathf.Clamp(
+            OrrerySpellCompendium.Shatterbolt.BaseMaximumImpacts +
+                lightningProfile.AdditionalProjectileOrChainCount,
+            1,
+            OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
         state.LightningDamage = BuildDamageProfile(
-            lightningFocus,
+            lightningProfile,
             lightningSource,
             OrrerySpellCompendium.Shatterbolt.LightningDamageMultiplier);
         state.IceDamage = BuildDamageProfile(
-            iceFocus,
+            iceProfile,
             iceSource,
             OrrerySpellCompendium.Shatterbolt.IceExplosionDamageMultiplier);
         state.LightningContributor = ResolveSatelliteContributor(
@@ -319,9 +348,10 @@ public static class OrreryShatterbolt
 
         Vector2 targetPosition = target.transform.position;
         Vector2 toTarget = targetPosition - state.ProjectilePosition;
+        float speedMeters = state.LightningProfile.ApplyProjectileVelocityBonus(
+            OrrerySpellCompendium.Shatterbolt.ProjectileSpeedMetersPerSecond);
         float speedWorld = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f,
-                OrrerySpellCompendium.Shatterbolt.ProjectileSpeedMetersPerSecond));
+            Mathf.Max(0f, speedMeters));
         float step = speedWorld * dt;
 
         if (toTarget.sqrMagnitude <= step * step || toTarget.sqrMagnitude <= 0.000001f)
@@ -390,7 +420,10 @@ public static class OrreryShatterbolt
         snapshot.ImpactCount = (byte)Mathf.Clamp(
             state.ImpactCount,
             0,
-            OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
+            Mathf.Clamp(
+                state.ImpactLimit,
+                1,
+                OrrerySpellCompendium.Shatterbolt.MaximumImpacts));
         snapshot.OrbPosition = state.ProjectilePosition;
 
         int count = Mathf.Min(snapshot.ImpactCount, state.ImpactPositions.Length);
@@ -418,7 +451,8 @@ public static class OrreryShatterbolt
         }
         state.ImpactCount++;
 
-        int maxImpacts = Mathf.Max(
+        int maxImpacts = Mathf.Clamp(
+            state.ImpactLimit,
             1,
             OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
         if (state.ImpactCount >= maxImpacts)
@@ -447,12 +481,16 @@ public static class OrreryShatterbolt
         DamageProfile profile = state.LightningDamage;
         GameShip targetShip = target as GameShip;
         bool crit = Modifier.CritRoll(profile.CritChance, targetShip);
+        float chainMultiplier = state.ImpactCount > 0
+            ? Mathf.Max(0f, 1f + state.LightningProfile.ChainDamageBonus)
+            : 1f;
+        float neutralDamage = profile.NeutralDamage * chainMultiplier;
         float damage = crit
-            ? profile.NeutralDamage * (1f + profile.CritModifier)
-            : profile.NeutralDamage;
+            ? neutralDamage * (1f + profile.CritModifier)
+            : neutralDamage;
         state.DirectDamageScratch[0] = new Damageable.DamageData(
             damage,
-            profile.DamageDps);
+            profile.DamageDps * chainMultiplier);
 
         RouteAuthoredDamage(
             owner,
@@ -505,8 +543,10 @@ public static class OrreryShatterbolt
         if (PhysicsController.instance == null)
             return;
 
+        float radiusMeters = state.IceProfile.ApplyRangeBonus(
+            OrrerySpellCompendium.Shatterbolt.ExplosionRadiusMeters);
         float finalRadius = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f, OrrerySpellCompendium.Shatterbolt.ExplosionRadiusMeters));
+            Mathf.Max(0f, radiusMeters));
         float expansionPerSecond = OrreryUnits.MetersToWorld(
             Mathf.Max(0f,
                 OrrerySpellCompendium.Shatterbolt.ExplosionExpansionMetersPerSecond));
@@ -609,9 +649,10 @@ public static class OrreryShatterbolt
         OwnerState state,
         Vector2 cursorPosition)
     {
+        float rangeMeters = state.LightningProfile.ApplyRangeBonus(
+            OrrerySpellCompendium.Shatterbolt.InitialAcquisitionRangeMeters);
         float range = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f,
-                OrrerySpellCompendium.Shatterbolt.InitialAcquisitionRangeMeters));
+            Mathf.Max(0f, rangeMeters));
         CollectCandidateShips(owner, state, owner.transform.position, range);
 
         GameShip best = null;
@@ -641,8 +682,10 @@ public static class OrreryShatterbolt
         Vector2 origin,
         GameShip currentTarget)
     {
+        float rangeMeters = state.LightningProfile.ApplyChainRangeBonus(
+            OrrerySpellCompendium.Shatterbolt.ChainRangeMeters);
         float range = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f, OrrerySpellCompendium.Shatterbolt.ChainRangeMeters));
+            Mathf.Max(0f, rangeMeters));
         CollectCandidateShips(owner, state, origin, range);
 
         GameShip bestUnhit = null;
@@ -832,33 +875,32 @@ public static class OrreryShatterbolt
     }
 
     private static DamageProfile BuildDamageProfile(
-        OrreryFocusResolver.Focus focus,
-        Launcher source,
+        OrreryFocusProfile.Resolved focus,
+        Launcher implementationSource,
         float damageMultiplier)
     {
         DamageProfile result = default(DamageProfile);
-        if (source == null || !focus.IsValid)
+        if (implementationSource == null || !focus.IsValid)
             return result;
 
-        float referenceDps = OrrerySpellPower.GetReferenceDps(
-            focus.EffectiveItemLevel,
+        float referenceDps = focus.GetReferenceDps(
             OrrerySpellPower.ReferenceMode.Mean);
-        result.DamageDps = referenceDps * Mathf.Max(0f, damageMultiplier);
-        float integratedDamage = result.DamageDps * Mathf.Max(
+        result.DamageDps = focus.ApplySpellDamageBonus(
+            referenceDps * Mathf.Max(0f, damageMultiplier));
+        result.NeutralDamage = result.DamageDps * Mathf.Max(
             0f,
             OrrerySpellCompendium.Shatterbolt.IntegratedReferenceSeconds);
-        // V0 keeps the same logical crit/status behavior as the existing Orrery
-        // virtual-weapon runtime: the native donor supplies combat rolls while
-        // focus item level supplies reference power. Full cross-family focus-roll
-        // inheritance belongs in the shared focus adapter when FF/II/LL migrate.
-        result.CritChance = Mathf.Clamp01(source.GetCritChance());
-        result.CritModifier = Mathf.Max(0f, source.GetCritModifier());
-        result.StatusChance = Mathf.Clamp01(source.GetStatusEffectChance());
-        result.NeutralDamage = integratedDamage /
-            Mathf.Max(0.01f, 1f + result.CritChance * result.CritModifier);
-        result.BypassDamageLimit =
-            source.HasCustomizer(Customizer.Type.BypassDamageLimit);
-        result.Source = source;
+        result.CritChance = Mathf.Clamp01(focus.CritChance);
+        result.CritModifier = Mathf.Max(0f, focus.CritModifier);
+        result.StatusChance = Mathf.Clamp01(focus.StatusChance);
+        result.BypassDamageLimit = focus.BypassDamageLimit;
+
+        // A real focus is the logical native source for compatible on-kill and
+        // source-slot behavior. The hidden launcher exists only as implementation
+        // context and is used as source when the cast is unfocused.
+        result.Source = focus.HasFocus && focus.Donor != null
+            ? focus.Donor
+            : implementationSource;
         return result;
     }
 
@@ -866,13 +908,13 @@ public static class OrreryShatterbolt
         GameShip owner,
         OrreryElement element,
         string resourcePath,
-        out OrreryFocusResolver.Focus focus,
+        out OrreryFocusProfile.Resolved focus,
         out Launcher launcher)
     {
-        focus = default(OrreryFocusResolver.Focus);
+        focus = default(OrreryFocusProfile.Resolved);
         launcher = null;
 
-        if (!OrreryFocusResolver.TryResolve(owner, element, out focus) ||
+        if (!OrreryFocusProfile.TryResolve(owner, element, out focus) ||
             !focus.IsValid)
         {
             return false;
@@ -881,20 +923,29 @@ public static class OrreryShatterbolt
         ItemBase itemBase = Resources.Load<ItemBase>(resourcePath);
         if (itemBase == null)
         {
-            Debug.LogError("[Orrery] Shatterbolt native donor not found: " + resourcePath);
+            Debug.LogError(
+                "[Orrery] Shatterbolt native implementation item not found: " +
+                resourcePath);
             return false;
         }
 
         launcher = itemBase.GetItem(Item.Rarity.Common, 1, 0) as Launcher;
         if (launcher == null)
         {
-            Debug.LogError("[Orrery] Shatterbolt donor is not a Launcher: " + resourcePath);
+            Debug.LogError(
+                "[Orrery] Shatterbolt implementation item is not a Launcher: " +
+                resourcePath);
             return false;
         }
 
         launcher.heatPerSecond = 0f;
         launcher.SetFaction(owner.faction);
-        launcher.Equip(owner, Placement.zero, focus.SlotIndex, false, false);
+        launcher.Equip(
+            owner,
+            Placement.zero,
+            focus.Focus.SlotIndex,
+            false,
+            false);
         launcher.ToggleVisbility(false);
         return true;
     }
@@ -1221,6 +1272,7 @@ public static class OrreryShatterbolt
         state.ProjectilePosition = Vector2.zero;
         state.LegElapsedSeconds = 0f;
         state.ImpactCount = 0;
+        state.ImpactLimit = OrrerySpellCompendium.Shatterbolt.BaseMaximumImpacts;
         state.LightningContributor = default(CoreCombat.ContributorKey);
         state.IceContributor = default(CoreCombat.ContributorKey);
         for (int i = 0; i < state.ImpactPositions.Length; i++)
@@ -1241,6 +1293,8 @@ public static class OrreryShatterbolt
         state.IceSource = null;
         state.LightningFocus = default(OrreryFocusResolver.Focus);
         state.IceFocus = default(OrreryFocusResolver.Focus);
+        state.LightningProfile = default(OrreryFocusProfile.Resolved);
+        state.IceProfile = default(OrreryFocusProfile.Resolved);
         state.LightningDamage = default(DamageProfile);
         state.IceDamage = default(DamageProfile);
     }
@@ -1257,7 +1311,7 @@ public static class OrreryShatterbolt
         }
         catch (System.Exception ex)
         {
-            Debug.LogError("[Orrery] Failed to dispose Shatterbolt donor: " + ex);
+            Debug.LogError("[Orrery] Failed to dispose Shatterbolt implementation source: " + ex);
         }
     }
 

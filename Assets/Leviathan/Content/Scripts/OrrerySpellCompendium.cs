@@ -28,13 +28,13 @@ public static class OrrerySpellCompendium
         public const int AdditionalChains = 3;
         public const int BaseMaximumImpacts = AdditionalChains + 1;
 
-        // Keep the current live spell at four impacts until the runtime patch
-        // explicitly opts into inherited Extra Shot / Extra Chain count. The
-        // larger bound is the preallocated safety ceiling for that migration.
-        public const int MaximumImpacts = BaseMaximumImpacts;
+        // Native Extra Shot / Extra Chain rolls add chain attempts 1:1. This is
+        // only the bounded storage/transport ceiling; actual casts still stop as
+        // soon as their resolved chain allowance is spent or no target exists.
         public const int MaxInheritedAdditionalChains = 6;
-        public const int MaximumInheritedImpacts =
+        public const int MaximumImpacts =
             BaseMaximumImpacts + MaxInheritedAdditionalChains;
+        public const int MaximumInheritedImpacts = MaximumImpacts;
 
         public const int MaxCandidateShipsPerQuery = 64;
         public const int MaxTargetsPerExplosion = 64;
