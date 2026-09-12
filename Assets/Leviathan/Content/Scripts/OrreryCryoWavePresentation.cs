@@ -36,7 +36,6 @@ public static class OrreryCryoWavePresentation
 
     private sealed class Sequence
     {
-        public GameShip Owner;
         public ChargingLauncher Launcher;
         public Quaternion BaseAim;
         public int ExtraWavesRemaining;
@@ -83,7 +82,6 @@ public static class OrreryCryoWavePresentation
             return;
 
         Sequence sequence = new Sequence();
-        sequence.Owner = owner;
         sequence.Launcher = cryo;
         sequence.BaseAim = cryo.gameObject == null
             ? Quaternion.identity
