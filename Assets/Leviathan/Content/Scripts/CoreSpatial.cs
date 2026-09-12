@@ -18,6 +18,7 @@ public static class CoreSpatial
     public const float WorldUnitsPerMeter = 1f / 20f;
 
     private const float DirectionEpsilonSquared = 0.000001f;
+    private const float AngularDotEpsilon = 0.000001f;
 
     public static float MetersToWorldUnits(float meters)
     {
@@ -95,7 +96,7 @@ public static class CoreSpatial
         float denominator = Mathf.Sqrt(distanceSquared * forward.sqrMagnitude);
         float cosineThreshold = Mathf.Cos(halfAngleDegrees * Mathf.Deg2Rad);
         float dot = Vector2.Dot(offset, forward);
-        return dot >= cosineThreshold * denominator;
+        return dot >= (cosineThreshold - AngularDotEpsilon) * denominator;
     }
 
     /// <summary>
@@ -187,7 +188,7 @@ public static class CoreSpatial
         float denominator = Mathf.Sqrt(distanceSquared * forward.sqrMagnitude);
         float cosineThreshold = Mathf.Cos(halfAngleDegrees * Mathf.Deg2Rad);
         float dot = Vector2.Dot(offset, forward);
-        return dot >= cosineThreshold * denominator;
+        return dot >= (cosineThreshold - AngularDotEpsilon) * denominator;
     }
 
     /// <summary>
