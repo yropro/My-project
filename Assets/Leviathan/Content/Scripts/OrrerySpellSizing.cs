@@ -8,8 +8,8 @@ using UnityEngine;
 /// Authoritative V0 spell-geometry tuning.
 ///
 /// Gameplay distances are authored in meters and converted only at the native
-/// Star Vortex boundary. Visual-only multipliers are explicitly named so art
-/// correction cannot silently change hit geometry.
+/// Star Vortex boundary. Presentation-only multipliers are explicitly named so
+/// art correction cannot silently change hit geometry.
 /// </summary>
 public static class OrrerySpellSizing
 {
@@ -17,10 +17,10 @@ public static class OrrerySpellSizing
     {
         // FF: native ExplosiveProjectile uses this same radius for physics and
         // ExplosiveArea visual scale, so gameplay and explosion presentation stay
-        // coupled by default. Projectile scale is presentation-only and is applied
-        // by OrreryFireballLifecycleSafety, which already owns pooled-scale restore.
+        // coupled by default. Root projectile scale affects native collision too,
+        // so this is intentionally a physical + visual chunky-missile knob.
         public const float FireballExplosionRadiusMeters = 40f;
-        public const float FireballProjectileVisualScaleMultiplier = 2f;
+        public const float FireballProjectileScaleMultiplier = 2f;
 
         // II: mechanical cone range/angle remain OrrerySpellRuntime tuning. These
         // values only make the presentation burst derive from those dimensions.
