@@ -59,6 +59,29 @@ public static class OrrerySpellPresentationSafety
     }
 }
 
+/// <summary>
+/// Native Launcher.ShootProjectile calls Projectile.Init before AddProjectile,
+/// and Projectile.Init may immediately perform collision. Register visual-only
+/// projectiles before that Init body executes so no spawn-frame hit can escape
+/// the presentation safety boundary.
+/// </summary>
+[HarmonyPatch(typeof(Projectile), "Init")]
+public static class OrreryPresentationProjectileInitPatch
+{
+    public static void Prefix(
+        Projectile __instance,
+        Launcher parentLauncher)
+    {
+        OrrerySpellPresentationSafety.RegisterIfPresentationOnly(
+            parentLauncher,
+            __instance);
+    }
+}
+
+/// <summary>
+/// Keep AddProjectile registration as a defensive fallback for future native
+/// projectile paths that may initialize or pool in a different order.
+/// </summary>
 [HarmonyPatch(typeof(Launcher), "AddProjectile")]
 public static class OrreryPresentationProjectileCapturePatch
 {
@@ -89,37 +112,31 @@ public static class OrreryPresentationProjectileHitPatch
 }
 
 /// <summary>
-/// FuzzyProjectile can author an end-of-life secondary space effect before its
-/// base cleanup. Cryo presentation projectiles are not allowed to create any
-/// mechanical secondary effect, so they return directly to the native pool.
+/// FuzzyProjectile can author a BurningSpace secondary effect both during its
+/// end-of-life update and during ScheduleDestroy. Block only that mechanical
+/// effect and leave native ScheduleDestroy intact so launcher membership and
+/// network despawn bookkeeping are still cleaned up normally.
 /// </summary>
-[HarmonyPatch(typeof(FuzzyProjectile), "ScheduleDestroy")]
-public static class OrreryPresentationFuzzyDestroyPatch
+[HarmonyPatch(typeof(FuzzyProjectile), "RollBurningSpace")]
+public static class OrreryPresentationFuzzySecondaryPatch
 {
     public static bool Prefix(FuzzyProjectile __instance)
     {
-        if (!OrrerySpellPresentationSafety.IsPresentationOnly(__instance))
-            return true;
-
-        __instance.PoolDestroy();
-        return false;
+        return !OrrerySpellPresentationSafety.IsPresentationOnly(__instance);
     }
 }
 
 /// <summary>
-/// Defensive coverage if a future Cryo visual prefab is explosive: expiry must
-/// still remain presentation-only rather than invoking ExplosiveProjectile AoE.
+/// Defensive coverage if a future Cryo visual prefab is explosive. Block only
+/// the private mechanical AoE routine; native TimedDestroy/HitObject lifecycle,
+/// visuals, launcher removal and despawn bookkeeping remain untouched.
 /// </summary>
-[HarmonyPatch(typeof(ExplosiveProjectile), "TimedDestroy")]
-public static class OrreryPresentationExplosiveExpiryPatch
+[HarmonyPatch(typeof(ExplosiveProjectile), "Explode")]
+public static class OrreryPresentationExplosiveMechanicalPatch
 {
     public static bool Prefix(ExplosiveProjectile __instance)
     {
-        if (!OrrerySpellPresentationSafety.IsPresentationOnly(__instance))
-            return true;
-
-        __instance.PoolDestroy();
-        return false;
+        return !OrrerySpellPresentationSafety.IsPresentationOnly(__instance);
     }
 }
 
