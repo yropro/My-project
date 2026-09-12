@@ -1,0 +1,56 @@
+using HarmonyLib;
+using StarVortex;
+using UnityEngine;
+
+/// <summary>
+/// Lightweight local presentation driver. Logical sectors stay in OrreryRuntime;
+/// this only keeps their native-Halo slices centered on the active Orrery ship.
+/// </summary>
+public sealed class OrrerySectorPresentationDriver : MonoBehaviour
+{
+    private static OrrerySectorPresentationDriver instance;
+
+    private void Awake()
+    {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    private void LateUpdate()
+    {
+        CoreOwnerContext context = CoreClassRuntime.CurrentContext;
+        GameShip owner = context != null && context.IsValid &&
+            context.ClassId == CoreClassId.Orrery
+                ? context.Ship
+                : null;
+        OrrerySectorPresentation.Tick(owner);
+    }
+
+    private void OnDestroy()
+    {
+        if (instance == this)
+            instance = null;
+        OrrerySectorPresentation.Hide();
+    }
+
+    public static bool Exists { get { return instance != null; } }
+}
+
+[HarmonyPatch(typeof(WorldController), "PostInit")]
+public static class OrrerySectorPresentationBootstrapPatch
+{
+    public static void Postfix()
+    {
+        if (OrrerySectorPresentationDriver.Exists)
+            return;
+
+        GameObject runtime = new GameObject("Orrery Sector Presentation");
+        runtime.AddComponent<OrrerySectorPresentationDriver>();
+    }
+}
