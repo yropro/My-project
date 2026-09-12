@@ -1053,7 +1053,7 @@ public static class OrrerySpellRuntime
 
             ParameterInfo[] parameters = method.GetParameters();
             if (parameters.Length == 14 &&
-                parameters[0].ParameterType == typeof(IDamageable) &&
+                parameters[0].ParameterType.IsAssignableFrom(typeof(Damageable)) &&
                 parameters[1].ParameterType == typeof(Damageable.DamageType) &&
                 parameters[2].ParameterType == typeof(Damageable.DamageData[]))
             {
