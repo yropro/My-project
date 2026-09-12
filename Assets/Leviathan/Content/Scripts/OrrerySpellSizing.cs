@@ -1,5 +1,6 @@
 using HarmonyLib;
 using StarVortex;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
@@ -36,12 +37,24 @@ public static class OrrerySpellSizing
         public const float TeslaBeamVisualWidthMultiplier = 1f;
     }
 
+    private struct BeamWidthBaseline
+    {
+        public float Main;
+        public float End;
+        public float Additional;
+    }
+
     private static readonly FieldInfo BeamMaxWidthField =
         AccessTools.Field(typeof(Beam), "maxWidth");
     private static readonly FieldInfo BeamMaxEndWidthField =
         AccessTools.Field(typeof(Beam), "maxEndWidth");
     private static readonly FieldInfo BeamAdditionalMaxWidthField =
         AccessTools.Field(typeof(Beam), "additionalMaxWidth");
+
+    private static readonly Dictionary<Projectile, Vector3> projectileBaseScales =
+        new Dictionary<Projectile, Vector3>(32);
+    private static readonly Dictionary<Beam, BeamWidthBaseline> beamBaseWidths =
+        new Dictionary<Beam, BeamWidthBaseline>(8);
 
     public static bool IsHiddenOrreryTesla(BeamWeapon beam)
     {
@@ -117,23 +130,109 @@ public static class OrrerySpellSizing
         if (beam == null || !IsHiddenOrreryTesla(parentBeamWeapon))
             return;
 
+        BeamWidthBaseline baseline;
+        if (!beamBaseWidths.TryGetValue(beam, out baseline))
+        {
+            baseline.Main = GetFloatField(BeamMaxWidthField, beam);
+            baseline.End = GetFloatField(BeamMaxEndWidthField, beam);
+            baseline.Additional = GetFloatField(BeamAdditionalMaxWidthField, beam);
+            beamBaseWidths[beam] = baseline;
+        }
+
         float multiplier = Mathf.Max(0f, Tuning.TeslaBeamVisualWidthMultiplier);
-        ScaleField(BeamMaxWidthField, beam, multiplier);
-        ScaleField(BeamMaxEndWidthField, beam, multiplier);
-        ScaleField(BeamAdditionalMaxWidthField, beam, multiplier);
+        SetFloatField(BeamMaxWidthField, beam, baseline.Main * multiplier);
+        SetFloatField(BeamMaxEndWidthField, beam, baseline.End * multiplier);
+        SetFloatField(
+            BeamAdditionalMaxWidthField,
+            beam,
+            baseline.Additional * multiplier);
     }
 
-    private static void ScaleField(
-        FieldInfo field,
-        Beam beam,
-        float multiplier)
+    public static void ApplyProjectileVisualScale(Projectile projectile)
     {
-        if (field == null || beam == null)
+        if (projectile == null || projectile.transform == null)
             return;
 
+        Vector3 baseScale;
+        if (!projectileBaseScales.TryGetValue(projectile, out baseScale))
+        {
+            baseScale = projectile.transform.localScale;
+            projectileBaseScales[projectile] = baseScale;
+        }
+        else
+        {
+            // A pooled projectile can be initialized again before a previous
+            // presentation scale would otherwise be overwritten.
+            projectile.transform.localScale = baseScale;
+        }
+
+        if (OrrerySpellPresentationSafety.IsPresentationOnly(projectile))
+        {
+            projectile.transform.localScale = baseScale * Mathf.Max(
+                0f,
+                Tuning.CryoVisualProjectileScaleMultiplier);
+            return;
+        }
+
+        GameShip originalOwner;
+        if (OrreryFireballLifecycleSafety.TryGetOriginalOwner(
+                projectile,
+                out originalOwner))
+        {
+            projectile.transform.localScale = baseScale * Mathf.Max(
+                0f,
+                Tuning.FireballProjectileVisualScaleMultiplier);
+        }
+    }
+
+    public static void RestoreProjectileVisualScale(Projectile projectile)
+    {
+        if (projectile == null)
+            return;
+
+        Vector3 baseScale;
+        if (projectileBaseScales.TryGetValue(projectile, out baseScale))
+        {
+            if (projectile.transform != null)
+                projectile.transform.localScale = baseScale;
+            projectileBaseScales.Remove(projectile);
+        }
+    }
+
+    public static void ForgetBeam(Beam beam)
+    {
+        if (beam != null)
+            beamBaseWidths.Remove(beam);
+    }
+
+    public static void ResetVisualBookkeeping()
+    {
+        if (projectileBaseScales.Count > 0)
+        {
+            foreach (KeyValuePair<Projectile, Vector3> pair in projectileBaseScales)
+            {
+                if (pair.Key != null && pair.Key.transform != null)
+                    pair.Key.transform.localScale = pair.Value;
+            }
+            projectileBaseScales.Clear();
+        }
+
+        beamBaseWidths.Clear();
+    }
+
+    private static float GetFloatField(FieldInfo field, Beam beam)
+    {
+        if (field == null || beam == null)
+            return 0f;
+
         object value = field.GetValue(beam);
-        if (value is float)
-            field.SetValue(beam, (float)value * multiplier);
+        return value is float ? (float)value : 0f;
+    }
+
+    private static void SetFloatField(FieldInfo field, Beam beam, float value)
+    {
+        if (field != null && beam != null)
+            field.SetValue(beam, value);
     }
 }
 
@@ -199,6 +298,15 @@ public static class OrrerySpellSizingBeamInitPatch
     }
 }
 
+[HarmonyPatch(typeof(Beam), "OnDestroy")]
+public static class OrrerySpellSizingBeamDestroyPatch
+{
+    public static void Postfix(Beam __instance)
+    {
+        OrrerySpellSizing.ForgetBeam(__instance);
+    }
+}
+
 /// <summary>
 /// Projectile visual scale is deliberately separate from mechanics. II shards
 /// cannot deal damage or become targeting decoys through the presentation-safety
@@ -207,27 +315,27 @@ public static class OrrerySpellSizingBeamInitPatch
 [HarmonyPatch(typeof(Projectile), "Init")]
 public static class OrrerySpellSizingProjectileVisualPatch
 {
-    public static void Postfix(Projectile __instance, Launcher parentLauncher)
+    public static void Postfix(Projectile __instance)
     {
-        if (__instance == null || parentLauncher == null)
-            return;
+        OrrerySpellSizing.ApplyProjectileVisualScale(__instance);
+    }
+}
 
-        if (OrrerySpellPresentationSafety.IsPresentationOnly(__instance))
-        {
-            __instance.transform.localScale *= Mathf.Max(
-                0f,
-                OrrerySpellSizing.Tuning.CryoVisualProjectileScaleMultiplier);
-            return;
-        }
+[HarmonyPatch(typeof(Projectile), "PoolDestroy")]
+public static class OrrerySpellSizingProjectilePoolPatch
+{
+    [HarmonyPriority(Priority.First)]
+    public static void Prefix(Projectile __instance)
+    {
+        OrrerySpellSizing.RestoreProjectileVisualScale(__instance);
+    }
+}
 
-        GameShip originalOwner;
-        if (OrreryFireballLifecycleSafety.TryGetOriginalOwner(
-                __instance,
-                out originalOwner))
-        {
-            __instance.transform.localScale *= Mathf.Max(
-                0f,
-                OrrerySpellSizing.Tuning.FireballProjectileVisualScaleMultiplier);
-        }
+[HarmonyPatch(typeof(WorldController), "OnDestroy")]
+public static class OrrerySpellSizingWorldDestroyPatch
+{
+    public static void Postfix()
+    {
+        OrrerySpellSizing.ResetVisualBookkeeping();
     }
 }
