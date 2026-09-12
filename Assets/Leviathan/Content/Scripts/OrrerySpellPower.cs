@@ -18,6 +18,8 @@ public static class OrrerySpellPower
     // most of baseline output so gearing improves/changes spells rather than
     // functioning as a hard class-enablement gate.
     public const float UnfocusedDpsMultiplier = 0.80f;
+    public const float UnfocusedCritChance = 0.10f;
+    public const float UnfocusedStatusEffectChance = 0.10f;
 
     public enum ReferenceMode : byte
     {
