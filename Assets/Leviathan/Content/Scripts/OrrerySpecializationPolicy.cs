@@ -18,7 +18,7 @@ public sealed class OrrerySpecializationPolicy : ICoreSpecializationPolicy, ICor
 
     public CoreClassId ClassId { get { return CoreClassId.Orrery; } }
     public string ProgressionName { get { return "Orrery"; } }
-    public string PointCurrencyName { get { return "Orrery Points"; } }
+    public string PointCurrencyName { get { return "Knowledge Points"; } }
     public Upgrade.Key ProgressionUpgradeKey { get { return UpgradeKey; } }
     public Upgrade.Category ClassCategory { get { return OrreryCategory; } }
 
