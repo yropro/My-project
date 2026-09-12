@@ -298,9 +298,11 @@ public static class OrrerySpellRuntime
             return false;
         }
 
-        // Populate native pools once per virtual weapon, never on the hot cast
-        // path after the focus/version remains stable.
+        // Pool sizing deliberately sees the native reference cadence. After the
+        // pool exists, spell-owned cadence normalization may safely remove native
+        // reload gates without asking PopulatePool to size against zero reload.
         weapon.PopulatePool();
+        NormalizeSpellCadence(spellId, weapon);
         SetVirtualWeapon(state, spellId, result);
         return true;
     }
@@ -366,6 +368,20 @@ public static class OrrerySpellRuntime
         }
 
         return false;
+    }
+
+    private static void NormalizeSpellCadence(ushort spellId, Activatable weapon)
+    {
+        // Magma is an Orrery discrete cast, not a held Magma Gun. Its native
+        // 0.15-second launcher reload is useful for pool sizing but must not gate
+        // the next formula invocation. One activation is still guaranteed because
+        // the cast is deactivated immediately after its first FixedUpdate tick.
+        if (spellId != 1)
+            return;
+
+        Launcher launcher = weapon as Launcher;
+        if (launcher != null)
+            launcher.BaseReloadTime = 0f;
     }
 
     private static void Complete(
