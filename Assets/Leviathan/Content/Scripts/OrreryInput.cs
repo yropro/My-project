@@ -8,8 +8,8 @@ using UnityEngine;
 ///
 /// FirePrimary (LMB by default) locks the next available formula satellite in the
 /// canonical live-snapshot order. ActivateActivatable (RMB by default) invokes
-/// the completed formula. These patches sit on Star Vortex's own input-update
-/// methods so normal menu/pause/chat gating is preserved automatically.
+/// the completed formula; its release edge is forwarded to live spells that own
+/// post-commit interaction (guided fireball detonation / held channels).
 /// </summary>
 public static class OrreryInput
 {
@@ -22,6 +22,12 @@ public static class OrreryInput
     {
         if (owner == null || !OrreryRuntime.IsActive(owner))
             return false;
+
+        if (OrreryController.IsShuffling(owner))
+        {
+            Log("LMB lock rejected: satellites are rearming/shuffling.");
+            return false;
+        }
 
         OrrerySatellites.SatelliteSnapshot snapshot =
             OrrerySatellites.GetSnapshot(owner);
@@ -72,6 +78,14 @@ public static class OrreryInput
         return result;
     }
 
+    public static bool ReleaseInvoke(GameShip owner)
+    {
+        bool handled = OrreryControl.ReleaseInvoke(owner);
+        if (handled)
+            Log("Invoke release handled by active spell.");
+        return handled;
+    }
+
     private static bool IsLocalOrreryOwner(GameShip owner)
     {
         CoreOwnerContext context = CoreClassRuntime.CurrentContext;
@@ -117,8 +131,13 @@ public static class OrreryInput
                 return true;
 
             Player input = __instance.rewiredPlayer;
-            if (input != null && input.GetButtonDown("ActivateActivatable"))
-                Invoke(owner);
+            if (input != null)
+            {
+                if (input.GetButtonDown("ActivateActivatable"))
+                    Invoke(owner);
+                if (input.GetButtonUp("ActivateActivatable"))
+                    ReleaseInvoke(owner);
+            }
 
             // Suppresses normal selected/numbered activatable weapon handling.
             // Dedicated utility inputs live elsewhere in InputController and are
