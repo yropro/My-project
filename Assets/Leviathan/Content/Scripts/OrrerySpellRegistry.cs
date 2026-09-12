@@ -80,7 +80,7 @@ public static class OrrerySpellRegistry
             OrreryRecipeKey.Pure(OrreryElement.Fire, 2),
             OrrerySpellExecutionKind.DiscreteProjectile,
             OrreryCombat.EffectIds.MagmaCannon,
-            null));
+            OrrerySpellRuntime.ExecuteMagma));
 
         Register(new SpellDefinition(
             2,
@@ -88,7 +88,7 @@ public static class OrrerySpellRegistry
             OrreryRecipeKey.Pure(OrreryElement.Lightning, 2),
             OrrerySpellExecutionKind.ContinuousBeam,
             OrreryCombat.EffectIds.TeslaCoil,
-            null));
+            OrrerySpellRuntime.ExecuteTesla));
 
         Register(new SpellDefinition(
             3,
@@ -96,7 +96,7 @@ public static class OrrerySpellRegistry
             OrreryRecipeKey.Pure(OrreryElement.Ice, 2),
             OrrerySpellExecutionKind.RapidProjectileStream,
             OrreryCombat.EffectIds.CryoGun,
-            null));
+            OrrerySpellRuntime.ExecuteCryo));
 
         Register(new SpellDefinition(
             4,
