@@ -56,6 +56,21 @@ public static class OrreryOrbit
     }
 
     /// <summary>
+    /// Canonical orbit direction for a satellite id. Positive angles are Unity's
+    /// counterclockwise Z rotation; negative angles are clockwise. Keeping this
+    /// in one place lets presentation derive an exact opposite axial spin without
+    /// duplicating the alternating-direction policy.
+    /// </summary>
+    public static float GetOrbitDirectionSign(byte satelliteId)
+    {
+        if (satelliteId == 0)
+            return 0f;
+
+        int index = satelliteId - 1;
+        return (index & 1) == 0 ? 1f : -1f;
+    }
+
+    /// <summary>
     /// Advances only unlocked satellites. A casting lock freezes angular
     /// progression while radial changes continue to affect the desired pose.
     /// Baseline satellites alternate direction by canonical slot so the first two
@@ -81,7 +96,7 @@ public static class OrreryOrbit
             if (locked)
                 continue;
 
-            float direction = (i & 1) == 0 ? 1f : -1f;
+            float direction = GetOrbitDirectionSign(satelliteId);
             state.AnglesDegrees[i] = OrreryRuntime.NormalizeDegrees(
                 state.AnglesDegrees[i] + speed * direction * deltaTime);
         }
