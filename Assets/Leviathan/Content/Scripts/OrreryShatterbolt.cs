@@ -18,6 +18,44 @@ public static class OrreryShatterbolt
         "Base/Items/SecondaryWeapon/Lightning Orb Launcher";
     private const string FrozenOrbPath =
         "Base/Items/SecondaryWeapon/Frozen Orb Launcher";
+    private const string FrostNovaPath =
+        "Base/Items/Special/Frost Nova Pulse";
+
+    public struct PresentationSnapshot
+    {
+        public bool Present;
+        public bool OrbActive;
+        public byte CastSequence;
+        public byte ImpactCount;
+        public Vector2 OrbPosition;
+        public Vector2 Impact0;
+        public Vector2 Impact1;
+        public Vector2 Impact2;
+        public Vector2 Impact3;
+
+        public Vector2 GetImpact(int index)
+        {
+            switch (index)
+            {
+                case 0: return Impact0;
+                case 1: return Impact1;
+                case 2: return Impact2;
+                case 3: return Impact3;
+                default: return Vector2.zero;
+            }
+        }
+
+        public void SetImpact(int index, Vector2 position)
+        {
+            switch (index)
+            {
+                case 0: Impact0 = position; break;
+                case 1: Impact1 = position; break;
+                case 2: Impact2 = position; break;
+                case 3: Impact3 = position; break;
+            }
+        }
+    }
 
     private struct DamageProfile
     {
@@ -40,9 +78,11 @@ public static class OrreryShatterbolt
             new Damageable[OrrerySpellCompendium.Shatterbolt.MaxTargetsPerExplosion];
         public int HitCount;
 
-        public AutoDestroy Visual;
-        public ExplosiveArea VisualArea;
+        public Wave Visual;
         public bool VisualWasEnabled;
+        public CircleCollider2D VisualCollider;
+        public bool VisualColliderWasEnabled;
+        public float VisualColliderRadius;
         public Vector3 VisualBaseScale;
     }
 
@@ -65,8 +105,10 @@ public static class OrreryShatterbolt
         public Vector2 ProjectilePosition;
         public float LegElapsedSeconds;
         public int ImpactCount;
+        public readonly Vector2[] ImpactPositions =
+            new Vector2[OrrerySpellCompendium.Shatterbolt.MaximumImpacts];
         public readonly GameShip[] DirectHistory =
-            new GameShip[OrrerySpellCompendium.Shatterbolt.AdditionalChains + 1];
+            new GameShip[OrrerySpellCompendium.Shatterbolt.MaximumImpacts];
         public int DirectHistoryCount;
         public readonly GameShip[] CandidateShips =
             new GameShip[OrrerySpellCompendium.Shatterbolt.MaxCandidateShipsPerQuery];
@@ -85,12 +127,13 @@ public static class OrreryShatterbolt
 
         public OrbVisualState OrbVisual;
         public readonly ExplosionState[] Explosions =
+            new ExplosionState[OrrerySpellCompendium.Shatterbolt.MaximumImpacts];
+
+        public OwnerState()
         {
-            new ExplosionState(),
-            new ExplosionState(),
-            new ExplosionState(),
-            new ExplosionState()
-        };
+            for (int i = 0; i < Explosions.Length; i++)
+                Explosions[i] = new ExplosionState();
+        }
     }
 
     private static readonly Dictionary<GameShip, OwnerState> owners =
@@ -180,6 +223,7 @@ public static class OrreryShatterbolt
         state.CurrentTarget = initialTarget;
         state.ProjectilePosition = spawnPosition;
         state.LegElapsedSeconds = 0f;
+        OrreryNetwork.PublishLocal(owner);
         return true;
     }
 
@@ -223,8 +267,17 @@ public static class OrreryShatterbolt
 
         if (!state.CastActive)
         {
-            if (!HasActiveExplosions(state))
+            if (HasActiveExplosions(state))
+            {
+                OrreryNetwork.PublishLocal(owner);
+            }
+            else
+            {
                 CleanupIdleState(owner, state);
+                // Publish once after removing the spell state so remote observers
+                // can clear their orb/persistent-presentation flag deterministically.
+                OrreryNetwork.PublishLocal(owner);
+            }
             return;
         }
 
@@ -269,12 +322,14 @@ public static class OrreryShatterbolt
             state.ProjectilePosition = targetPosition;
             UpdateOrbVisual(state, dt);
             HandleImpact(owner, state, target, targetPosition);
+            OrreryNetwork.PublishLocal(owner);
             return;
         }
 
         if (step > 0f)
             state.ProjectilePosition += toTarget.normalized * step;
         UpdateOrbVisual(state, dt);
+        OrreryNetwork.PublishLocal(owner);
     }
 
     public static void Forget(GameShip owner)
@@ -307,6 +362,36 @@ public static class OrreryShatterbolt
         OrreryDamageRouter.Reset();
     }
 
+    public static bool TryGetPresentation(
+        GameShip owner,
+        out PresentationSnapshot snapshot)
+    {
+        snapshot = default(PresentationSnapshot);
+
+        OwnerState state;
+        if (owner == null || !owners.TryGetValue(owner, out state) || state == null)
+            return false;
+
+        bool hasExplosions = HasActiveExplosions(state);
+        if (!state.CastActive && !hasExplosions && state.ImpactCount <= 0)
+            return false;
+
+        snapshot.Present = true;
+        snapshot.OrbActive = state.CastActive && state.OrbVisual != null;
+        snapshot.CastSequence = (byte)(state.Invocation.Sequence & 0xFF);
+        snapshot.ImpactCount = (byte)Mathf.Clamp(
+            state.ImpactCount,
+            0,
+            OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
+        snapshot.OrbPosition = state.ProjectilePosition;
+
+        int count = Mathf.Min(snapshot.ImpactCount, state.ImpactPositions.Length);
+        for (int i = 0; i < count; i++)
+            snapshot.SetImpact(i, state.ImpactPositions[i]);
+
+        return true;
+    }
+
     private static void HandleImpact(
         GameShip owner,
         OwnerState state,
@@ -318,11 +403,16 @@ public static class OrreryShatterbolt
 
         RecordDirectTarget(state, target);
         SpawnExplosion(state, impactPoint);
+        if (state.ImpactCount >= 0 &&
+            state.ImpactCount < state.ImpactPositions.Length)
+        {
+            state.ImpactPositions[state.ImpactCount] = impactPoint;
+        }
         state.ImpactCount++;
 
-        int maxImpacts = 1 + Mathf.Max(
-            0,
-            OrrerySpellCompendium.Shatterbolt.AdditionalChains);
+        int maxImpacts = Mathf.Max(
+            1,
+            OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
         if (state.ImpactCount >= maxImpacts)
         {
             CompleteCast(owner, state);
@@ -421,7 +511,7 @@ public static class OrreryShatterbolt
             explosion.RadiusWorld = Mathf.Min(
                 finalRadius,
                 explosion.RadiusWorld + deltaRadius);
-            UpdateExplosionVisual(explosion, finalRadius);
+            UpdateExplosionVisual(explosion);
             DamageExplosionTargets(owner, state, explosion);
 
             if (explosion.RadiusWorld >= finalRadius)
@@ -738,11 +828,14 @@ public static class OrreryShatterbolt
             position,
             Quaternion.identity,
             false);
+        if (visualObject == null)
+            return false;
+
         Projectile projectile;
-        if (visualObject == null ||
-            !visualObject.TryGetComponent<Projectile>(out projectile) ||
+        if (!visualObject.TryGetComponent<Projectile>(out projectile) ||
             projectile == null)
         {
+            ReturnUnexpectedVisual(visualObject);
             return false;
         }
 
@@ -839,29 +932,17 @@ public static class OrreryShatterbolt
         OwnerState state,
         ExplosionState explosion)
     {
-        if (state.IceSource == null || PoolController.instance == null)
+        if (PoolController.instance == null)
             return;
 
-        GameObject projectilePrefab = state.IceSource.GetProjectile();
-        Projectile projectile;
-        if (projectilePrefab == null ||
-            !projectilePrefab.TryGetComponent<Projectile>(out projectile) ||
-            projectile == null)
+        PulseItemBase frostNova = Resources.Load<PulseItemBase>(FrostNovaPath);
+        GameObject visualPrefab = frostNova == null ? null : frostNova.wave;
+        if (visualPrefab == null)
         {
+            Debug.LogError(
+                "[Orrery] Shatterbolt Frost Nova presentation prefab was not found.");
             return;
         }
-
-        GameObject visualPrefab = null;
-        ExplosiveProjectile explosiveProjectile = projectile as ExplosiveProjectile;
-        if (explosiveProjectile != null && explosiveProjectile.explosiveAreaPrefab != null)
-            visualPrefab = explosiveProjectile.explosiveAreaPrefab;
-        else if (projectile.explosionPrefab != null)
-            visualPrefab = projectile.explosionPrefab;
-        else if (projectile.explosion != null)
-            visualPrefab = projectile.explosion;
-
-        if (visualPrefab == null)
-            return;
 
         GameObject visualObject = PoolController.instance.GetObject(
             visualPrefab,
@@ -871,45 +952,67 @@ public static class OrreryShatterbolt
         if (visualObject == null)
             return;
 
-        AutoDestroy autoDestroy;
-        if (!visualObject.TryGetComponent<AutoDestroy>(out autoDestroy) ||
-            autoDestroy == null)
+        Wave wave;
+        if (!visualObject.TryGetComponent<Wave>(out wave) || wave == null)
         {
+            ReturnUnexpectedVisual(visualObject);
             return;
         }
 
-        explosion.Visual = autoDestroy;
-        explosion.VisualWasEnabled = autoDestroy.enabled;
-        explosion.VisualBaseScale = autoDestroy.transform.localScale;
-        autoDestroy.enabled = false;
+        CircleCollider2D circle;
+        if (!visualObject.TryGetComponent<CircleCollider2D>(out circle) ||
+            circle == null || circle.radius <= 0f)
+        {
+            ReturnUnexpectedVisual(visualObject);
+            return;
+        }
 
-        ExplosiveArea area;
-        if (visualObject.TryGetComponent<ExplosiveArea>(out area))
-            explosion.VisualArea = area;
+        explosion.Visual = wave;
+        explosion.VisualWasEnabled = wave.enabled;
+        explosion.VisualCollider = circle;
+        explosion.VisualColliderWasEnabled = circle.enabled;
+        explosion.VisualColliderRadius = circle.radius;
+        explosion.VisualBaseScale = wave.transform.localScale;
+
+        // This is presentation only. Native Wave.FixedUpdate performs its own
+        // collision/damage, so disable both native behavior and collider and let
+        // Shatterbolt's bounded mechanical expansion own gameplay.
+        wave.enabled = false;
+        circle.enabled = false;
+        wave.transform.localScale = Vector3.zero;
     }
 
-    private static void UpdateExplosionVisual(
-        ExplosionState explosion,
-        float finalRadiusWorld)
+    private static void ReturnUnexpectedVisual(GameObject visualObject)
     {
-        if (explosion.Visual == null)
+        if (visualObject == null)
+            return;
+
+        PoolableObject poolable;
+        if (visualObject.TryGetComponent<PoolableObject>(out poolable) &&
+            poolable != null)
+        {
+            poolable.PoolDestroy();
+            return;
+        }
+
+        Object.Destroy(visualObject);
+    }
+
+    private static void UpdateExplosionVisual(ExplosionState explosion)
+    {
+        if (explosion.Visual == null || explosion.VisualColliderRadius <= 0f)
             return;
 
         float visualScale = Mathf.Max(
             0.01f,
             OrrerySpellCompendium.Shatterbolt.ExplosionVisualScale);
-        if (explosion.VisualArea != null)
-        {
-            float diameter = Mathf.Max(0.01f, explosion.RadiusWorld * 2f * visualScale);
-            explosion.VisualArea.SetScale(new Vector3(diameter, diameter, diameter));
-            return;
-        }
-
-        float t = finalRadiusWorld <= 0f
-            ? 1f
-            : Mathf.Clamp01(explosion.RadiusWorld / finalRadiusWorld);
+        float scale = Mathf.Max(
+            0.001f,
+            explosion.RadiusWorld /
+                explosion.VisualColliderRadius *
+                visualScale);
         explosion.Visual.transform.localScale =
-            explosion.VisualBaseScale * Mathf.Max(0.01f, t * visualScale);
+            new Vector3(scale, scale, scale);
     }
 
     private static void FinishExplosion(ExplosionState explosion)
@@ -929,15 +1032,21 @@ public static class OrreryShatterbolt
         if (explosion == null || explosion.Visual == null)
         {
             if (explosion != null)
-                explosion.VisualArea = null;
+            {
+                explosion.VisualCollider = null;
+                explosion.VisualColliderRadius = 0f;
+            }
             return;
         }
 
         explosion.Visual.transform.localScale = explosion.VisualBaseScale;
+        if (explosion.VisualCollider != null)
+            explosion.VisualCollider.enabled = explosion.VisualColliderWasEnabled;
         explosion.Visual.enabled = explosion.VisualWasEnabled;
         explosion.Visual.PoolDestroy();
         explosion.Visual = null;
-        explosion.VisualArea = null;
+        explosion.VisualCollider = null;
+        explosion.VisualColliderRadius = 0f;
     }
 
     private static void ClearExplosions(OwnerState state)
@@ -1025,6 +1134,8 @@ public static class OrreryShatterbolt
         state.ProjectilePosition = Vector2.zero;
         state.LegElapsedSeconds = 0f;
         state.ImpactCount = 0;
+        for (int i = 0; i < state.ImpactPositions.Length; i++)
+            state.ImpactPositions[i] = Vector2.zero;
         for (int i = 0; i < state.DirectHistoryCount; i++)
             state.DirectHistory[i] = null;
         state.DirectHistoryCount = 0;
