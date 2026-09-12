@@ -65,7 +65,7 @@ public static class OrreryShatterbolt
         public float CritModifier;
         public float StatusChance;
         public bool BypassDamageLimit;
-        public Launcher Source;
+        public Activatable Source;
     }
 
     private sealed class ExplosionState
@@ -120,6 +120,8 @@ public static class OrreryShatterbolt
         public Launcher IceSource;
         public DamageProfile LightningDamage;
         public DamageProfile IceDamage;
+        public CoreCombat.ContributorKey LightningContributor;
+        public CoreCombat.ContributorKey IceContributor;
         public readonly Damageable.DamageData[] DirectDamageScratch =
             new Damageable.DamageData[1];
         public readonly Damageable.DamageData[] ExplosionDamageScratch =
@@ -139,6 +141,7 @@ public static class OrreryShatterbolt
     private static readonly Dictionary<GameShip, OwnerState> owners =
         new Dictionary<GameShip, OwnerState>(4);
     private static GameShip lastTickOwner;
+    private static PulseItemBase frostNovaBase;
 
     public static bool Execute(
         GameShip owner,
@@ -202,6 +205,10 @@ public static class OrreryShatterbolt
             iceFocus,
             iceSource,
             OrrerySpellCompendium.Shatterbolt.IceExplosionDamageMultiplier);
+        state.LightningContributor = ResolveSatelliteContributor(
+            invocation, OrreryElement.Lightning);
+        state.IceContributor = ResolveSatelliteContributor(
+            invocation, OrreryElement.Ice);
 
         Vector2 aimPoint = GetAimPoint(owner);
         GameShip initialTarget = FindInitialTarget(owner, state, aimPoint);
@@ -359,6 +366,7 @@ public static class OrreryShatterbolt
             Forget(keys[i]);
         owners.Clear();
         lastTickOwner = null;
+        frostNovaBase = null;
         OrreryDamageRouter.Reset();
     }
 
@@ -446,8 +454,9 @@ public static class OrreryShatterbolt
             damage,
             profile.DamageDps);
 
-        OrreryDamageRouter.Route(
+        RouteAuthoredDamage(
             owner,
+            state,
             target,
             Damageable.DamageType.Electric,
             state.DirectDamageScratch,
@@ -455,8 +464,9 @@ public static class OrreryShatterbolt
             crit,
             impactPoint,
             profile.BypassDamageLimit,
-            0f,
-            profile.Source);
+            profile.Source,
+            OrreryCombat.Shatterbolt,
+            state.LightningContributor);
     }
 
     private static void SpawnExplosion(OwnerState state, Vector2 center)
@@ -566,8 +576,9 @@ public static class OrreryShatterbolt
                 damage,
                 profile.DamageDps);
 
-            OrreryDamageRouter.Route(
+            RouteAuthoredDamage(
                 owner,
+                state,
                 damageable,
                 Damageable.DamageType.Cold,
                 state.ExplosionDamageScratch,
@@ -575,8 +586,9 @@ public static class OrreryShatterbolt
                 crit,
                 targetObject.transform.position,
                 profile.BypassDamageLimit,
-                0f,
-                profile.Source);
+                profile.Source,
+                OrreryCombat.ShatterboltFrostBurst,
+                state.IceContributor);
         }
     }
 
@@ -750,6 +762,75 @@ public static class OrreryShatterbolt
         return false;
     }
 
+    private static CoreCombat.ContributorKey ResolveSatelliteContributor(
+        OrreryCastInvocation invocation,
+        OrreryElement element)
+    {
+        for (byte satelliteId = 1;
+             satelliteId <= OrreryCasting.MaxFormulaSatellites;
+             satelliteId++)
+        {
+            int bit = 1 << (satelliteId - 1);
+            if ((invocation.LockedMask & bit) == 0)
+                continue;
+
+            int shift = (satelliteId - 1) * 3;
+            OrreryElement captured = (OrreryElement)(
+                (invocation.PackedElementsBySatellite >> shift) & 0x07u);
+            if (captured == element)
+                return OrreryCombat.Satellite(satelliteId);
+        }
+
+        return OrreryCombat.Satellite(invocation.LastLockedSatelliteId);
+    }
+
+    private static void RouteAuthoredDamage(
+        GameShip owner,
+        OwnerState state,
+        Damageable target,
+        Damageable.DamageType damageType,
+        Damageable.DamageData[] damageData,
+        float statusEffectChance,
+        bool crit,
+        Vector2 fromPosition,
+        bool bypassDamageLimit,
+        Activatable slotSource,
+        CoreCombat.SemanticKey semantic,
+        CoreCombat.ContributorKey contributor)
+    {
+        GameShip targetShip = target as GameShip;
+        if (targetShip == null)
+        {
+            OrreryDamageRouter.Route(
+                owner, target, damageType, damageData, statusEffectChance, crit,
+                fromPosition, bypassDamageLimit, 0f, slotSource);
+            return;
+        }
+
+        ushort attackInstanceId = state == null
+            ? (ushort)0
+            : (ushort)(state.Invocation.Sequence & 0xFFFF);
+        CoreCombat.DamageScope scope = CoreCombat.BeginDamage(
+            owner,
+            targetShip,
+            semantic,
+            contributor,
+            CoreCombat.AcknowledgementMode.NativeResult,
+            CoreCombat.TrackingFlags.Summary,
+            attackInstanceId,
+            owner);
+        try
+        {
+            OrreryDamageRouter.Route(
+                owner, target, damageType, damageData, statusEffectChance, crit,
+                fromPosition, bypassDamageLimit, 0f, slotSource);
+        }
+        finally
+        {
+            CoreCombat.EndDamage(scope);
+        }
+    }
+
     private static DamageProfile BuildDamageProfile(
         OrreryFocusResolver.Focus focus,
         Launcher source,
@@ -766,6 +847,10 @@ public static class OrreryShatterbolt
         float integratedDamage = result.DamageDps * Mathf.Max(
             0f,
             OrrerySpellCompendium.Shatterbolt.IntegratedReferenceSeconds);
+        // V0 keeps the same logical crit/status behavior as the existing Orrery
+        // virtual-weapon runtime: the native donor supplies combat rolls while
+        // focus item level supplies reference power. Full cross-family focus-roll
+        // inheritance belongs in the shared focus adapter when FF/II/LL migrate.
         result.CritChance = Mathf.Clamp01(source.GetCritChance());
         result.CritModifier = Mathf.Max(0f, source.GetCritModifier());
         result.StatusChance = Mathf.Clamp01(source.GetStatusEffectChance());
@@ -935,8 +1020,10 @@ public static class OrreryShatterbolt
         if (PoolController.instance == null)
             return;
 
-        PulseItemBase frostNova = Resources.Load<PulseItemBase>(FrostNovaPath);
-        GameObject visualPrefab = frostNova == null ? null : frostNova.wave;
+        if (frostNovaBase == null)
+            frostNovaBase = Resources.Load<PulseItemBase>(FrostNovaPath);
+        GameObject visualPrefab =
+            frostNovaBase == null ? null : frostNovaBase.wave;
         if (visualPrefab == null)
         {
             Debug.LogError(
@@ -1134,6 +1221,8 @@ public static class OrreryShatterbolt
         state.ProjectilePosition = Vector2.zero;
         state.LegElapsedSeconds = 0f;
         state.ImpactCount = 0;
+        state.LightningContributor = default(CoreCombat.ContributorKey);
+        state.IceContributor = default(CoreCombat.ContributorKey);
         for (int i = 0; i < state.ImpactPositions.Length; i++)
             state.ImpactPositions[i] = Vector2.zero;
         for (int i = 0; i < state.DirectHistoryCount; i++)
