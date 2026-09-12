@@ -17,7 +17,8 @@ public static class OrrerySpellSizing
     {
         // FF: native ExplosiveProjectile uses this same radius for physics and
         // ExplosiveArea visual scale, so gameplay and explosion presentation stay
-        // coupled by default. Projectile scale is presentation-only.
+        // coupled by default. Projectile scale is presentation-only and is applied
+        // by OrreryFireballLifecycleSafety, which already owns pooled-scale restore.
         public const float FireballExplosionRadiusMeters = 40f;
         public const float FireballProjectileVisualScaleMultiplier = 1f;
 
@@ -51,7 +52,9 @@ public static class OrrerySpellSizing
     private static readonly FieldInfo BeamAdditionalMaxWidthField =
         AccessTools.Field(typeof(Beam), "additionalMaxWidth");
 
-    private static readonly Dictionary<Projectile, Vector3> projectileBaseScales =
+    // Cryo presentation projectiles are pooled. Cache only while live and restore
+    // before PoolDestroy so repeated casts never compound transform scale.
+    private static readonly Dictionary<Projectile, Vector3> cryoBaseScales =
         new Dictionary<Projectile, Vector3>(32);
     private static readonly Dictionary<Beam, BeamWidthBaseline> beamBaseWidths =
         new Dictionary<Beam, BeamWidthBaseline>(8);
@@ -148,54 +151,41 @@ public static class OrrerySpellSizing
             baseline.Additional * multiplier);
     }
 
-    public static void ApplyProjectileVisualScale(Projectile projectile)
+    public static void ApplyCryoProjectileVisualScale(Projectile projectile)
     {
-        if (projectile == null || projectile.transform == null)
+        if (projectile == null || projectile.transform == null ||
+            !OrrerySpellPresentationSafety.IsPresentationOnly(projectile))
+        {
             return;
+        }
 
         Vector3 baseScale;
-        if (!projectileBaseScales.TryGetValue(projectile, out baseScale))
+        if (!cryoBaseScales.TryGetValue(projectile, out baseScale))
         {
             baseScale = projectile.transform.localScale;
-            projectileBaseScales[projectile] = baseScale;
+            cryoBaseScales[projectile] = baseScale;
         }
         else
         {
-            // A pooled projectile can be initialized again before a previous
-            // presentation scale would otherwise be overwritten.
             projectile.transform.localScale = baseScale;
         }
 
-        if (OrrerySpellPresentationSafety.IsPresentationOnly(projectile))
-        {
-            projectile.transform.localScale = baseScale * Mathf.Max(
-                0f,
-                Tuning.CryoVisualProjectileScaleMultiplier);
-            return;
-        }
-
-        GameShip originalOwner;
-        if (OrreryFireballLifecycleSafety.TryGetOriginalOwner(
-                projectile,
-                out originalOwner))
-        {
-            projectile.transform.localScale = baseScale * Mathf.Max(
-                0f,
-                Tuning.FireballProjectileVisualScaleMultiplier);
-        }
+        projectile.transform.localScale = baseScale * Mathf.Max(
+            0f,
+            Tuning.CryoVisualProjectileScaleMultiplier);
     }
 
-    public static void RestoreProjectileVisualScale(Projectile projectile)
+    public static void RestoreCryoProjectileVisualScale(Projectile projectile)
     {
         if (projectile == null)
             return;
 
         Vector3 baseScale;
-        if (projectileBaseScales.TryGetValue(projectile, out baseScale))
+        if (cryoBaseScales.TryGetValue(projectile, out baseScale))
         {
             if (projectile.transform != null)
                 projectile.transform.localScale = baseScale;
-            projectileBaseScales.Remove(projectile);
+            cryoBaseScales.Remove(projectile);
         }
     }
 
@@ -207,14 +197,14 @@ public static class OrrerySpellSizing
 
     public static void ResetVisualBookkeeping()
     {
-        if (projectileBaseScales.Count > 0)
+        if (cryoBaseScales.Count > 0)
         {
-            foreach (KeyValuePair<Projectile, Vector3> pair in projectileBaseScales)
+            foreach (KeyValuePair<Projectile, Vector3> pair in cryoBaseScales)
             {
                 if (pair.Key != null && pair.Key.transform != null)
                     pair.Key.transform.localScale = pair.Value;
             }
-            projectileBaseScales.Clear();
+            cryoBaseScales.Clear();
         }
 
         beamBaseWidths.Clear();
@@ -308,16 +298,15 @@ public static class OrrerySpellSizingBeamDestroyPatch
 }
 
 /// <summary>
-/// Projectile visual scale is deliberately separate from mechanics. II shards
-/// cannot deal damage or become targeting decoys through the presentation-safety
-/// boundary, and FF explosion radius remains owned by the launcher/AoE contract.
+/// II visual scale is presentation-only and pool-safe. FF scale is owned by the
+/// fireball lifecycle tracker so reflection/capture cleanup restores it exactly.
 /// </summary>
 [HarmonyPatch(typeof(Projectile), "Init")]
 public static class OrrerySpellSizingProjectileVisualPatch
 {
     public static void Postfix(Projectile __instance)
     {
-        OrrerySpellSizing.ApplyProjectileVisualScale(__instance);
+        OrrerySpellSizing.ApplyCryoProjectileVisualScale(__instance);
     }
 }
 
@@ -327,7 +316,7 @@ public static class OrrerySpellSizingProjectilePoolPatch
     [HarmonyPriority(Priority.First)]
     public static void Prefix(Projectile __instance)
     {
-        OrrerySpellSizing.RestoreProjectileVisualScale(__instance);
+        OrrerySpellSizing.RestoreCryoProjectileVisualScale(__instance);
     }
 }
 
