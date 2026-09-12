@@ -7,7 +7,8 @@ using UnityEngine;
 /// Ice + Lightning mixed Orrery spell.
 ///
 /// A presentation-only Lightning Orb visual physically travels to the hostile
-/// nearest the cursor, then through up to three more chain legs. Each impact owns
+/// nearest the cursor, then through its base chain legs plus inherited Extra
+/// Shot / Extra Chain count. Each impact owns
 /// one Electric direct packet plus one independently expanding Cold explosion.
 /// Chain selection prefers ships not yet directly hit, then permits revisits while
 /// never selecting the ship just struck.
@@ -220,7 +221,11 @@ public static class OrreryShatterbolt
         state.IceProfile = iceProfile;
         state.LightningSource = lightningSource;
         state.IceSource = iceSource;
-        state.ImpactLimit = OrrerySpellCompendium.Shatterbolt.BaseMaximumImpacts;
+        state.ImpactLimit = Mathf.Clamp(
+            OrrerySpellCompendium.Shatterbolt.BaseMaximumImpacts +
+                lightningProfile.AdditionalProjectileOrChainCount,
+            1,
+            OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
         state.LightningDamage = BuildDamageProfile(
             lightningProfile,
             lightningSource,
@@ -415,7 +420,10 @@ public static class OrreryShatterbolt
         snapshot.ImpactCount = (byte)Mathf.Clamp(
             state.ImpactCount,
             0,
-            OrrerySpellCompendium.Shatterbolt.BaseMaximumImpacts);
+            Mathf.Clamp(
+                state.ImpactLimit,
+                1,
+                OrrerySpellCompendium.Shatterbolt.MaximumImpacts));
         snapshot.OrbPosition = state.ProjectilePosition;
 
         int count = Mathf.Min(snapshot.ImpactCount, state.ImpactPositions.Length);
@@ -443,9 +451,10 @@ public static class OrreryShatterbolt
         }
         state.ImpactCount++;
 
-        int maxImpacts = Mathf.Max(
+        int maxImpacts = Mathf.Clamp(
+            state.ImpactLimit,
             1,
-            state.ImpactLimit);
+            OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
         if (state.ImpactCount >= maxImpacts)
         {
             CompleteCast(owner, state);

@@ -2,25 +2,45 @@ using StarVortex;
 using UnityEngine;
 
 /// <summary>
-/// Orrery-owned presentation contract over the current shared ship-state
-/// transport. Gameplay remains owner-authoritative. This wrapper intentionally
-/// hides the historical CoreNetwork name from all other Orrery systems so
-/// the transport can be renamed/factored later without rewriting class logic.
+/// Orrery-owned presentation contract over the shared Core ship-state transport.
+/// Gameplay remains owner-authoritative. Base casting/satellite state has its own
+/// slot; spell-specific transient presentation lives in a second bounded slot so
+/// individual spells cannot consume the entire class casting budget.
 /// </summary>
 public static class OrreryNetwork
 {
     public const byte SharedSlotId = CoreNetwork.SlotOrrery;
-    public const byte PayloadVersion = 2;
+    public const byte PayloadVersion = 3;
     public const int MaxPresentedSatellites = 8;
-    private const byte PayloadEndSentinel = 0xA7;
 
-    // Shatterbolt's full four-impact history is encoded as chained signed byte
-    // offsets. 2m steps cover the 240m first leg and every <=160m later hop while
-    // keeping the entire Orrery slot below CoreNetwork's 32-byte ceiling.
-    private const float ShatterboltPositionStepMeters = 2f;
+    // Core's default dynamic slots currently occupy 1-6. Orrery owns slot 6 for
+    // class casting state and claims 7 for spell-specific presentation payloads.
+    // Keep this stable once shipped.
+    private const byte SpellPresentationSlotId = 7;
+    private const byte SpellPayloadVersion = 1;
+    private const byte PayloadEndSentinel = 0xA7;
+    private const byte SpellPayloadEndSentinel = 0xB7;
+
+    // Impact history uses chained signed-byte deltas at 3m precision. Canonical
+    // Shatterbolt focus rolls can extend the 240m first-leg range to 276m and the
+    // 160m chain range to 200m, both comfortably inside +/-381m. The moving orb
+    // uses signed 16-bit deltas at 2m precision so a mid-flight reacquisition can
+    // never clamp merely because it moved farther than one normal leg from the
+    // most recent impact anchor.
+    private const float ShatterboltImpactStepMeters = 3f;
+    private const float ShatterboltOrbStepMeters = 2f;
     private const byte ShatterboltFlagPresent = 1 << 0;
     private const byte ShatterboltFlagOrbActive = 1 << 1;
-    private const int MaxNetworkedShatterboltImpacts = 4;
+    private const int MaxNetworkedShatterboltImpacts =
+        OrrerySpellCompendium.Shatterbolt.MaximumImpacts;
+
+    static OrreryNetwork()
+    {
+        CoreNetwork.RegisterSlot(
+            SpellPresentationSlotId,
+            CoreClassId.Orrery,
+            "Orrery spell presentation");
+    }
 
     public struct PresentationState
     {
@@ -44,6 +64,12 @@ public static class OrreryNetwork
         public Vector2 ShatterboltImpact1;
         public Vector2 ShatterboltImpact2;
         public Vector2 ShatterboltImpact3;
+        public Vector2 ShatterboltImpact4;
+        public Vector2 ShatterboltImpact5;
+        public Vector2 ShatterboltImpact6;
+        public Vector2 ShatterboltImpact7;
+        public Vector2 ShatterboltImpact8;
+        public Vector2 ShatterboltImpact9;
 
         public OrreryElement GetElement(byte satelliteId)
         {
@@ -74,6 +100,12 @@ public static class OrreryNetwork
                 case 1: return ShatterboltImpact1;
                 case 2: return ShatterboltImpact2;
                 case 3: return ShatterboltImpact3;
+                case 4: return ShatterboltImpact4;
+                case 5: return ShatterboltImpact5;
+                case 6: return ShatterboltImpact6;
+                case 7: return ShatterboltImpact7;
+                case 8: return ShatterboltImpact8;
+                case 9: return ShatterboltImpact9;
                 default: return Vector2.zero;
             }
         }
@@ -86,6 +118,12 @@ public static class OrreryNetwork
                 case 1: ShatterboltImpact1 = position; break;
                 case 2: ShatterboltImpact2 = position; break;
                 case 3: ShatterboltImpact3 = position; break;
+                case 4: ShatterboltImpact4 = position; break;
+                case 5: ShatterboltImpact5 = position; break;
+                case 6: ShatterboltImpact6 = position; break;
+                case 7: ShatterboltImpact7 = position; break;
+                case 8: ShatterboltImpact8 = position; break;
+                case 9: ShatterboltImpact9 = position; break;
             }
         }
     }
@@ -160,9 +198,7 @@ public static class OrreryNetwork
         if (!TryBuildLocalState(owner, out state))
             return;
 
-        CoreNetwork.SlotWriter writer =
-            CoreNetwork.BeginSlot(SharedSlotId);
-
+        CoreNetwork.SlotWriter writer = CoreNetwork.BeginSlot(SharedSlotId);
         writer.Byte(PayloadVersion);
         writer.Byte((byte)state.Phase);
         writer.Byte(state.FormulaCapacity);
@@ -178,14 +214,26 @@ public static class OrreryNetwork
         writer.Byte((byte)(state.PackedElementsBySatellite & 0xFF));
         writer.Byte((byte)((state.PackedElementsBySatellite >> 8) & 0xFF));
         writer.Byte((byte)((state.PackedElementsBySatellite >> 16) & 0xFF));
+        writer.Byte(PayloadEndSentinel);
+        CoreNetwork.EndSlot(writer);
 
-        byte shatterboltFlags = 0;
         if (state.ShatterboltPresent)
-            shatterboltFlags |= ShatterboltFlagPresent;
-        if (state.ShatterboltOrbActive)
-            shatterboltFlags |= ShatterboltFlagOrbActive;
+            PublishShatterbolt(owner, state);
+    }
 
-        writer.Byte(shatterboltFlags);
+    private static void PublishShatterbolt(
+        GameShip owner,
+        PresentationState state)
+    {
+        CoreNetwork.SlotWriter writer =
+            CoreNetwork.BeginSlot(SpellPresentationSlotId);
+
+        byte flags = ShatterboltFlagPresent;
+        if (state.ShatterboltOrbActive)
+            flags |= ShatterboltFlagOrbActive;
+
+        writer.Byte(SpellPayloadVersion);
+        writer.Byte(flags);
         writer.Byte(state.ShatterboltCastSequence);
         writer.Byte(state.ShatterboltImpactCount);
 
@@ -194,8 +242,12 @@ public static class OrreryNetwork
             ? state.GetShatterboltImpact(state.ShatterboltImpactCount - 1)
             : ownerPosition;
         Vector2 orbDelta = state.ShatterboltOrbPosition - orbAnchor;
-        writer.Byte(EncodeShatterboltDelta(orbDelta.x));
-        writer.Byte(EncodeShatterboltDelta(orbDelta.y));
+        WriteSigned16(
+            ref writer,
+            EncodeSigned16Delta(orbDelta.x, ShatterboltOrbStepMeters));
+        WriteSigned16(
+            ref writer,
+            EncodeSigned16Delta(orbDelta.y, ShatterboltOrbStepMeters));
 
         Vector2 impactAnchor = ownerPosition;
         for (int i = 0; i < MaxNetworkedShatterboltImpacts; i++)
@@ -204,8 +256,12 @@ public static class OrreryNetwork
             {
                 Vector2 impact = state.GetShatterboltImpact(i);
                 Vector2 delta = impact - impactAnchor;
-                writer.Byte(EncodeShatterboltDelta(delta.x));
-                writer.Byte(EncodeShatterboltDelta(delta.y));
+                writer.Byte(EncodeSignedByteDelta(
+                    delta.x,
+                    ShatterboltImpactStepMeters));
+                writer.Byte(EncodeSignedByteDelta(
+                    delta.y,
+                    ShatterboltImpactStepMeters));
                 impactAnchor = impact;
             }
             else
@@ -215,7 +271,7 @@ public static class OrreryNetwork
             }
         }
 
-        writer.Byte(PayloadEndSentinel);
+        writer.Byte(SpellPayloadEndSentinel);
         CoreNetwork.EndSlot(writer);
     }
 
@@ -250,16 +306,65 @@ public static class OrreryNetwork
             ((uint)reader.Byte() << 8) |
             ((uint)reader.Byte() << 16);
 
-        byte shatterboltFlags = reader.Byte();
-        state.ShatterboltPresent =
-            (shatterboltFlags & ShatterboltFlagPresent) != 0;
-        state.ShatterboltOrbActive =
-            (shatterboltFlags & ShatterboltFlagOrbActive) != 0;
-        state.ShatterboltCastSequence = reader.Byte();
-        state.ShatterboltImpactCount = reader.Byte();
+        if (reader.Byte() != PayloadEndSentinel ||
+            (byte)state.Phase > (byte)OrreryCastPhase.Invoking ||
+            state.FormulaCapacity > MaxPresentedSatellites ||
+            state.LockedCount > state.FormulaCapacity)
+        {
+            state = default(PresentationState);
+            return false;
+        }
 
-        byte orbDeltaX = reader.Byte();
-        byte orbDeltaY = reader.Byte();
+        // Spell presentation is deliberately isolated. A malformed/missing spell
+        // slot suppresses only that spell's VFX, never otherwise-valid Orrery
+        // satellite/casting presentation.
+        TryReadShatterbolt(remoteOwner, ref state);
+        return true;
+    }
+
+    private static bool TryReadShatterbolt(
+        GameShip remoteOwner,
+        ref PresentationState state)
+    {
+        CoreNetwork.SlotReader reader;
+        if (!CoreNetwork.TryReadSlot(
+                remoteOwner,
+                SpellPresentationSlotId,
+                out reader))
+        {
+            return false;
+        }
+
+        if (reader.Byte() != SpellPayloadVersion)
+            return false;
+
+        byte flags = reader.Byte();
+        const byte knownFlags =
+            ShatterboltFlagPresent | ShatterboltFlagOrbActive;
+        if ((flags & ~knownFlags) != 0 ||
+            (flags & ShatterboltFlagPresent) == 0)
+        {
+            return false;
+        }
+
+        byte castSequence = reader.Byte();
+        byte impactCount = reader.Byte();
+        if (impactCount > MaxNetworkedShatterboltImpacts)
+            return false;
+
+        short orbDeltaX = ReadSigned16(ref reader);
+        short orbDeltaY = ReadSigned16(ref reader);
+
+        Vector2 impact0 = Vector2.zero;
+        Vector2 impact1 = Vector2.zero;
+        Vector2 impact2 = Vector2.zero;
+        Vector2 impact3 = Vector2.zero;
+        Vector2 impact4 = Vector2.zero;
+        Vector2 impact5 = Vector2.zero;
+        Vector2 impact6 = Vector2.zero;
+        Vector2 impact7 = Vector2.zero;
+        Vector2 impact8 = Vector2.zero;
+        Vector2 impact9 = Vector2.zero;
 
         Vector2 ownerPosition = remoteOwner.transform.position;
         Vector2 impactAnchor = ownerPosition;
@@ -267,58 +372,107 @@ public static class OrreryNetwork
         {
             byte deltaX = reader.Byte();
             byte deltaY = reader.Byte();
-
-            if (i >= state.ShatterboltImpactCount)
+            if (i >= impactCount)
                 continue;
 
             Vector2 impact = impactAnchor + new Vector2(
-                DecodeShatterboltDelta(deltaX),
-                DecodeShatterboltDelta(deltaY));
-            state.SetShatterboltImpact(i, impact);
+                DecodeSignedByteDelta(deltaX, ShatterboltImpactStepMeters),
+                DecodeSignedByteDelta(deltaY, ShatterboltImpactStepMeters));
+            switch (i)
+            {
+                case 0: impact0 = impact; break;
+                case 1: impact1 = impact; break;
+                case 2: impact2 = impact; break;
+                case 3: impact3 = impact; break;
+                case 4: impact4 = impact; break;
+                case 5: impact5 = impact; break;
+                case 6: impact6 = impact; break;
+                case 7: impact7 = impact; break;
+                case 8: impact8 = impact; break;
+                case 9: impact9 = impact; break;
+            }
             impactAnchor = impact;
         }
 
-        Vector2 orbAnchor = state.ShatterboltImpactCount > 0
-            ? state.GetShatterboltImpact(state.ShatterboltImpactCount - 1)
+        if (reader.Byte() != SpellPayloadEndSentinel)
+            return false;
+
+        state.ShatterboltPresent = true;
+        state.ShatterboltOrbActive =
+            (flags & ShatterboltFlagOrbActive) != 0;
+        state.ShatterboltCastSequence = castSequence;
+        state.ShatterboltImpactCount = impactCount;
+        state.ShatterboltImpact0 = impact0;
+        state.ShatterboltImpact1 = impact1;
+        state.ShatterboltImpact2 = impact2;
+        state.ShatterboltImpact3 = impact3;
+        state.ShatterboltImpact4 = impact4;
+        state.ShatterboltImpact5 = impact5;
+        state.ShatterboltImpact6 = impact6;
+        state.ShatterboltImpact7 = impact7;
+        state.ShatterboltImpact8 = impact8;
+        state.ShatterboltImpact9 = impact9;
+
+        Vector2 orbAnchor = impactCount > 0
+            ? state.GetShatterboltImpact(impactCount - 1)
             : ownerPosition;
         state.ShatterboltOrbPosition = orbAnchor + new Vector2(
-            DecodeShatterboltDelta(orbDeltaX),
-            DecodeShatterboltDelta(orbDeltaY));
-
-        if (reader.Byte() != PayloadEndSentinel)
-        {
-            state = default(PresentationState);
-            return false;
-        }
-
-        if ((byte)state.Phase > (byte)OrreryCastPhase.Invoking ||
-            state.FormulaCapacity > MaxPresentedSatellites ||
-            state.LockedCount > state.FormulaCapacity ||
-            state.ShatterboltImpactCount > MaxNetworkedShatterboltImpacts ||
-            (state.ShatterboltOrbActive && !state.ShatterboltPresent))
-        {
-            state = default(PresentationState);
-            return false;
-        }
-
+            DecodeSigned16Delta(orbDeltaX, ShatterboltOrbStepMeters),
+            DecodeSigned16Delta(orbDeltaY, ShatterboltOrbStepMeters));
         return true;
     }
 
-    private static byte EncodeShatterboltDelta(float worldDelta)
+    private static byte EncodeSignedByteDelta(
+        float worldDelta,
+        float stepMeters)
     {
         float meters = OrreryUnits.WorldToMeters(worldDelta);
         int quantized = Mathf.Clamp(
-            Mathf.RoundToInt(meters / ShatterboltPositionStepMeters),
+            Mathf.RoundToInt(meters / Mathf.Max(0.001f, stepMeters)),
             -127,
             127);
         return unchecked((byte)(sbyte)quantized);
     }
 
-    private static float DecodeShatterboltDelta(byte encoded)
+    private static float DecodeSignedByteDelta(
+        byte encoded,
+        float stepMeters)
     {
         sbyte quantized = unchecked((sbyte)encoded);
-        return quantized *
-            ShatterboltPositionStepMeters *
-            OrreryUnits.WorldUnitsPerMeter;
+        return quantized * stepMeters * OrreryUnits.WorldUnitsPerMeter;
+    }
+
+    private static short EncodeSigned16Delta(
+        float worldDelta,
+        float stepMeters)
+    {
+        float meters = OrreryUnits.WorldToMeters(worldDelta);
+        int quantized = Mathf.Clamp(
+            Mathf.RoundToInt(meters / Mathf.Max(0.001f, stepMeters)),
+            short.MinValue + 1,
+            short.MaxValue);
+        return (short)quantized;
+    }
+
+    private static float DecodeSigned16Delta(
+        short encoded,
+        float stepMeters)
+    {
+        return encoded * stepMeters * OrreryUnits.WorldUnitsPerMeter;
+    }
+
+    private static void WriteSigned16(
+        ref CoreNetwork.SlotWriter writer,
+        short value)
+    {
+        ushort raw = unchecked((ushort)value);
+        writer.Byte((byte)(raw & 0xFF));
+        writer.Byte((byte)(raw >> 8));
+    }
+
+    private static short ReadSigned16(ref CoreNetwork.SlotReader reader)
+    {
+        ushort raw = (ushort)(reader.Byte() | (reader.Byte() << 8));
+        return unchecked((short)raw);
     }
 }
