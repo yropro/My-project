@@ -19,6 +19,7 @@ public static class OrrerySpellRuntime
     {
         public const float FireballIntegratedReferenceSeconds = 1f;
         public const float FireballDamageMultiplier = 1f;
+        public const float FireballMultishotPerProjectileDamageMultiplier = 0.55f;
         public const float FireballVelocityMultiplier = 0.65f;
         public const float FireballTurnDegreesPerSecond = 120f;
         public const float FireballProjectileVisualScale = 2f;
@@ -74,7 +75,6 @@ public static class OrrerySpellRuntime
         public OrreryCastInvocation Invocation;
         public VirtualWeapon VirtualWeapon;
         public ActiveSpellKind Kind;
-        public Projectile Projectile;
         public float ElapsedSeconds;
         public bool EmitterStopped;
         public bool ReleaseRequested;
@@ -87,6 +87,7 @@ public static class OrrerySpellRuntime
         public VirtualWeapon Cryo;
         public VirtualWeapon Tesla;
         public ActiveCast Active;
+        public readonly List<Projectile> Fireballs = new List<Projectile>(8);
         public readonly HashSet<Damageable> ConeTargets =
             new HashSet<Damageable>();
         public readonly Damageable.DamageData[] DamageScratch =
@@ -124,6 +125,7 @@ public static class OrrerySpellRuntime
             return false;
 
         AimAtCursor(owner, virtualWeapon);
+        state.Fireballs.Clear();
         state.Active = new ActiveCast
         {
             Invocation = invocation,
@@ -214,7 +216,8 @@ public static class OrrerySpellRuntime
     /// <summary>
     /// Handles the semantic RMB-release edge after a cast has committed. Cryo is
     /// instantaneous and therefore has no release interaction. Fireball release
-    /// detonates; Tesla release ends its otherwise unbounded channel.
+    /// detonates every projectile in the cast; Tesla release ends its otherwise
+    /// unbounded channel.
     /// </summary>
     public static bool ReleaseInvoke(GameShip owner)
     {
@@ -229,8 +232,8 @@ public static class OrrerySpellRuntime
         if (active.Kind == ActiveSpellKind.Fireball)
         {
             active.ReleaseRequested = true;
-            if (active.Projectile != null)
-                DetonateFireball(owner, state, active);
+            if (state.Fireballs.Count > 0)
+                DetonateFireballs(owner, state, active);
             return true;
         }
 
@@ -315,10 +318,11 @@ public static class OrrerySpellRuntime
 
     /// <summary>
     /// Launcher.AddProjectile postfix entry point. The native launcher remains the
-    /// projectile factory/lifecycle authority; Orrery only captures the one live
-    /// FF projectile so it can steer/detonate it after launch. Hidden adapters do
-    /// not occupy real native slots, so remote projectile presentation is a
-    /// separate Orrery networking concern.
+    /// projectile factory/lifecycle authority; Orrery captures every live FF
+    /// projectile in the cast so inherited multishot keeps the same steering and
+    /// release-detonation semantics. Hidden adapters do not occupy real native
+    /// slots, so remote projectile presentation is a separate Orrery networking
+    /// concern.
     /// </summary>
     public static void OnProjectileAdded(Launcher launcher, Projectile projectile)
     {
@@ -336,8 +340,8 @@ public static class OrrerySpellRuntime
                 continue;
             }
 
-            if (active.Projectile == null)
-                active.Projectile = projectile;
+            if (!state.Fireballs.Contains(projectile))
+                state.Fireballs.Add(projectile);
             return;
         }
     }
@@ -361,7 +365,8 @@ public static class OrrerySpellRuntime
             OwnerState state = pair.Value;
             ActiveCast active = state == null ? null : state.Active;
             if (active == null || active.Kind != ActiveSpellKind.Fireball ||
-                !object.ReferenceEquals(active.Projectile, projectile))
+                !state.Fireballs.Contains(projectile) ||
+                OrreryFireballLifecycleSafety.IsDetached(projectile))
             {
                 continue;
             }
@@ -422,6 +427,7 @@ public static class OrrerySpellRuntime
         Dispose(state.Inferno);
         Dispose(state.Cryo);
         Dispose(state.Tesla);
+        state.Fireballs.Clear();
         owners.Remove(owner);
     }
 
@@ -573,16 +579,23 @@ public static class OrrerySpellRuntime
             if (launcher == null)
                 return false;
 
-            float expectedLocalHit = launcher.LocalDamage *
-                Mathf.Max(1, launcher.LocalShotCount) *
+            float expectedLocalProjectileHit = launcher.LocalDamage *
                 (1f + launcher.LocalCritChance * launcher.LocalCritModifier);
-            if (expectedLocalHit <= 0f)
+            if (expectedLocalProjectileHit <= 0f)
                 return false;
 
-            float targetIntegratedDamage = referenceDps *
+            int shotCount = Mathf.Max(1, launcher.LocalShotCount);
+            float perProjectileMultiplier = shotCount > 1
+                ? Mathf.Max(
+                    0f,
+                    Tuning.FireballMultishotPerProjectileDamageMultiplier)
+                : 1f;
+            float targetIntegratedDamagePerProjectile = referenceDps *
                 Tuning.FireballIntegratedReferenceSeconds *
-                Tuning.FireballDamageMultiplier;
-            launcher.ScaleDamage(targetIntegratedDamage / expectedLocalHit);
+                Tuning.FireballDamageMultiplier *
+                perProjectileMultiplier;
+            launcher.ScaleDamage(
+                targetIntegratedDamagePerProjectile / expectedLocalProjectileHit);
             return true;
         }
 
@@ -682,8 +695,7 @@ public static class OrrerySpellRuntime
             active.EmitterStopped = true;
         }
 
-        Projectile projectile = active.Projectile;
-        if (projectile == null)
+        if (state.Fireballs.Count == 0)
         {
             if (active.ElapsedSeconds >= Tuning.FireballSpawnGraceSeconds)
                 AbortAndShuffle(owner, state, active);
@@ -692,51 +704,77 @@ public static class OrrerySpellRuntime
 
         if (active.ReleaseRequested)
         {
-            DetonateFireball(owner, state, active);
+            DetonateFireballs(owner, state, active);
             return;
         }
 
-        if (projectile.hasExploded || projectile.gameObject == null ||
-            !projectile.gameObject.activeInHierarchy)
+        Launcher launcher = active.VirtualWeapon == null
+            ? null
+            : active.VirtualWeapon.Weapon as Launcher;
+        if (launcher == null)
         {
-            CompleteAndShuffle(owner, state, active);
+            AbortAndShuffle(owner, state, active);
             return;
         }
-
-        Rigidbody2D body = projectile.rigidBody;
-        if (body == null)
-            return;
 
         Vector2 aimPoint = GetAimPoint(owner);
-        Vector2 toAim = aimPoint - body.position;
-        if (toAim.sqrMagnitude <= 0.0001f)
-            return;
+        float speed = Mathf.Max(0.1f, launcher.Velocity);
+        float maxTurn = Mathf.Max(0f, Tuning.FireballTurnDegreesPerSecond) *
+            Mathf.Max(0f, deltaTime);
 
-        Vector2 currentVelocity = body.velocity;
-        float speed = Mathf.Max(
-            0.1f,
-            (active.VirtualWeapon.Weapon as Launcher).Velocity);
-        float currentAngle = currentVelocity.sqrMagnitude > 0.0001f
-            ? Mathf.Atan2(currentVelocity.y, currentVelocity.x) * Mathf.Rad2Deg
-            : projectile.transform.rotation.eulerAngles.z;
-        float targetAngle = Mathf.Atan2(toAim.y, toAim.x) * Mathf.Rad2Deg;
-        float nextAngle = Mathf.MoveTowardsAngle(
-            currentAngle,
-            targetAngle,
-            Mathf.Max(0f, Tuning.FireballTurnDegreesPerSecond) *
-                Mathf.Max(0f, deltaTime));
-        float radians = nextAngle * Mathf.Deg2Rad;
-        body.velocity = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians)) * speed;
+        for (int i = state.Fireballs.Count - 1; i >= 0; i--)
+        {
+            Projectile projectile = state.Fireballs[i];
+            if (projectile == null ||
+                OrreryFireballLifecycleSafety.IsDetached(projectile) ||
+                projectile.hasExploded || projectile.gameObject == null ||
+                !projectile.gameObject.activeInHierarchy)
+            {
+                state.Fireballs.RemoveAt(i);
+                continue;
+            }
+
+            Rigidbody2D body = projectile.rigidBody;
+            if (body == null)
+                continue;
+
+            Vector2 toAim = aimPoint - body.position;
+            if (toAim.sqrMagnitude <= 0.0001f)
+                continue;
+
+            Vector2 currentVelocity = body.velocity;
+            float currentAngle = currentVelocity.sqrMagnitude > 0.0001f
+                ? Mathf.Atan2(currentVelocity.y, currentVelocity.x) * Mathf.Rad2Deg
+                : projectile.transform.rotation.eulerAngles.z;
+            float targetAngle = Mathf.Atan2(toAim.y, toAim.x) * Mathf.Rad2Deg;
+            float nextAngle = Mathf.MoveTowardsAngle(
+                currentAngle,
+                targetAngle,
+                maxTurn);
+            float radians = nextAngle * Mathf.Deg2Rad;
+            body.velocity = new Vector2(
+                Mathf.Cos(radians),
+                Mathf.Sin(radians)) * speed;
+        }
+
+        if (state.Fireballs.Count == 0)
+            CompleteAndShuffle(owner, state, active);
     }
 
-    private static void DetonateFireball(
+    private static void DetonateFireballs(
         GameShip owner,
         OwnerState state,
         ActiveCast active)
     {
-        Projectile projectile = active.Projectile;
-        if (projectile != null && !projectile.hasExploded)
+        for (int i = 0; i < state.Fireballs.Count; i++)
         {
+            Projectile projectile = state.Fireballs[i];
+            if (projectile == null || projectile.hasExploded ||
+                OrreryFireballLifecycleSafety.IsDetached(projectile))
+            {
+                continue;
+            }
+
             ExplosiveProjectile explosive = projectile as ExplosiveProjectile;
             if (explosive != null)
                 explosive.explodeOnExpiry = true;
@@ -883,6 +921,8 @@ public static class OrrerySpellRuntime
 
         StopActiveWeapon(active);
         state.Active = null;
+        if (active.Kind == ActiveSpellKind.Fireball)
+            state.Fireballs.Clear();
 
         if (active.Invocation.Execution != null &&
             active.Invocation.Execution.IsValid)
@@ -912,6 +952,8 @@ public static class OrrerySpellRuntime
         StopActiveWeapon(active);
         state.Active = null;
         OrreryCasting.Cancel(owner);
+        if (active.Kind == ActiveSpellKind.Fireball)
+            state.Fireballs.Clear();
         OrreryNetwork.PublishLocal(owner);
         OrreryController.StartShuffle(owner);
     }
