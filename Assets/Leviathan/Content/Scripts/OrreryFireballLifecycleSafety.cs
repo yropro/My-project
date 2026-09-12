@@ -64,7 +64,7 @@ public static class OrreryFireballLifecycleSafety
 
         float visualScale = Mathf.Max(
             0.01f,
-            OrrerySpellRuntime.Tuning.FireballProjectileVisualScale);
+            OrrerySpellSizing.Tuning.FireballProjectileVisualScaleMultiplier);
         projectile.transform.localScale = entry.OriginalScale * visualScale;
     }
 
