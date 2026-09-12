@@ -135,8 +135,21 @@ public static class OrreryInput
             {
                 if (input.GetButtonDown("ActivateActivatable"))
                     Invoke(owner);
+
                 if (input.GetButtonUp("ActivateActivatable"))
+                {
                     ReleaseInvoke(owner);
+                }
+                else if (!input.GetButton("ActivateActivatable"))
+                {
+                    // Star Vortex does not call this native input-update method
+                    // while paused or an input field is focused. If RMB was
+                    // released during that interval, Rewired's one-frame Up edge
+                    // is gone when gameplay resumes. Reconcile from held state so
+                    // FF/LL cannot remain active indefinitely after a menu/UI
+                    // interruption.
+                    ReleaseInvoke(owner);
+                }
             }
 
             // Suppresses normal selected/numbered activatable weapon handling.
