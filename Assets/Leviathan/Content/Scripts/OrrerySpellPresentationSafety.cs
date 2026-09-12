@@ -16,6 +16,8 @@ public static class OrrerySpellPresentationSafety
 {
     private static readonly HashSet<Projectile> presentationOnly =
         new HashSet<Projectile>();
+    private static readonly Dictionary<Projectile, Vector3> originalScales =
+        new Dictionary<Projectile, Vector3>();
 
     public static bool IsPresentationOnly(Projectile projectile)
     {
@@ -29,13 +31,15 @@ public static class OrrerySpellPresentationSafety
         if (projectile == null)
             return;
 
-        // A pooled projectile may previously have belonged to the visual set.
-        presentationOnly.Remove(projectile);
+        // AddProjectile is retained as a defensive second registration path after
+        // the Init prefix. Do not apply visual scale twice if Init already tagged it.
+        if (presentationOnly.Contains(projectile))
+            return;
 
         ChargingLauncher cryo = launcher as ChargingLauncher;
         if (cryo == null || cryo.parentShip == null ||
             !OrreryRuntime.IsActive(cryo.parentShip) ||
-            OrreryWeaponSuppression.ShouldSuppress(cryo) ||
+            !OrreryWeaponSuppression.IsRuntimeAdapter(cryo) ||
             cryo.damageType != Damageable.DamageType.Cold ||
             !Mathf.Approximately(cryo.BaseDamage, 0f) ||
             !Mathf.Approximately(cryo.BaseStatusEffectChance, 0f) ||
@@ -46,16 +50,35 @@ public static class OrrerySpellPresentationSafety
         }
 
         presentationOnly.Add(projectile);
+        Vector3 originalScale = projectile.transform.localScale;
+        originalScales[projectile] = originalScale;
+        float visualScale = Mathf.Max(
+            0.01f,
+            OrrerySpellRuntime.Tuning.CryoVisualProjectileScale);
+        projectile.transform.localScale = originalScale * visualScale;
     }
 
     public static void Unregister(Projectile projectile)
     {
-        if (projectile != null)
-            presentationOnly.Remove(projectile);
+        if (projectile == null)
+            return;
+
+        Vector3 originalScale;
+        if (originalScales.TryGetValue(projectile, out originalScale))
+            projectile.transform.localScale = originalScale;
+
+        originalScales.Remove(projectile);
+        presentationOnly.Remove(projectile);
     }
 
     public static void Reset()
     {
+        foreach (KeyValuePair<Projectile, Vector3> pair in originalScales)
+        {
+            if (pair.Key != null)
+                pair.Key.transform.localScale = pair.Value;
+        }
+        originalScales.Clear();
         presentationOnly.Clear();
     }
 }
