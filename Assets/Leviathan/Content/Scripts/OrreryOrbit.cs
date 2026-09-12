@@ -58,6 +58,9 @@ public static class OrreryOrbit
     /// <summary>
     /// Advances only unlocked satellites. A casting lock freezes angular
     /// progression while radial changes continue to affect the desired pose.
+    /// Baseline satellites alternate direction by canonical slot so the first two
+    /// counter-rotate as designed; later per-slot direction knobs can replace this
+    /// policy without changing semantic satellite identity.
     /// </summary>
     public static void Tick(GameShip owner, float deltaTime)
     {
@@ -78,8 +81,9 @@ public static class OrreryOrbit
             if (locked)
                 continue;
 
+            float direction = (i & 1) == 0 ? 1f : -1f;
             state.AnglesDegrees[i] = OrreryRuntime.NormalizeDegrees(
-                state.AnglesDegrees[i] + speed * deltaTime);
+                state.AnglesDegrees[i] + speed * direction * deltaTime);
         }
     }
 
