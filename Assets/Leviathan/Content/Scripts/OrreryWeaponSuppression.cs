@@ -7,6 +7,10 @@ using StarVortex;
 ///
 /// The hidden native spell adapters are intentionally exempt: they are equipped
 /// virtually against a focus slot but are not the slot's actual Equippable.
+///
+/// InputController already converts configured controls into GameShip activation
+/// calls. These patches are therefore also Orrery's native input interception
+/// seam, keeping the mod independent from Rewired_Core.
 /// </summary>
 public static class OrreryWeaponSuppression
 {
@@ -87,15 +91,19 @@ public static class OrreryStartActivatingTypePatch
 {
     public static bool Prefix(GameShip __instance, Item.Type type, ref bool __result)
     {
-        if (__instance == null || !OrreryRuntime.IsActive(__instance) ||
-            !OrreryWeaponSuppression.IsSuppressedWeaponType(type))
-        {
+        if (__instance == null || !OrreryRuntime.IsActive(__instance))
             return true;
-        }
+
+        // Native FirePrimary is Orrery's satellite-lock input. Handle it before
+        // ordinary weapon suppression so no real primary weapon is fired.
+        bool handledInput = OrreryInput.HandleNativeStartByType(__instance, type);
+        if (!handledInput && !OrreryWeaponSuppression.IsSuppressedWeaponType(type))
+            return true;
 
         // Native StartActivating returns false on a successful activation and true
-        // when input should play its error sound. Suppression is intentional, not
-        // an activation failure, so return false without running native firing.
+        // when input should play its error sound. Orrery consumption/suppression is
+        // intentional, not an activation failure, so return false without native
+        // weapon firing.
         __result = false;
         return false;
     }
@@ -106,8 +114,22 @@ public static class OrreryStartActivatingIndexPatch
 {
     public static bool Prefix(GameShip __instance, int number, ref bool __result)
     {
-        if (__instance == null || !OrreryRuntime.IsActive(__instance) ||
-            __instance.activatables == null ||
+        if (__instance == null || !OrreryRuntime.IsActive(__instance))
+            return true;
+
+        // This replaces the old UpdateActivateActivatable interception without a
+        // Rewired dependency. The selected activatable index is the Orrery invoke
+        // input; other numbered activatable presses are consumed while Orrery owns
+        // that control surface.
+        if (OrreryInput.HandleNativeStartByIndex(__instance, number))
+        {
+            __result = false;
+            return false;
+        }
+
+        // Defensive fallback for any future non-local Orrery runtime path: retain
+        // ordinary weapon suppression semantics.
+        if (__instance.activatables == null ||
             number < 0 || number >= __instance.activatables.Count)
         {
             return true;
@@ -122,5 +144,25 @@ public static class OrreryStartActivatingIndexPatch
 
         __result = false;
         return false;
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "StopActivating", new System.Type[] { typeof(Item.Type?) })]
+public static class OrreryStopActivatingTypePatch
+{
+    public static void Prefix(GameShip __instance, Item.Type? type)
+    {
+        if (__instance != null && OrreryRuntime.IsActive(__instance))
+            OrreryInput.HandleNativeStopByType(__instance, type);
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "StopActivating", new System.Type[] { typeof(int) })]
+public static class OrreryStopActivatingIndexPatch
+{
+    public static void Prefix(GameShip __instance, int number)
+    {
+        if (__instance != null && OrreryRuntime.IsActive(__instance))
+            OrreryInput.HandleNativeStopByIndex(__instance, number);
     }
 }
