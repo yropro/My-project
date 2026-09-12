@@ -13,6 +13,7 @@ using UnityEngine;
 public sealed class OrreryController : MonoBehaviour
 {
     private const string SpawnCarrierName = "LeviathanTest";
+    private const string SpawnCarrierResourcePath = "Base/Squadrons/Skeran";
     private const float FailedBuildRetrySeconds = 2f;
 
     private static OrreryController instance;
@@ -135,7 +136,7 @@ public sealed class OrreryController : MonoBehaviour
         if (carrier == null)
         {
             Debug.LogError("[Orrery] Could not find temporary satellite spawn carrier '" +
-                SpawnCarrierName + "'.");
+                SpawnCarrierResourcePath + "/" + SpawnCarrierName + "'.");
             return false;
         }
 
@@ -365,12 +366,21 @@ public sealed class OrreryController : MonoBehaviour
 
     private static SquadronBase FindSpawnCarrier()
     {
+        string fullPath = SpawnCarrierResourcePath + "/" + SpawnCarrierName;
+        SquadronBase direct = Resources.Load<SquadronBase>(fullPath);
+        if (direct != null)
+            return direct;
+
         SquadronBase[] bases = Resources.FindObjectsOfTypeAll<SquadronBase>();
         for (int i = 0; i < bases.Length; i++)
         {
             SquadronBase candidate = bases[i];
-            if (candidate != null && candidate.name == SpawnCarrierName)
+            if (candidate != null &&
+                candidate.filename == SpawnCarrierName &&
+                candidate.resourcePath == SpawnCarrierResourcePath)
+            {
                 return candidate;
+            }
         }
         return null;
     }
