@@ -125,14 +125,18 @@ public sealed class OrreryController : MonoBehaviour
         for (int i = 1; i <= satelliteCount; i++)
         {
             Squadron.SquadronShip slot = squadron.ships[i];
-            if (slot == null || slot.npc == null || slot.npc.ship == null)
+            Ship definition = slot == null || slot.npc == null
+                ? null
+                : slot.npc.GetShip();
+            if (definition == null)
             {
-                Debug.LogError("[Orrery] Spawn carrier follower slot " + i + " has no mutable Ship definition.");
+                Debug.LogError("[Orrery] Spawn carrier follower slot " + i +
+                    " has no mutable Ship definition.");
                 return false;
             }
 
-            slot.npc.ship.aiBehaviour = Ship.AiBehaviour.OrbitInner;
-            slot.npc.ship.faction = owner.faction;
+            definition.aiBehaviour = Ship.AiBehaviour.OrbitInner;
+            definition.faction = owner.faction;
             slot.spawned = false;
             slot.ship = null;
             slot.temporary = false;
