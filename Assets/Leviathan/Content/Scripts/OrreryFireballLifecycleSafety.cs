@@ -13,7 +13,7 @@ using UnityEngine;
 /// network-despawn/pool lifecycle without authoring an explosion.
 ///
 /// Reflected FF projectiles remain registered until they return to the pool so we
-/// can restore presentation scale and preserve original-owner provenance, but are
+/// can restore projectile scale and preserve original-owner provenance, but are
 /// marked detached so original-owner/class cleanup can no longer capture them.
 /// </summary>
 public static class OrreryFireballLifecycleSafety
@@ -62,10 +62,10 @@ public static class OrreryFireballLifecycleSafety
         };
         managed[projectile] = entry;
 
-        float visualScale = Mathf.Max(
+        float projectileScale = Mathf.Max(
             0.01f,
-            OrrerySpellSizing.Tuning.FireballProjectileVisualScaleMultiplier);
-        projectile.transform.localScale = entry.OriginalScale * visualScale;
+            OrrerySpellSizing.Tuning.FireballProjectileScaleMultiplier);
+        projectile.transform.localScale = entry.OriginalScale * projectileScale;
     }
 
     public static bool TryGetOriginalOwner(
