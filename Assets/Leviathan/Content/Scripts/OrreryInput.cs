@@ -52,7 +52,10 @@ public static class OrreryInput
             return false;
         }
 
-        for (int i = 0; i < snapshot.Count; i++)
+        // Lock from the outermost formula lane inward. Snapshot publication uses
+        // canonical ascending satellite ids, and higher ids occupy larger orbit
+        // radii, so reverse iteration gives the desired outer -> inner order.
+        for (int i = snapshot.Count - 1; i >= 0; i--)
         {
             OrrerySatellites.SatelliteContext satellite = snapshot.Get(i);
             if (satellite == null || !satellite.IsValid || satellite.Disabled ||
