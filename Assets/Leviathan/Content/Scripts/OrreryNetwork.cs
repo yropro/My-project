@@ -1,4 +1,3 @@
-using HarmonyLib;
 using StarVortex;
 
 /// <summary>
@@ -169,14 +168,5 @@ public static class OrreryNetwork
         }
 
         return true;
-    }
-}
-
-[HarmonyPatch(typeof(NetWorldBridge), "Teardown")]
-public static class OrreryNetworkTeardownPatch
-{
-    public static void Postfix()
-    {
-        OrreryRuntime.Reset();
     }
 }
