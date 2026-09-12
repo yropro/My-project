@@ -61,9 +61,9 @@ public static class OrrerySpellPresentationSafety
 
 /// <summary>
 /// Native Launcher.ShootProjectile calls Projectile.Init before AddProjectile,
-/// and Projectile.Init may immediately perform collision. Register visual-only
-/// projectiles before that Init body executes so no spawn-frame hit can escape
-/// the presentation safety boundary.
+/// and Projectile.Init may immediately perform collision. Capture Orrery's FF
+/// projectile and register II presentation projectiles before that Init body so
+/// spawn-frame hits obey the same semantics as later-frame hits.
 /// </summary>
 [HarmonyPatch(typeof(Projectile), "Init")]
 public static class OrreryPresentationProjectileInitPatch
@@ -72,6 +72,7 @@ public static class OrreryPresentationProjectileInitPatch
         Projectile __instance,
         Launcher parentLauncher)
     {
+        OrrerySpellRuntime.OnProjectileAdded(parentLauncher, __instance);
         OrrerySpellPresentationSafety.RegisterIfPresentationOnly(
             parentLauncher,
             __instance);
