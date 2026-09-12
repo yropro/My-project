@@ -18,6 +18,31 @@ public static class OrreryWeaponSuppression
             type == Item.Type.AutoSpecial;
     }
 
+    /// <summary>
+    /// True only for an Orrery-owned virtual Activatable that borrows a real focus
+    /// slot for native owner/modifier context without actually occupying that slot.
+    /// This is also the canonical discriminator for presentation/tuning patches.
+    /// </summary>
+    public static bool IsRuntimeAdapter(Activatable activatable)
+    {
+        if (activatable == null || activatable.parentShip == null ||
+            !OrreryRuntime.IsActive(activatable.parentShip))
+        {
+            return false;
+        }
+
+        int? slotIndex = activatable.equippedSlot;
+        if (slotIndex == null || activatable.parentShip.slots == null)
+            return false;
+
+        int index = slotIndex.Value;
+        if (index < 0 || index >= activatable.parentShip.slots.Length)
+            return false;
+
+        Slot slot = activatable.parentShip.slots[index];
+        return slot != null && !object.ReferenceEquals(slot.equippable, activatable);
+    }
+
     public static bool ShouldSuppress(Activatable activatable)
     {
         if (activatable == null || activatable.parentShip == null ||
