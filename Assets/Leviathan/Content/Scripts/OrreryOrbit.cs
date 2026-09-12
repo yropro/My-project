@@ -111,6 +111,8 @@ public static class OrreryOrbit
     /// Computes the owner-relative pose for an explicit orbital phase without
     /// mutating canonical orbit state. Shuffle uses this so its target remains
     /// attached to a moving owner while the rolled phase stays fixed.
+    /// Authored radius remains in meters and is converted only at the transform
+    /// boundary.
     /// </summary>
     public static bool TryGetDesiredPoseAtAngle(
         GameShip owner,
@@ -135,8 +137,9 @@ public static class OrreryOrbit
             state.Control.RadiusOffsetMeters);
 
         float normalizedAngle = OrreryRuntime.NormalizeDegrees(angleDegrees);
+        float radiusWorldUnits = OrreryUnits.MetersToWorld(orbitRadiusMeters);
         Vector3 radial = Quaternion.Euler(0f, 0f, normalizedAngle) *
-            (Vector3.right * orbitRadiusMeters);
+            (Vector3.right * radiusWorldUnits);
         worldPosition = owner.transform.position + radial;
         return true;
     }
