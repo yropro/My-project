@@ -71,9 +71,8 @@ public static class OrrerySpellRegistry
             return;
 
         // Baseline Orrery formulas use two satellites. The three pure-element
-        // recipes are the first executable spell families; the mixed recipes are
-        // registered now as stable canonical identities so later unlocks do not
-        // change recipe meaning or network ids.
+        // recipes are the first executable spell families; mixed recipes keep
+        // their stable ids as their individual spell implementations come online.
         Register(new SpellDefinition(
             1,
             "Magma Cannon",
@@ -115,12 +114,12 @@ public static class OrrerySpellRegistry
             null));
 
         Register(new SpellDefinition(
-            6,
-            "Ice + Lightning",
-            Pair(OrreryElement.Ice, OrreryElement.Lightning),
+            OrrerySpellCompendium.Shatterbolt.Id,
+            OrrerySpellCompendium.Shatterbolt.Name,
+            OrrerySpellCompendium.Shatterbolt.Recipe,
             OrrerySpellExecutionKind.Custom,
-            0,
-            null));
+            OrreryCombat.EffectIds.Shatterbolt,
+            OrreryShatterbolt.Execute));
 
         defaultsRegistered = true;
     }
