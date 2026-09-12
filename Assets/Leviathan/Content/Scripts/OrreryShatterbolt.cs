@@ -32,6 +32,12 @@ public static class OrreryShatterbolt
         public Vector2 Impact1;
         public Vector2 Impact2;
         public Vector2 Impact3;
+        public Vector2 Impact4;
+        public Vector2 Impact5;
+        public Vector2 Impact6;
+        public Vector2 Impact7;
+        public Vector2 Impact8;
+        public Vector2 Impact9;
 
         public Vector2 GetImpact(int index)
         {
@@ -41,6 +47,12 @@ public static class OrreryShatterbolt
                 case 1: return Impact1;
                 case 2: return Impact2;
                 case 3: return Impact3;
+                case 4: return Impact4;
+                case 5: return Impact5;
+                case 6: return Impact6;
+                case 7: return Impact7;
+                case 8: return Impact8;
+                case 9: return Impact9;
                 default: return Vector2.zero;
             }
         }
@@ -53,6 +65,12 @@ public static class OrreryShatterbolt
                 case 1: Impact1 = position; break;
                 case 2: Impact2 = position; break;
                 case 3: Impact3 = position; break;
+                case 4: Impact4 = position; break;
+                case 5: Impact5 = position; break;
+                case 6: Impact6 = position; break;
+                case 7: Impact7 = position; break;
+                case 8: Impact8 = position; break;
+                case 9: Impact9 = position; break;
             }
         }
     }
@@ -105,6 +123,7 @@ public static class OrreryShatterbolt
         public Vector2 ProjectilePosition;
         public float LegElapsedSeconds;
         public int ImpactCount;
+        public int ImpactLimit;
         public readonly Vector2[] ImpactPositions =
             new Vector2[OrrerySpellCompendium.Shatterbolt.MaximumImpacts];
         public readonly GameShip[] DirectHistory =
@@ -201,6 +220,7 @@ public static class OrreryShatterbolt
         state.IceProfile = iceProfile;
         state.LightningSource = lightningSource;
         state.IceSource = iceSource;
+        state.ImpactLimit = OrrerySpellCompendium.Shatterbolt.BaseMaximumImpacts;
         state.LightningDamage = BuildDamageProfile(
             lightningProfile,
             lightningSource,
@@ -323,9 +343,10 @@ public static class OrreryShatterbolt
 
         Vector2 targetPosition = target.transform.position;
         Vector2 toTarget = targetPosition - state.ProjectilePosition;
+        float speedMeters = state.LightningProfile.ApplyProjectileVelocityBonus(
+            OrrerySpellCompendium.Shatterbolt.ProjectileSpeedMetersPerSecond);
         float speedWorld = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f,
-                OrrerySpellCompendium.Shatterbolt.ProjectileSpeedMetersPerSecond));
+            Mathf.Max(0f, speedMeters));
         float step = speedWorld * dt;
 
         if (toTarget.sqrMagnitude <= step * step || toTarget.sqrMagnitude <= 0.000001f)
@@ -424,7 +445,7 @@ public static class OrreryShatterbolt
 
         int maxImpacts = Mathf.Max(
             1,
-            OrrerySpellCompendium.Shatterbolt.BaseMaximumImpacts);
+            state.ImpactLimit);
         if (state.ImpactCount >= maxImpacts)
         {
             CompleteCast(owner, state);
@@ -451,12 +472,16 @@ public static class OrreryShatterbolt
         DamageProfile profile = state.LightningDamage;
         GameShip targetShip = target as GameShip;
         bool crit = Modifier.CritRoll(profile.CritChance, targetShip);
+        float chainMultiplier = state.ImpactCount > 0
+            ? Mathf.Max(0f, 1f + state.LightningProfile.ChainDamageBonus)
+            : 1f;
+        float neutralDamage = profile.NeutralDamage * chainMultiplier;
         float damage = crit
-            ? profile.NeutralDamage * (1f + profile.CritModifier)
-            : profile.NeutralDamage;
+            ? neutralDamage * (1f + profile.CritModifier)
+            : neutralDamage;
         state.DirectDamageScratch[0] = new Damageable.DamageData(
             damage,
-            profile.DamageDps);
+            profile.DamageDps * chainMultiplier);
 
         RouteAuthoredDamage(
             owner,
@@ -509,8 +534,10 @@ public static class OrreryShatterbolt
         if (PhysicsController.instance == null)
             return;
 
+        float radiusMeters = state.IceProfile.ApplyRangeBonus(
+            OrrerySpellCompendium.Shatterbolt.ExplosionRadiusMeters);
         float finalRadius = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f, OrrerySpellCompendium.Shatterbolt.ExplosionRadiusMeters));
+            Mathf.Max(0f, radiusMeters));
         float expansionPerSecond = OrreryUnits.MetersToWorld(
             Mathf.Max(0f,
                 OrrerySpellCompendium.Shatterbolt.ExplosionExpansionMetersPerSecond));
@@ -613,9 +640,10 @@ public static class OrreryShatterbolt
         OwnerState state,
         Vector2 cursorPosition)
     {
+        float rangeMeters = state.LightningProfile.ApplyRangeBonus(
+            OrrerySpellCompendium.Shatterbolt.InitialAcquisitionRangeMeters);
         float range = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f,
-                OrrerySpellCompendium.Shatterbolt.InitialAcquisitionRangeMeters));
+            Mathf.Max(0f, rangeMeters));
         CollectCandidateShips(owner, state, owner.transform.position, range);
 
         GameShip best = null;
@@ -645,8 +673,10 @@ public static class OrreryShatterbolt
         Vector2 origin,
         GameShip currentTarget)
     {
+        float rangeMeters = state.LightningProfile.ApplyChainRangeBonus(
+            OrrerySpellCompendium.Shatterbolt.ChainRangeMeters);
         float range = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f, OrrerySpellCompendium.Shatterbolt.ChainRangeMeters));
+            Mathf.Max(0f, rangeMeters));
         CollectCandidateShips(owner, state, origin, range);
 
         GameShip bestUnhit = null;
@@ -1233,6 +1263,7 @@ public static class OrreryShatterbolt
         state.ProjectilePosition = Vector2.zero;
         state.LegElapsedSeconds = 0f;
         state.ImpactCount = 0;
+        state.ImpactLimit = OrrerySpellCompendium.Shatterbolt.BaseMaximumImpacts;
         state.LightningContributor = default(CoreCombat.ContributorKey);
         state.IceContributor = default(CoreCombat.ContributorKey);
         for (int i = 0; i < state.ImpactPositions.Length; i++)
