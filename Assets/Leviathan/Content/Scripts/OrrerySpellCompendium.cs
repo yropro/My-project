@@ -26,6 +26,7 @@ public static class OrrerySpellCompendium
         public const float InitialAcquisitionRangeMeters = 240f;
         public const float ChainRangeMeters = 160f;
         public const int AdditionalChains = 3;
+        public const int MaximumImpacts = AdditionalChains + 1;
         public const int MaxCandidateShipsPerQuery = 64;
         public const int MaxTargetsPerExplosion = 64;
 
