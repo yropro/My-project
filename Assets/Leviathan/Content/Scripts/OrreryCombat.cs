@@ -19,6 +19,8 @@ public static class OrreryCombat
         public const byte MagmaCannon = 1;
         public const byte TeslaCoil = 2;
         public const byte CryoGun = 3;
+        public const byte Shatterbolt = 4;
+        public const byte ShatterboltFrostBurst = 5;
         public const byte CastInvoked = 128;
     }
 
@@ -28,6 +30,10 @@ public static class OrreryCombat
         CoreCombat.SemanticKey.Create(SkillId, EffectIds.TeslaCoil);
     public static readonly CoreCombat.SemanticKey CryoGun =
         CoreCombat.SemanticKey.Create(SkillId, EffectIds.CryoGun);
+    public static readonly CoreCombat.SemanticKey Shatterbolt =
+        CoreCombat.SemanticKey.Create(SkillId, EffectIds.Shatterbolt);
+    public static readonly CoreCombat.SemanticKey ShatterboltFrostBurst =
+        CoreCombat.SemanticKey.Create(SkillId, EffectIds.ShatterboltFrostBurst);
     public static readonly CoreCombat.SemanticKey CastInvoked =
         CoreCombat.SemanticKey.Create(SkillId, EffectIds.CastInvoked);
 
