@@ -27,10 +27,10 @@ public static class OrreryRuntime
         public const int PersistedSatelliteDesignSlots = 5;
 
         // First-playtest orbit values. 45 deg/s matches Star Vortex's native
-        // OrbitAIShip cadence; 60 m + 12 m lanes follows the Orrery architecture
-        // model. They are resolved data, not casting assumptions.
-        public const float BaseOrbitRadiusMeters = 60f;
-        public const float OrbitLaneSpacingMeters = 12f;
+        // OrbitAIShip cadence. The initial 60 m / 12 m layout read too detached
+        // from the player, so baseline V0 now uses tighter 50 m / 8 m lanes.
+        public const float BaseOrbitRadiusMeters = 50f;
+        public const float OrbitLaneSpacingMeters = 8f;
         public const float BaseOrbitAngularSpeedDegreesPerSecond = 45f;
         public const float WheelBaseRotationOffsetDegrees = 0f;
         public const float WheelFollowSmoothTimeSeconds = 0f;
@@ -333,6 +333,7 @@ public static class OrreryRuntime
         // activation window after respec/class switch and can strand a live FF
         // projectile or Tesla beam while Core already considers the class gone.
         OrrerySpellRuntime.Forget(owner);
+        OrrerySectorPresentation.Hide(owner);
 
         owners.Remove(owner);
         OrreryCasting.Forget(owner);
@@ -348,6 +349,7 @@ public static class OrreryRuntime
         // Reset hidden spell machinery before dropping logical owner tables so
         // native projectile/beam cleanup still has its authoritative owner data.
         OrrerySpellRuntime.Reset();
+        OrrerySectorPresentation.Hide();
         owners.Clear();
         OrreryCasting.Reset();
         OrreryOrbit.Reset();
