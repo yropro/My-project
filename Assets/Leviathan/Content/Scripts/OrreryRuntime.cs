@@ -14,15 +14,26 @@ public static class OrreryRuntime
 {
     public static class Tuning
     {
-        public const int BaseSatelliteCount = 3;
-        public const int BaseFormulaSatelliteCount = 3;
+        // Baseline Celestial Theurge/Orrery starts with two physical formula
+        // satellites and therefore assembles two-rune recipes. Keep these as
+        // independent resolved values so later progression can add satellites
+        // without baking formula arity into casting code.
+        public const int BaseSatelliteCount = 2;
+        public const int BaseFormulaSatelliteCount = 2;
+
+        // Persist more designs than are currently active so progression can
+        // activate additional satellites without destroying player-authored
+        // inactive designs.
+        public const int PersistedSatelliteDesignSlots = 5;
+
         public const float SatelliteIncomingDamageMultiplier = 0.50f;
 
-        // The class spec intentionally leaves recovery tuning unresolved. The
-        // resolved shape supports both contributions without inventing balance.
+        // Recovery balance is intentionally unresolved. The resolved shape
+        // supports both contributions without inventing balance.
         public const float DisabledRecoveryFlatHullPerSecond = 0f;
         public const float DisabledRecoveryMaxHullFractionPerSecond = 0f;
 
+        // Fire, Ice and Lightning evenly partition the baseline wheel.
         public const float BaseSectorArcDegrees = 120f;
     }
 
