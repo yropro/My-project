@@ -1,27 +1,35 @@
 using StarVortex;
-using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
 /// <summary>
 /// Narrow Orrery adapter over Star Vortex's native NetCombat.RouteDamage path.
 ///
-/// New explicit spell files can route custom packets without duplicating the
-/// reflected native signature or allocating argument arrays per hit. Legacy V0
-/// spells still carry their private copy until their later per-spell migration.
+/// The native overload is internal, so the signature is resolved once by
+/// reflection and converted to a strongly typed delegate. Steady-state custom
+/// spell hits therefore avoid MethodInfo.Invoke argument arrays and value boxing.
+/// Legacy V0 spells can migrate onto this helper when they move to per-spell files.
 /// </summary>
 public static class OrreryDamageRouter
 {
-    private sealed class OwnerScratch
-    {
-        public readonly object[] Arguments = new object[14];
-    }
+    private delegate bool RouteDamageDelegate(
+        IDamageable damageable,
+        Damageable.DamageType damageType,
+        Damageable.DamageData[] damageData,
+        float statusEffectChance,
+        bool crit,
+        Vector2 fromPosition,
+        GameShip fromShip,
+        bool bypassDamageLimit,
+        float knockbackPower,
+        Activatable slotSource,
+        float impaleDps,
+        float impaleDuration,
+        bool forceAttackerLocal,
+        float impaleRotation);
 
-    private static readonly Dictionary<GameShip, OwnerScratch> scratchByOwner =
-        new Dictionary<GameShip, OwnerScratch>(4);
-
-    private static MethodInfo routeDamageMethod;
-    private static bool routeDamageMethodResolved;
+    private static RouteDamageDelegate routeDamage;
+    private static bool routeDamageResolved;
 
     public static bool Route(
         GameShip owner,
@@ -41,33 +49,23 @@ public static class OrreryDamageRouter
             return false;
         }
 
-        OwnerScratch scratch;
-        if (!scratchByOwner.TryGetValue(owner, out scratch) || scratch == null)
-        {
-            scratch = new OwnerScratch();
-            scratchByOwner[owner] = scratch;
-        }
-
-        object[] args = scratch.Arguments;
-        args[0] = damageable;
-        args[1] = damageType;
-        args[2] = damageData;
-        args[3] = statusEffectChance;
-        args[4] = crit;
-        args[5] = fromPosition;
-        args[6] = owner;
-        args[7] = bypassDamageLimit;
-        args[8] = knockbackPower;
-        args[9] = slotSource;
-        args[10] = 0f;
-        args[11] = 0f;
-        args[12] = false;
-        args[13] = 0f;
-
         try
         {
-            object result = routeDamageMethod.Invoke(null, args);
-            return result is bool && (bool)result;
+            return routeDamage(
+                damageable,
+                damageType,
+                damageData,
+                statusEffectChance,
+                crit,
+                fromPosition,
+                owner,
+                bypassDamageLimit,
+                knockbackPower,
+                slotSource,
+                0f,
+                0f,
+                false,
+                0f);
         }
         catch (System.Exception ex)
         {
@@ -76,25 +74,22 @@ public static class OrreryDamageRouter
         }
     }
 
-    public static void Forget(GameShip owner)
-    {
-        if (owner != null)
-            scratchByOwner.Remove(owner);
-    }
+    // Kept as part of the shared spell-runtime lifecycle surface. The delegate is
+    // process-wide and owner-agnostic, so there is intentionally no per-owner state.
+    public static void Forget(GameShip owner) { }
 
     public static void Reset()
     {
-        scratchByOwner.Clear();
-        routeDamageMethod = null;
-        routeDamageMethodResolved = false;
+        routeDamage = null;
+        routeDamageResolved = false;
     }
 
     private static bool EnsureNativeDamageRouter()
     {
-        if (routeDamageMethodResolved)
-            return routeDamageMethod != null;
+        if (routeDamageResolved)
+            return routeDamage != null;
 
-        routeDamageMethodResolved = true;
+        routeDamageResolved = true;
         MethodInfo[] methods = typeof(NetCombat).GetMethods(
             BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
         for (int i = 0; i < methods.Length; i++)
@@ -104,18 +99,30 @@ public static class OrreryDamageRouter
                 continue;
 
             ParameterInfo[] parameters = method.GetParameters();
-            if (parameters.Length == 14 &&
-                parameters[0].ParameterType.IsAssignableFrom(typeof(Damageable)) &&
-                parameters[1].ParameterType == typeof(Damageable.DamageType) &&
-                parameters[2].ParameterType == typeof(Damageable.DamageData[]))
+            if (parameters.Length != 14 ||
+                parameters[0].ParameterType != typeof(IDamageable) ||
+                parameters[1].ParameterType != typeof(Damageable.DamageType) ||
+                parameters[2].ParameterType != typeof(Damageable.DamageData[]))
             {
-                routeDamageMethod = method;
-                break;
+                continue;
             }
+
+            try
+            {
+                routeDamage = (RouteDamageDelegate)System.Delegate.CreateDelegate(
+                    typeof(RouteDamageDelegate),
+                    method);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("[Orrery] Could not bind native NetCombat.RouteDamage: " + ex);
+                routeDamage = null;
+            }
+            break;
         }
 
-        if (routeDamageMethod == null)
+        if (routeDamage == null)
             Debug.LogError("[Orrery] Could not resolve native NetCombat.RouteDamage signature.");
-        return routeDamageMethod != null;
+        return routeDamage != null;
     }
 }
