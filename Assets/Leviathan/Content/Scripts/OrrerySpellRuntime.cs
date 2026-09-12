@@ -309,8 +309,10 @@ public static class OrrerySpellRuntime
 
     /// <summary>
     /// Launcher.AddProjectile postfix entry point. The native launcher remains the
-    /// projectile factory/network authority; Orrery only captures the one live FF
-    /// projectile so it can steer/detonate it after launch.
+    /// projectile factory/lifecycle authority; Orrery only captures the one live
+    /// FF projectile so it can steer/detonate it after launch. Hidden adapters do
+    /// not occupy real native slots, so remote projectile presentation is a
+    /// separate Orrery networking concern.
     /// </summary>
     public static void OnProjectileAdded(Launcher launcher, Projectile projectile)
     {
@@ -626,7 +628,8 @@ public static class OrrerySpellRuntime
 
             launcher.BaseReloadTime = 0f;
             launcher.BaseVelocity *= Tuning.FireballVelocityMultiplier;
-            launcher.BaseExplosiveRadius = Tuning.FireballExplosionRadiusMeters;
+            launcher.BaseExplosiveRadius =
+                OrreryUnits.MetersToWorld(Tuning.FireballExplosionRadiusMeters);
             launcher.BaseAutoDestroyTime = Tuning.FireballLifetimeSeconds;
             return;
         }
@@ -710,7 +713,12 @@ public static class OrrerySpellRuntime
     {
         Projectile projectile = active.Projectile;
         if (projectile != null && !projectile.hasExploded)
+        {
+            ExplosiveProjectile explosive = projectile as ExplosiveProjectile;
+            if (explosive != null)
+                explosive.explodeOnExpiry = true;
             projectile.TimedDestroy();
+        }
 
         CompleteAndShuffle(owner, state, active);
     }
@@ -730,9 +738,9 @@ public static class OrrerySpellRuntime
         float referenceDps = OrrerySpellPower.GetReferenceDps(
             virtualWeapon.EffectiveItemLevel,
             OrrerySpellPower.ReferenceMode.Mean);
-        float expectedIntegratedDamage = referenceDps *
-            Tuning.CryoIntegratedReferenceSeconds *
-            Tuning.CryoDamageMultiplier;
+        float damageDps = referenceDps * Tuning.CryoDamageMultiplier;
+        float expectedIntegratedDamage = damageDps *
+            Tuning.CryoIntegratedReferenceSeconds;
         float critChance = Mathf.Clamp01(virtualWeapon.LogicalCritChance);
         float critModifier = Mathf.Max(0f, virtualWeapon.LogicalCritModifier);
         float neutralDamage = expectedIntegratedDamage /
@@ -747,9 +755,15 @@ public static class OrrerySpellRuntime
             forward = owner.transform.right;
         forward.Normalize();
 
-        float range = Mathf.Max(0f, Tuning.CryoConeRangeMeters);
-        float halfAngle = Mathf.Clamp(Tuning.CryoConeAngleDegrees, 0f, 360f) * 0.5f;
-        Collider2D[] overlaps = PhysicsController.instance.OverlapCircle(origin, range);
+        float rangeWorldUnits =
+            OrreryUnits.MetersToWorld(Tuning.CryoConeRangeMeters);
+        float halfAngle = Mathf.Clamp(
+            Tuning.CryoConeAngleDegrees,
+            0f,
+            360f) * 0.5f;
+        Collider2D[] overlaps = PhysicsController.instance.OverlapCircle(
+            origin,
+            rangeWorldUnits);
         state.ConeTargets.Clear();
 
         for (int i = 0; i < overlaps.Length; i++)
@@ -775,7 +789,8 @@ public static class OrrerySpellRuntime
             if (targetShip != null && targetShip.IsDodging())
                 continue;
 
-            Vector2 toTarget = (Vector2)targetObject.transform.position - origin;
+            Vector2 toTarget =
+                (Vector2)targetObject.transform.position - origin;
             if (toTarget.sqrMagnitude > 0.0001f &&
                 Vector2.Angle(forward, toTarget) > halfAngle)
             {
@@ -788,7 +803,7 @@ public static class OrrerySpellRuntime
                 : neutralDamage;
             state.DamageScratch[0] = new Damageable.DamageData(
                 damage,
-                expectedIntegratedDamage);
+                damageDps);
 
             RouteNativeDamage(
                 state,
@@ -942,7 +957,8 @@ public static class OrrerySpellRuntime
 
         return owner == null
             ? Vector2.zero
-            : (Vector2)owner.transform.position + (Vector2)owner.transform.right * 10f;
+            : (Vector2)owner.transform.position +
+                (Vector2)owner.transform.right * 10f;
     }
 
     private static void Deactivate(VirtualWeapon virtualWeapon)
@@ -1014,6 +1030,7 @@ public static class OrrerySpellRuntime
 
             ParameterInfo[] parameters = method.GetParameters();
             if (parameters.Length == 14 &&
+                parameters[0].ParameterType == typeof(IDamageable) &&
                 parameters[1].ParameterType == typeof(Damageable.DamageType) &&
                 parameters[2].ParameterType == typeof(Damageable.DamageData[]))
             {
