@@ -26,11 +26,11 @@ public static class OrreryRuntime
         // inactive designs.
         public const int PersistedSatelliteDesignSlots = 5;
 
-        // First-playtest orbit values. 45 deg/s matches Star Vortex's native
-        // OrbitAIShip cadence. The initial 60 m / 12 m layout read too detached
-        // from the player, so baseline V0 now uses tighter 50 m / 8 m lanes.
-        public const float BaseOrbitRadiusMeters = 50f;
-        public const float OrbitLaneSpacingMeters = 8f;
+        // First-playtest orbit values. Keep the innermost satellite intimate to
+        // the player while giving adjacent orbital lanes enough separation for
+        // distinct player-authored satellite bodies to read clearly.
+        public const float BaseOrbitRadiusMeters = 25f;
+        public const float OrbitLaneSpacingMeters = 16f;
         public const float BaseOrbitAngularSpeedDegreesPerSecond = 45f;
         public const float WheelBaseRotationOffsetDegrees = 0f;
         public const float WheelFollowSmoothTimeSeconds = 0f;
