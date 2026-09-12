@@ -9,7 +9,8 @@ using UnityEngine;
 /// Setting the hidden Cryo launcher's authored damage/status to zero is not by
 /// itself sufficient because global player modifiers can still be applied to an
 /// equipped Activatable. Projectiles emitted by the V0 visual adapter are tracked
-/// for their short native lifetime and denied mechanical hit processing.
+/// for their short native lifetime and denied only mechanical interactions while
+/// native projectile teardown/pooling/despawn lifecycle remains intact.
 /// </summary>
 public static class OrrerySpellPresentationSafety
 {
@@ -95,9 +96,29 @@ public static class OrreryPresentationProjectileCapturePatch
 }
 
 /// <summary>
+/// Shield Ward reflection happens in Projectile.UpdateCollision before
+/// Projectile.HitObject. A presentation-only Cryo shard must not become a real
+/// mechanical reflected projectile, so block only the ward interaction while
+/// leaving the rest of native collision/lifetime processing untouched.
+/// </summary>
+[HarmonyPatch(typeof(Projectile), "TryReflectOffShieldWard")]
+public static class OrreryPresentationProjectileWardReflectionPatch
+{
+    public static bool Prefix(Projectile __instance, ref bool __result)
+    {
+        if (!OrrerySpellPresentationSafety.IsPresentationOnly(__instance))
+            return true;
+
+        __result = false;
+        return false;
+    }
+}
+
+/// <summary>
 /// Base Projectile.HitObject is the common mechanical damage/status boundary.
 /// Specialized projectile classes in the supplied game assembly call through it;
 /// returning false also tells those derived classes that no valid hit occurred.
+/// Native movement, expiry, launcher removal and pooling still run normally.
 /// </summary>
 [HarmonyPatch(typeof(Projectile), "HitObject")]
 public static class OrreryPresentationProjectileHitPatch
@@ -150,10 +171,15 @@ public static class OrreryPresentationProjectilePoolPatch
     }
 }
 
+/// <summary>
+/// Clear presentation bookkeeping only after native/Orrery world teardown has
+/// had a chance to destroy pooled projectiles. Clearing in a Prefix could remove
+/// the guard before another OnDestroy Prefix disposes hidden Cryo weapons.
+/// </summary>
 [HarmonyPatch(typeof(WorldController), "OnDestroy")]
 public static class OrreryPresentationProjectileWorldDestroyPatch
 {
-    public static void Prefix()
+    public static void Postfix()
     {
         OrrerySpellPresentationSafety.Reset();
     }
