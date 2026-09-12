@@ -15,7 +15,7 @@ public static class OrrerySectorPresentation
     public static class Tuning
     {
         public const float OuterPaddingMeters = 8f;
-        public const float SectorGapDegrees = 3f;
+        public const float SectorGapDegrees = 0f;
         public const int ArcSegmentsPer120Degrees = 28;
 
         // Two copies of each elemental Halo slice give a readable field without
