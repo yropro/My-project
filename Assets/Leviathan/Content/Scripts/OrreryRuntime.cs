@@ -26,6 +26,15 @@ public static class OrreryRuntime
         // inactive designs.
         public const int PersistedSatelliteDesignSlots = 5;
 
+        // First-playtest orbit values. 45 deg/s matches Star Vortex's native
+        // OrbitAIShip cadence; 60 m + 12 m lanes follows the Orrery architecture
+        // model. They are resolved data, not casting assumptions.
+        public const float BaseOrbitRadiusMeters = 60f;
+        public const float OrbitLaneSpacingMeters = 12f;
+        public const float BaseOrbitAngularSpeedDegreesPerSecond = 45f;
+        public const float WheelBaseRotationOffsetDegrees = 0f;
+        public const float WheelFollowSmoothTimeSeconds = 0f;
+
         public const float SatelliteIncomingDamageMultiplier = 0.50f;
 
         // Recovery balance is intentionally unresolved. The resolved shape
@@ -134,15 +143,51 @@ public static class OrreryRuntime
         public readonly bool Active;
         public readonly int SatelliteCount;
         public readonly int FormulaSatelliteCount;
+        public readonly float BaseOrbitRadiusMeters;
+        public readonly float OrbitLaneSpacingMeters;
+        public readonly float BaseOrbitAngularSpeedDegreesPerSecond;
+        public readonly float WheelBaseRotationOffsetDegrees;
+        public readonly float WheelFollowSmoothTimeSeconds;
         public readonly float SatelliteIncomingDamageMultiplier;
         public readonly float DisabledRecoveryFlatHullPerSecond;
         public readonly float DisabledRecoveryMaxHullFractionPerSecond;
         public readonly SectorLayout Sectors;
 
+        // Compatibility constructor for early scaffold consumers. New class code
+        // should resolve the orbit/wheel values explicitly through the full form.
         public ResolvedState(
             bool active,
             int satelliteCount,
             int formulaSatelliteCount,
+            float satelliteIncomingDamageMultiplier,
+            float disabledRecoveryFlatHullPerSecond,
+            float disabledRecoveryMaxHullFractionPerSecond,
+            SectorLayout sectors)
+            : this(
+                active,
+                satelliteCount,
+                formulaSatelliteCount,
+                Tuning.BaseOrbitRadiusMeters,
+                Tuning.OrbitLaneSpacingMeters,
+                Tuning.BaseOrbitAngularSpeedDegreesPerSecond,
+                Tuning.WheelBaseRotationOffsetDegrees,
+                Tuning.WheelFollowSmoothTimeSeconds,
+                satelliteIncomingDamageMultiplier,
+                disabledRecoveryFlatHullPerSecond,
+                disabledRecoveryMaxHullFractionPerSecond,
+                sectors)
+        {
+        }
+
+        public ResolvedState(
+            bool active,
+            int satelliteCount,
+            int formulaSatelliteCount,
+            float baseOrbitRadiusMeters,
+            float orbitLaneSpacingMeters,
+            float baseOrbitAngularSpeedDegreesPerSecond,
+            float wheelBaseRotationOffsetDegrees,
+            float wheelFollowSmoothTimeSeconds,
             float satelliteIncomingDamageMultiplier,
             float disabledRecoveryFlatHullPerSecond,
             float disabledRecoveryMaxHullFractionPerSecond,
@@ -154,6 +199,11 @@ public static class OrreryRuntime
                 formulaSatelliteCount,
                 0,
                 SatelliteCount);
+            BaseOrbitRadiusMeters = Mathf.Max(0f, baseOrbitRadiusMeters);
+            OrbitLaneSpacingMeters = Mathf.Max(0f, orbitLaneSpacingMeters);
+            BaseOrbitAngularSpeedDegreesPerSecond = baseOrbitAngularSpeedDegreesPerSecond;
+            WheelBaseRotationOffsetDegrees = NormalizeDegrees(wheelBaseRotationOffsetDegrees);
+            WheelFollowSmoothTimeSeconds = Mathf.Max(0f, wheelFollowSmoothTimeSeconds);
             SatelliteIncomingDamageMultiplier = Mathf.Max(
                 0f,
                 satelliteIncomingDamageMultiplier);
@@ -184,6 +234,11 @@ public static class OrreryRuntime
         false,
         0,
         0,
+        Tuning.BaseOrbitRadiusMeters,
+        Tuning.OrbitLaneSpacingMeters,
+        Tuning.BaseOrbitAngularSpeedDegreesPerSecond,
+        Tuning.WheelBaseRotationOffsetDegrees,
+        Tuning.WheelFollowSmoothTimeSeconds,
         Tuning.SatelliteIncomingDamageMultiplier,
         0f,
         0f,
@@ -197,6 +252,11 @@ public static class OrreryRuntime
             true,
             Tuning.BaseSatelliteCount,
             Tuning.BaseFormulaSatelliteCount,
+            Tuning.BaseOrbitRadiusMeters,
+            Tuning.OrbitLaneSpacingMeters,
+            Tuning.BaseOrbitAngularSpeedDegreesPerSecond,
+            Tuning.WheelBaseRotationOffsetDegrees,
+            Tuning.WheelFollowSmoothTimeSeconds,
             Tuning.SatelliteIncomingDamageMultiplier,
             Tuning.DisabledRecoveryFlatHullPerSecond,
             Tuning.DisabledRecoveryMaxHullFractionPerSecond,
@@ -285,6 +345,7 @@ public static class OrreryRuntime
 
         owners.Remove(owner);
         OrreryCasting.Forget(owner);
+        OrreryOrbit.Forget(owner);
         OrrerySatellites.InvalidateLiveSatellites(owner);
         OrrerySatellites.InvalidateIntent(owner);
         OrreryCombat.ResetOwner(owner);
@@ -298,6 +359,7 @@ public static class OrreryRuntime
         // here by attempting per-owner resets after that global reset has run.
         owners.Clear();
         OrreryCasting.Reset();
+        OrreryOrbit.Reset();
         OrrerySatellites.Reset();
         Revision++;
     }
