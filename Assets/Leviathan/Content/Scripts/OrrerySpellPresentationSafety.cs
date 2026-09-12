@@ -11,13 +11,14 @@ using UnityEngine;
 /// equipped Activatable. Projectiles emitted by the V0 visual adapter are tracked
 /// for their short native lifetime and denied only mechanical interactions while
 /// native projectile teardown/pooling/despawn lifecycle remains intact.
+///
+/// Visual size belongs to OrrerySpellSizing. This type owns only semantic
+/// classification and mechanical suppression.
 /// </summary>
 public static class OrrerySpellPresentationSafety
 {
     private static readonly HashSet<Projectile> presentationOnly =
         new HashSet<Projectile>();
-    private static readonly Dictionary<Projectile, Vector3> originalScales =
-        new Dictionary<Projectile, Vector3>();
 
     public static bool IsPresentationOnly(Projectile projectile)
     {
@@ -28,12 +29,7 @@ public static class OrrerySpellPresentationSafety
         Launcher launcher,
         Projectile projectile)
     {
-        if (projectile == null)
-            return;
-
-        // AddProjectile is retained as a defensive second registration path after
-        // the Init prefix. Do not apply visual scale twice if Init already tagged it.
-        if (presentationOnly.Contains(projectile))
+        if (projectile == null || presentationOnly.Contains(projectile))
             return;
 
         ChargingLauncher cryo = launcher as ChargingLauncher;
@@ -43,42 +39,32 @@ public static class OrrerySpellPresentationSafety
             cryo.damageType != Damageable.DamageType.Cold ||
             !Mathf.Approximately(cryo.BaseDamage, 0f) ||
             !Mathf.Approximately(cryo.BaseStatusEffectChance, 0f) ||
-            cryo.BaseShotCount != OrrerySpellRuntime.Tuning.CryoVisualProjectileCount ||
-            cryo.shotAngle != OrrerySpellRuntime.Tuning.CryoVisualSpreadDegrees)
+            !Mathf.Approximately(cryo.BaseCritChance, 0f) ||
+            cryo.BaseShotCount != OrrerySpellRuntime.Tuning.CryoVisualProjectileCount)
         {
             return;
         }
 
+        int expectedVisualAngle = Mathf.RoundToInt(
+            Mathf.Clamp(
+                OrrerySpellRuntime.Tuning.CryoConeAngleDegrees *
+                    OrrerySpellSizing.Tuning.CryoVisualAngleMultiplier,
+                0f,
+                360f));
+        if (cryo.shotAngle != expectedVisualAngle)
+            return;
+
         presentationOnly.Add(projectile);
-        Vector3 originalScale = projectile.transform.localScale;
-        originalScales[projectile] = originalScale;
-        float visualScale = Mathf.Max(
-            0.01f,
-            OrrerySpellRuntime.Tuning.CryoVisualProjectileScale);
-        projectile.transform.localScale = originalScale * visualScale;
     }
 
     public static void Unregister(Projectile projectile)
     {
-        if (projectile == null)
-            return;
-
-        Vector3 originalScale;
-        if (originalScales.TryGetValue(projectile, out originalScale))
-            projectile.transform.localScale = originalScale;
-
-        originalScales.Remove(projectile);
-        presentationOnly.Remove(projectile);
+        if (projectile != null)
+            presentationOnly.Remove(projectile);
     }
 
     public static void Reset()
     {
-        foreach (KeyValuePair<Projectile, Vector3> pair in originalScales)
-        {
-            if (pair.Key != null)
-                pair.Key.transform.localScale = pair.Value;
-        }
-        originalScales.Clear();
         presentationOnly.Clear();
     }
 }
@@ -104,8 +90,8 @@ public static class OrreryPresentationProjectileInitPatch
 }
 
 /// <summary>
-/// Keep AddProjectile registration as a defensive fallback for future native
-/// projectile paths that may initialize or pool in a different order.
+/// Keep AddProjectile registration as a defensive second registration path after
+/// the Init prefix. It is harmless if Init already tagged the projectile.
 /// </summary>
 [HarmonyPatch(typeof(Launcher), "AddProjectile")]
 public static class OrreryPresentationProjectileCapturePatch
