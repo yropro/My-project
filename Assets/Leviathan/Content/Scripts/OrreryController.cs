@@ -17,6 +17,8 @@ public sealed class OrreryController : MonoBehaviour
 
     private static OrreryController instance;
 
+    private readonly List<OrrerySatellites.IntentEntry> intentEntries =
+        new List<OrrerySatellites.IntentEntry>(OrreryOrbit.MaxSatellites);
     private readonly List<OrrerySatellites.PublishEntry> publishEntries =
         new List<OrrerySatellites.PublishEntry>(OrreryOrbit.MaxSatellites);
 
@@ -55,6 +57,13 @@ public sealed class OrreryController : MonoBehaviour
         TearDownCurrentBuild();
     }
 
+    public void ResetWorld()
+    {
+        TearDownCurrentBuild();
+        currentOwner = null;
+        nextBuildAttemptTime = 0f;
+    }
+
     private void SyncOwner()
     {
         CoreOwnerContext context = CoreClassRuntime.CurrentContext;
@@ -91,6 +100,25 @@ public sealed class OrreryController : MonoBehaviour
             resolved.SatelliteCount,
             0,
             OrreryOrbit.MaxSatellites);
+
+        intentEntries.Clear();
+        for (int i = 0; i < satelliteCount; i++)
+        {
+            byte satelliteId = (byte)(i + 1);
+            float radius = resolved.BaseOrbitRadiusMeters +
+                resolved.OrbitLaneSpacingMeters * i;
+            intentEntries.Add(new OrrerySatellites.IntentEntry(
+                satelliteId,
+                OrrerySatellites.SatelliteKind.Formula,
+                radius,
+                resolved.BaseOrbitAngularSpeedDegreesPerSecond));
+        }
+
+        if (!OrrerySatellites.PublishIntent(owner, intentEntries))
+        {
+            Debug.LogError("[Orrery] Canonical satellite intent rejected baseline build.");
+            return false;
+        }
 
         SquadronBase carrier = FindSpawnCarrier();
         if (carrier == null)
@@ -169,15 +197,13 @@ public sealed class OrreryController : MonoBehaviour
             }
 
             ConfigureSatellite(satellite, owner);
-            byte satelliteId = (byte)i;
-            float radius = resolved.BaseOrbitRadiusMeters +
-                resolved.OrbitLaneSpacingMeters * (i - 1);
+            OrrerySatellites.IntentEntry intent = intentEntries[i - 1];
             publishEntries.Add(new OrrerySatellites.PublishEntry(
                 satellite,
-                satelliteId,
-                OrrerySatellites.SatelliteKind.Formula,
-                radius,
-                resolved.BaseOrbitAngularSpeedDegreesPerSecond));
+                intent.SatelliteId,
+                intent.Kind,
+                intent.OrbitRadiusMeters,
+                intent.AngularSpeedDegreesPerSecond));
         }
 
         if (!OrrerySatellites.PublishLiveSatellites(owner, publishEntries))
@@ -264,28 +290,38 @@ public sealed class OrreryController : MonoBehaviour
         {
             OrreryCasting.Cancel(owner);
             OrrerySatellites.InvalidateLiveSatellites(owner);
+            OrrerySatellites.InvalidateIntent(owner);
             OrreryOrbit.Forget(owner);
         }
 
-        if (activeSquadron != null)
+        Squadron oldSquadron = activeSquadron;
+        if (oldSquadron != null)
         {
-            for (int i = activeSquadron.ships.Count - 1; i >= 1; i--)
+            for (int i = oldSquadron.ships.Count - 1; i >= 1; i--)
             {
-                GameShip satellite = activeSquadron.ships[i].ship;
+                GameShip satellite = oldSquadron.ships[i].ship;
                 if (satellite == null)
                     continue;
 
                 satellite.grantXp = false;
                 satellite.lootTables = new LootTable[0];
-                activeSquadron.RemoveShip(satellite);
-                satellite.Destroyed(true, null);
+
+                if (ReferenceEquals(satellite.squadron, oldSquadron))
+                    satellite.SetSquadron(null);
+
+                if (satellite.gameObject == null)
+                    continue;
+
+                satellite.gameObject.SetActive(false);
+                UnityEngine.Object.Destroy(satellite.gameObject);
             }
 
-            if (owner != null && ReferenceEquals(owner.squadron, activeSquadron))
+            if (owner != null && ReferenceEquals(owner.squadron, oldSquadron))
                 owner.SetSquadron(null);
         }
 
         activeSquadron = null;
+        intentEntries.Clear();
         publishEntries.Clear();
     }
 
@@ -343,6 +379,16 @@ public static class OrreryControllerBootstrapPatch
 
         GameObject runtime = new GameObject("Orrery Runtime");
         runtime.AddComponent<OrreryController>();
+    }
+}
+
+[HarmonyPatch(typeof(WorldController), "OnDestroy")]
+public static class OrreryControllerWorldDestroyedPatch
+{
+    public static void Prefix()
+    {
+        if (OrreryController.Instance != null)
+            OrreryController.Instance.ResetWorld();
     }
 }
 
