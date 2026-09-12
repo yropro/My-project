@@ -126,9 +126,11 @@ This is the short current-status companion to `ORRERY_IMPLEMENTATION_HANDOFF.md`
 - [D] II adds flat `+50 percentage points` to the captured baseline Freeze/status chance, clamped to 100%.
 - [D] Cone damage is normalized to one second of mean reference DPS at neutral `1.0x` tuning, with crit expectation normalized before the per-target crit roll.
 - [D] Custom cone packets route through Star Vortex's native `NetCombat.RouteDamage` boundary; the internal overload is resolved once and cached rather than reimplementing multiplayer damage routing.
-- [D] Native Cryo projectiles are presentation-only: their hidden launcher has zero damage/status/crit.
+- [D] Native Cryo projectiles are presentation-only: their hidden launcher has zero authored damage/status/crit.
 - [D] Visual burst = 9 Cryo projectiles over a 60-degree spread at `1.30x` native Cryo velocity.
 - [D] Cryo native charge penalty is neutralized with `unchargedMulitplier = 1` for the visual emission.
+- [D] Presentation-only Cryo projectiles are explicitly tracked and denied native `Projectile.HitObject` mechanics, fuzzy-projectile secondary effects, and explosive expiry effects, so owner/global modifiers cannot accidentally make the visual burst damaging.
+- [D] Presentation projectile tracking is cleared on native pool return and world teardown.
 
 ### LL — held Tesla channel
 
@@ -147,6 +149,7 @@ This is the short current-status companion to `ORRERY_IMPLEMENTATION_HANDOFF.md`
 - [D] At most one active Orrery invocation per owner.
 - [D] Custom cone target dedupe is bounded to one cast and reused per owner.
 - [D] Native damage reflection metadata and argument storage are cached/reused rather than rediscovered per hit.
+- [D] Presentation-only Cryo projectile tracking is bounded by the small native projectile pool/lifetime and removes entries when projectiles return to the pool.
 
 ### Network / shared architecture
 
