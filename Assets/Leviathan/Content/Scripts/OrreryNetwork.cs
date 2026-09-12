@@ -1,4 +1,5 @@
 using StarVortex;
+using UnityEngine;
 
 /// <summary>
 /// Orrery-owned presentation contract over the current shared ship-state
@@ -9,9 +10,17 @@ using StarVortex;
 public static class OrreryNetwork
 {
     public const byte SharedSlotId = CoreNetwork.SlotOrrery;
-    public const byte PayloadVersion = 1;
+    public const byte PayloadVersion = 2;
     public const int MaxPresentedSatellites = 8;
     private const byte PayloadEndSentinel = 0xA7;
+
+    // Shatterbolt's full four-impact history is encoded as chained signed byte
+    // offsets. 2m steps cover the 240m first leg and every <=160m later hop while
+    // keeping the entire Orrery slot below CoreNetwork's 32-byte ceiling.
+    private const float ShatterboltPositionStepMeters = 2f;
+    private const byte ShatterboltFlagPresent = 1 << 0;
+    private const byte ShatterboltFlagOrbActive = 1 << 1;
+    private const int MaxNetworkedShatterboltImpacts = 4;
 
     public struct PresentationState
     {
@@ -25,6 +34,16 @@ public static class OrreryNetwork
         public ushort LockedMask;
         public ushort DisabledMask;
         public uint PackedElementsBySatellite;
+
+        public bool ShatterboltPresent;
+        public bool ShatterboltOrbActive;
+        public byte ShatterboltCastSequence;
+        public byte ShatterboltImpactCount;
+        public Vector2 ShatterboltOrbPosition;
+        public Vector2 ShatterboltImpact0;
+        public Vector2 ShatterboltImpact1;
+        public Vector2 ShatterboltImpact2;
+        public Vector2 ShatterboltImpact3;
 
         public OrreryElement GetElement(byte satelliteId)
         {
@@ -45,6 +64,29 @@ public static class OrreryNetwork
         {
             return satelliteId > 0 && satelliteId <= MaxPresentedSatellites &&
                 (DisabledMask & (1 << (satelliteId - 1))) != 0;
+        }
+
+        public Vector2 GetShatterboltImpact(int index)
+        {
+            switch (index)
+            {
+                case 0: return ShatterboltImpact0;
+                case 1: return ShatterboltImpact1;
+                case 2: return ShatterboltImpact2;
+                case 3: return ShatterboltImpact3;
+                default: return Vector2.zero;
+            }
+        }
+
+        public void SetShatterboltImpact(int index, Vector2 position)
+        {
+            switch (index)
+            {
+                case 0: ShatterboltImpact0 = position; break;
+                case 1: ShatterboltImpact1 = position; break;
+                case 2: ShatterboltImpact2 = position; break;
+                case 3: ShatterboltImpact3 = position; break;
+            }
         }
     }
 
@@ -91,6 +133,24 @@ public static class OrreryNetwork
             owner,
             MaxPresentedSatellites);
         state.PackedElementsBySatellite = packedElements;
+
+        OrreryShatterbolt.PresentationSnapshot shatterbolt;
+        if (OrreryShatterbolt.TryGetPresentation(owner, out shatterbolt) &&
+            shatterbolt.Present)
+        {
+            state.ShatterboltPresent = true;
+            state.ShatterboltOrbActive = shatterbolt.OrbActive;
+            state.ShatterboltCastSequence = shatterbolt.CastSequence;
+            state.ShatterboltImpactCount = (byte)Mathf.Clamp(
+                shatterbolt.ImpactCount,
+                0,
+                MaxNetworkedShatterboltImpacts);
+            state.ShatterboltOrbPosition = shatterbolt.OrbPosition;
+
+            for (int i = 0; i < state.ShatterboltImpactCount; i++)
+                state.SetShatterboltImpact(i, shatterbolt.GetImpact(i));
+        }
+
         return true;
     }
 
@@ -118,6 +178,43 @@ public static class OrreryNetwork
         writer.Byte((byte)(state.PackedElementsBySatellite & 0xFF));
         writer.Byte((byte)((state.PackedElementsBySatellite >> 8) & 0xFF));
         writer.Byte((byte)((state.PackedElementsBySatellite >> 16) & 0xFF));
+
+        byte shatterboltFlags = 0;
+        if (state.ShatterboltPresent)
+            shatterboltFlags |= ShatterboltFlagPresent;
+        if (state.ShatterboltOrbActive)
+            shatterboltFlags |= ShatterboltFlagOrbActive;
+
+        writer.Byte(shatterboltFlags);
+        writer.Byte(state.ShatterboltCastSequence);
+        writer.Byte(state.ShatterboltImpactCount);
+
+        Vector2 ownerPosition = owner.transform.position;
+        Vector2 orbAnchor = state.ShatterboltImpactCount > 0
+            ? state.GetShatterboltImpact(state.ShatterboltImpactCount - 1)
+            : ownerPosition;
+        Vector2 orbDelta = state.ShatterboltOrbPosition - orbAnchor;
+        writer.Byte(EncodeShatterboltDelta(orbDelta.x));
+        writer.Byte(EncodeShatterboltDelta(orbDelta.y));
+
+        Vector2 impactAnchor = ownerPosition;
+        for (int i = 0; i < MaxNetworkedShatterboltImpacts; i++)
+        {
+            if (i < state.ShatterboltImpactCount)
+            {
+                Vector2 impact = state.GetShatterboltImpact(i);
+                Vector2 delta = impact - impactAnchor;
+                writer.Byte(EncodeShatterboltDelta(delta.x));
+                writer.Byte(EncodeShatterboltDelta(delta.y));
+                impactAnchor = impact;
+            }
+            else
+            {
+                writer.Byte(0);
+                writer.Byte(0);
+            }
+        }
+
         writer.Byte(PayloadEndSentinel);
         CoreNetwork.EndSlot(writer);
     }
@@ -153,6 +250,41 @@ public static class OrreryNetwork
             ((uint)reader.Byte() << 8) |
             ((uint)reader.Byte() << 16);
 
+        byte shatterboltFlags = reader.Byte();
+        state.ShatterboltPresent =
+            (shatterboltFlags & ShatterboltFlagPresent) != 0;
+        state.ShatterboltOrbActive =
+            (shatterboltFlags & ShatterboltFlagOrbActive) != 0;
+        state.ShatterboltCastSequence = reader.Byte();
+        state.ShatterboltImpactCount = reader.Byte();
+
+        byte orbDeltaX = reader.Byte();
+        byte orbDeltaY = reader.Byte();
+
+        Vector2 ownerPosition = remoteOwner.transform.position;
+        Vector2 impactAnchor = ownerPosition;
+        for (int i = 0; i < MaxNetworkedShatterboltImpacts; i++)
+        {
+            byte deltaX = reader.Byte();
+            byte deltaY = reader.Byte();
+
+            if (i >= state.ShatterboltImpactCount)
+                continue;
+
+            Vector2 impact = impactAnchor + new Vector2(
+                DecodeShatterboltDelta(deltaX),
+                DecodeShatterboltDelta(deltaY));
+            state.SetShatterboltImpact(i, impact);
+            impactAnchor = impact;
+        }
+
+        Vector2 orbAnchor = state.ShatterboltImpactCount > 0
+            ? state.GetShatterboltImpact(state.ShatterboltImpactCount - 1)
+            : ownerPosition;
+        state.ShatterboltOrbPosition = orbAnchor + new Vector2(
+            DecodeShatterboltDelta(orbDeltaX),
+            DecodeShatterboltDelta(orbDeltaY));
+
         if (reader.Byte() != PayloadEndSentinel)
         {
             state = default(PresentationState);
@@ -161,12 +293,32 @@ public static class OrreryNetwork
 
         if ((byte)state.Phase > (byte)OrreryCastPhase.Invoking ||
             state.FormulaCapacity > MaxPresentedSatellites ||
-            state.LockedCount > state.FormulaCapacity)
+            state.LockedCount > state.FormulaCapacity ||
+            state.ShatterboltImpactCount > MaxNetworkedShatterboltImpacts ||
+            (state.ShatterboltOrbActive && !state.ShatterboltPresent))
         {
             state = default(PresentationState);
             return false;
         }
 
         return true;
+    }
+
+    private static byte EncodeShatterboltDelta(float worldDelta)
+    {
+        float meters = OrreryUnits.WorldToMeters(worldDelta);
+        int quantized = Mathf.Clamp(
+            Mathf.RoundToInt(meters / ShatterboltPositionStepMeters),
+            -127,
+            127);
+        return unchecked((byte)(sbyte)quantized);
+    }
+
+    private static float DecodeShatterboltDelta(byte encoded)
+    {
+        sbyte quantized = unchecked((sbyte)encoded);
+        return quantized *
+            ShatterboltPositionStepMeters *
+            OrreryUnits.WorldUnitsPerMeter;
     }
 }

@@ -523,8 +523,12 @@ public sealed class OrreryController : MonoBehaviour
                 if (satellite.gameObject == null)
                     continue;
 
-                satellite.gameObject.SetActive(false);
-                UnityEngine.Object.Destroy(satellite.gameObject);
+                // GameShip owns pooled status/VFX children. Raw Unity destruction
+                // bypasses ReturnStatusEffectLayers/DisownPoolableObjects and can
+                // destroy Burning/Radioactive layers while they still belong to a
+                // native pool. Voluntary native teardown suppresses ordinary death
+                // rewards/VFX while preserving the complete cleanup lifecycle.
+                satellite.Destroyed(true, null);
             }
 
             if (owner != null && ReferenceEquals(owner.squadron, oldSquadron))
