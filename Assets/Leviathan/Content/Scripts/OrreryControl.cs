@@ -26,7 +26,7 @@ public static class OrreryControl
         capturedElement = OrreryElement.None;
         formulaComplete = false;
 
-        if (!IsLocalOrreryOwner(owner))
+        if (!IsLocalOrreryOwner(owner) || OrreryController.IsShuffling(owner))
             return false;
 
         OrrerySatellites.SatelliteContext satellite;
@@ -53,12 +53,12 @@ public static class OrreryControl
 
     /// <summary>
     /// Baseline invocation requires a complete formula. Unknown/unimplemented
-    /// recipes are consumed and released cleanly rather than leaving the cast
-    /// state stuck in Invoking.
+    /// recipes are consumed and released cleanly, then use the same physical
+    /// shuffle/rearm path as a successful cast rather than trapping cast state.
     /// </summary>
     public static InvokeResult TryInvoke(GameShip owner)
     {
-        if (!IsLocalOrreryOwner(owner))
+        if (!IsLocalOrreryOwner(owner) || OrreryController.IsShuffling(owner))
             return InvokeResult.Rejected;
 
         OrreryCastInvocation invocation;
@@ -73,6 +73,7 @@ public static class OrreryControl
         {
             OrreryCasting.CompleteInvocation(owner, invocation.Execution, 0);
             OrreryNetwork.PublishLocal(owner);
+            OrreryController.StartShuffle(owner);
             return InvokeResult.UnimplementedRecipe;
         }
 
@@ -80,13 +81,20 @@ public static class OrreryControl
         {
             OrreryCasting.Cancel(owner);
             OrreryNetwork.PublishLocal(owner);
+            OrreryController.StartShuffle(owner);
             return InvokeResult.ExecutionRejected;
         }
 
-        // The executor owns completion timing. Instant spells may complete during
-        // execution; beams/streams may retain the CoreAbilityExecution until their
-        // bounded spell instance ends.
+        // The executor owns completion timing. II completes after its one visual
+        // emission tick; FF persists until hit/expiry/release; LL persists until
+        // the invoke input is released.
         return InvokeResult.Started;
+    }
+
+    public static bool ReleaseInvoke(GameShip owner)
+    {
+        return IsLocalOrreryOwner(owner) &&
+            OrrerySpellRuntime.ReleaseInvoke(owner);
     }
 
     public static bool Shuffle(GameShip owner)
@@ -97,7 +105,8 @@ public static class OrreryControl
         bool hadFormula = OrreryCasting.GetLockedCount(owner) > 0;
         OrreryCasting.Cancel(owner);
         OrreryNetwork.PublishLocal(owner);
-        return hadFormula;
+        bool started = OrreryController.StartShuffle(owner);
+        return hadFormula || started;
     }
 
     public static bool TryGetCapturedElement(
