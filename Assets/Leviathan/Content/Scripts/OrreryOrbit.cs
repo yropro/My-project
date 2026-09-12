@@ -15,7 +15,7 @@ public static class OrreryOrbit
     public sealed class ControlState
     {
         public float RadiusOffsetMeters;
-        public float AngularSpeedMultiplier = 1f;
+        public float AngularSpeedMultiplier = 1.2f;
     }
 
     public sealed class OrbitState
