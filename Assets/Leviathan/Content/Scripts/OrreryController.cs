@@ -12,9 +12,27 @@ using UnityEngine;
 /// </summary>
 public sealed class OrreryController : MonoBehaviour
 {
+    public static class ShuffleTuning
+    {
+        public const float DurationSeconds = 0.50f;
+    }
+
     private const string SpawnCarrierName = "LeviathanTest";
     private const string SpawnCarrierResourcePath = "Base/Squadrons/Skeran";
     private const float FailedBuildRetrySeconds = 2f;
+
+    private struct ShuffleSatelliteState
+    {
+        public OrrerySatellites.SatelliteContext Context;
+        public Vector2 StartOffsetFromOwner;
+        public float TargetAngleDegrees;
+    }
+
+    private sealed class SatelliteCollisionCache
+    {
+        public Collider2D[] Colliders;
+        public bool[] EnabledBeforeShuffle;
+    }
 
     private static OrreryController instance;
 
@@ -22,12 +40,39 @@ public sealed class OrreryController : MonoBehaviour
         new List<OrrerySatellites.IntentEntry>(OrreryOrbit.MaxSatellites);
     private readonly List<OrrerySatellites.PublishEntry> publishEntries =
         new List<OrrerySatellites.PublishEntry>(OrreryOrbit.MaxSatellites);
+    private readonly ShuffleSatelliteState[] shuffleSatellites =
+        new ShuffleSatelliteState[OrreryOrbit.MaxSatellites];
+    private readonly Dictionary<GameShip, SatelliteCollisionCache> collisionCache =
+        new Dictionary<GameShip, SatelliteCollisionCache>(OrreryOrbit.MaxSatellites);
 
     private GameShip currentOwner;
     private Squadron activeSquadron;
     private float nextBuildAttemptTime;
+    private bool shuffleActive;
+    private float shuffleElapsedSeconds;
+    private int shuffleSatelliteCount;
 
     public static OrreryController Instance { get { return instance; } }
+
+    public static bool IsShuffling(GameShip owner)
+    {
+        return instance != null && owner != null &&
+            object.ReferenceEquals(instance.currentOwner, owner) &&
+            instance.shuffleActive;
+    }
+
+    /// <summary>
+    /// Rearms every live, enabled formula satellite by moving it directly through
+    /// space to a fully random new orbital phase. The physical target is recomputed
+    /// relative to the moving owner every fixed tick; no minimum angular movement
+    /// is imposed.
+    /// </summary>
+    public static bool StartShuffle(GameShip owner)
+    {
+        return instance != null && owner != null &&
+            object.ReferenceEquals(instance.currentOwner, owner) &&
+            instance.BeginShuffle();
+    }
 
     private void Awake()
     {
@@ -50,6 +95,9 @@ public sealed class OrreryController : MonoBehaviour
         OrrerySpellRuntime.FixedTick(currentOwner, Time.fixedDeltaTime);
 
         if (activeSquadron == null)
+            return;
+
+        if (TickShuffle(Time.fixedDeltaTime))
             return;
 
         OrreryOrbit.Tick(currentOwner, Time.fixedDeltaTime);
@@ -198,6 +246,7 @@ public sealed class OrreryController : MonoBehaviour
         }
 
         publishEntries.Clear();
+        collisionCache.Clear();
         for (int i = 1; i <= satelliteCount; i++)
         {
             GameShip satellite = squadron.ships[i].ship;
@@ -209,6 +258,7 @@ public sealed class OrreryController : MonoBehaviour
             }
 
             ConfigureSatellite(satellite, owner);
+            CacheSatelliteColliders(satellite);
             OrrerySatellites.IntentEntry intent = intentEntries[i - 1];
             publishEntries.Add(new OrrerySatellites.PublishEntry(
                 satellite,
@@ -231,6 +281,152 @@ public sealed class OrreryController : MonoBehaviour
         Debug.Log("[Orrery] Built " + satelliteCount +
             " baseline formula satellites for local owner.");
         return true;
+    }
+
+    private bool BeginShuffle()
+    {
+        if (currentOwner == null || activeSquadron == null)
+            return false;
+
+        if (shuffleActive)
+            StopShuffle(false);
+
+        OrrerySatellites.SatelliteSnapshot snapshot =
+            OrrerySatellites.GetSnapshot(currentOwner);
+        if (snapshot == null)
+            return false;
+
+        shuffleSatelliteCount = 0;
+        Vector2 ownerPosition = currentOwner.transform.position;
+
+        for (int i = 0; i < snapshot.Count &&
+            shuffleSatelliteCount < shuffleSatellites.Length; i++)
+        {
+            OrrerySatellites.SatelliteContext context = snapshot.Get(i);
+            if (context == null || !context.IsValid || context.Ship == null ||
+                context.Disabled ||
+                context.Kind != OrrerySatellites.SatelliteKind.Formula)
+            {
+                continue;
+            }
+
+            ShuffleSatelliteState state = new ShuffleSatelliteState();
+            state.Context = context;
+            state.StartOffsetFromOwner =
+                (Vector2)context.Ship.transform.position - ownerPosition;
+            state.TargetAngleDegrees = Random.Range(0f, 360f);
+            shuffleSatellites[shuffleSatelliteCount++] = state;
+            SetSatelliteCollisionEnabled(context.Ship, false);
+        }
+
+        if (shuffleSatelliteCount == 0)
+            return false;
+
+        shuffleElapsedSeconds = 0f;
+        shuffleActive = true;
+        return true;
+    }
+
+    /// <summary>
+    /// Returns true whenever shuffle owned this fixed step. This deliberately
+    /// suppresses normal orbit advancement/correction until every participant has
+    /// landed, making the shuffle itself the visible rearm interval.
+    /// </summary>
+    private bool TickShuffle(float deltaTime)
+    {
+        if (!shuffleActive || currentOwner == null)
+            return false;
+
+        float duration = Mathf.Max(0.01f, ShuffleTuning.DurationSeconds);
+        shuffleElapsedSeconds += Mathf.Max(0f, deltaTime);
+        float t = Mathf.Clamp01(shuffleElapsedSeconds / duration);
+        float easedT = t * t * (3f - 2f * t);
+
+        Rigidbody2D ownerBody = currentOwner.GetRigidBody();
+        Vector2 ownerVelocity = ownerBody == null
+            ? Vector2.zero
+            : ownerBody.velocity;
+        Vector2 ownerPosition = currentOwner.transform.position;
+
+        for (int i = 0; i < shuffleSatelliteCount; i++)
+        {
+            ShuffleSatelliteState state = shuffleSatellites[i];
+            OrrerySatellites.SatelliteContext context = state.Context;
+            if (context == null || !context.IsValid || context.Ship == null)
+                continue;
+
+            Vector3 targetPosition;
+            float radius;
+            if (!OrreryOrbit.TryGetDesiredPoseAtAngle(
+                    currentOwner,
+                    context.SatelliteId,
+                    state.TargetAngleDegrees,
+                    out targetPosition,
+                    out radius))
+            {
+                continue;
+            }
+
+            Vector2 startPosition = ownerPosition + state.StartOffsetFromOwner;
+            Vector2 desired = Vector2.Lerp(
+                startPosition,
+                (Vector2)targetPosition,
+                easedT);
+
+            GameShip satellite = context.Ship;
+            satellite.transform.rotation = Quaternion.identity;
+            Rigidbody2D body = satellite.GetRigidBody();
+            if (body != null)
+            {
+                body.position = desired;
+                body.velocity = ownerVelocity;
+                body.angularVelocity = 0f;
+            }
+            else
+            {
+                Vector3 current = satellite.transform.position;
+                satellite.transform.position = new Vector3(
+                    desired.x,
+                    desired.y,
+                    current.z);
+            }
+        }
+
+        if (t >= 1f)
+            StopShuffle(true);
+
+        return true;
+    }
+
+    private void StopShuffle(bool settleAtTargets)
+    {
+        if (!shuffleActive && shuffleSatelliteCount == 0)
+            return;
+
+        for (int i = 0; i < shuffleSatelliteCount; i++)
+        {
+            ShuffleSatelliteState state = shuffleSatellites[i];
+            OrrerySatellites.SatelliteContext context = state.Context;
+            if (context == null)
+                continue;
+
+            if (settleAtTargets && context.IsValid)
+            {
+                OrreryOrbit.SetAngleDegrees(
+                    currentOwner,
+                    context.SatelliteId,
+                    state.TargetAngleDegrees);
+            }
+
+            if (context.Ship != null)
+                RestoreSatelliteCollision(context.Ship);
+
+            shuffleSatellites[i] = default(ShuffleSatelliteState);
+        }
+
+        shuffleSatelliteCount = 0;
+        shuffleElapsedSeconds = 0f;
+        shuffleActive = false;
     }
 
     private void ApplyDesiredOrbit(bool snap)
@@ -297,6 +493,8 @@ public sealed class OrreryController : MonoBehaviour
 
     private void TearDownCurrentBuild()
     {
+        StopShuffle(false);
+
         GameShip owner = currentOwner;
         if (owner != null)
         {
@@ -336,6 +534,62 @@ public sealed class OrreryController : MonoBehaviour
         activeSquadron = null;
         intentEntries.Clear();
         publishEntries.Clear();
+        collisionCache.Clear();
+    }
+
+    private void CacheSatelliteColliders(GameShip satellite)
+    {
+        if (satellite == null)
+            return;
+
+        Collider2D[] colliders = satellite.GetComponentsInChildren<Collider2D>(true);
+        collisionCache[satellite] = new SatelliteCollisionCache
+        {
+            Colliders = colliders,
+            EnabledBeforeShuffle = new bool[colliders.Length]
+        };
+    }
+
+    private void SetSatelliteCollisionEnabled(GameShip satellite, bool enabled)
+    {
+        if (satellite == null)
+            return;
+
+        SatelliteCollisionCache cache;
+        if (!collisionCache.TryGetValue(satellite, out cache) || cache == null)
+        {
+            CacheSatelliteColliders(satellite);
+            collisionCache.TryGetValue(satellite, out cache);
+        }
+        if (cache == null || cache.Colliders == null)
+            return;
+
+        for (int i = 0; i < cache.Colliders.Length; i++)
+        {
+            Collider2D collider = cache.Colliders[i];
+            if (collider == null)
+                continue;
+            cache.EnabledBeforeShuffle[i] = collider.enabled;
+            collider.enabled = enabled;
+        }
+    }
+
+    private void RestoreSatelliteCollision(GameShip satellite)
+    {
+        SatelliteCollisionCache cache;
+        if (satellite == null ||
+            !collisionCache.TryGetValue(satellite, out cache) ||
+            cache == null || cache.Colliders == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < cache.Colliders.Length; i++)
+        {
+            Collider2D collider = cache.Colliders[i];
+            if (collider != null)
+                collider.enabled = cache.EnabledBeforeShuffle[i];
+        }
     }
 
     private static void ConfigureSatellite(GameShip satellite, GameShip owner)
