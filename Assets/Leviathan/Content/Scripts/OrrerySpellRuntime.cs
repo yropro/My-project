@@ -21,7 +21,8 @@ public static class OrrerySpellRuntime
         public const float FireballDamageMultiplier = 1f;
         public const float FireballVelocityMultiplier = 0.65f;
         public const float FireballTurnDegreesPerSecond = 120f;
-        public const float FireballExplosionRadiusMeters = 3f;
+        public const float FireballProjectileVisualScale = 2f;
+        public const float FireballExplosionRadiusMeters = 40f;
         public const float FireballLifetimeSeconds = 2f;
         public const float FireballSpawnGraceSeconds = 0.15f;
 
@@ -33,10 +34,15 @@ public static class OrrerySpellRuntime
         public const int CryoVisualProjectileCount = 9;
         public const int CryoVisualSpreadDegrees = 60;
         public const float CryoVisualVelocityMultiplier = 1.30f;
+        public const float CryoVisualProjectileScale = 1f;
 
         public const float TeslaInitialDpsMultiplier = 2f;
         public const float TeslaMinimumDpsMultiplier = 1f;
         public const float TeslaFadeSeconds = 1f;
+        public const float TeslaRangeMultiplier = 1f;
+        public const float TeslaBeamWidthMultiplier = 1f;
+        public const float TeslaChainRangeMultiplier = 1f;
+        public const int TeslaChainCountAdjustment = 0;
     }
 
     private const string InfernoCannonPath = "Base/Items/PrimaryWeapon/Inferno Cannon";
@@ -628,9 +634,26 @@ public static class OrrerySpellRuntime
 
             launcher.BaseReloadTime = 0f;
             launcher.BaseVelocity *= Tuning.FireballVelocityMultiplier;
+            // ExplosiveProjectile.Explode uses this same radius for both the
+            // mechanical overlap and native ExplosiveArea prefab scale, so the
+            // 40 m gameplay radius and visible explosion stay coupled by design.
             launcher.BaseExplosiveRadius =
                 OrreryUnits.MetersToWorld(Tuning.FireballExplosionRadiusMeters);
             launcher.BaseAutoDestroyTime = Tuning.FireballLifetimeSeconds;
+            return;
+        }
+
+        if (spellId == 2)
+        {
+            BeamWeapon beam = weapon as BeamWeapon;
+            if (beam == null)
+                return;
+
+            beam.BaseMaxRange *= Mathf.Max(0f, Tuning.TeslaRangeMultiplier);
+            beam.BaseChainRange *= Mathf.Max(0f, Tuning.TeslaChainRangeMultiplier);
+            beam.BaseChainTargets = Mathf.Max(
+                0,
+                beam.BaseChainTargets + Tuning.TeslaChainCountAdjustment);
             return;
         }
 
