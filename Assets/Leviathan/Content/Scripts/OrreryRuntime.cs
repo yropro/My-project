@@ -153,8 +153,6 @@ public static class OrreryRuntime
         public readonly float DisabledRecoveryMaxHullFractionPerSecond;
         public readonly SectorLayout Sectors;
 
-        // Compatibility constructor for early scaffold consumers. New class code
-        // should resolve the orbit/wheel values explicitly through the full form.
         public ResolvedState(
             bool active,
             int satelliteCount,
@@ -195,24 +193,15 @@ public static class OrreryRuntime
         {
             Active = active;
             SatelliteCount = Mathf.Max(0, satelliteCount);
-            FormulaSatelliteCount = Mathf.Clamp(
-                formulaSatelliteCount,
-                0,
-                SatelliteCount);
+            FormulaSatelliteCount = Mathf.Clamp(formulaSatelliteCount, 0, SatelliteCount);
             BaseOrbitRadiusMeters = Mathf.Max(0f, baseOrbitRadiusMeters);
             OrbitLaneSpacingMeters = Mathf.Max(0f, orbitLaneSpacingMeters);
             BaseOrbitAngularSpeedDegreesPerSecond = baseOrbitAngularSpeedDegreesPerSecond;
             WheelBaseRotationOffsetDegrees = NormalizeDegrees(wheelBaseRotationOffsetDegrees);
             WheelFollowSmoothTimeSeconds = Mathf.Max(0f, wheelFollowSmoothTimeSeconds);
-            SatelliteIncomingDamageMultiplier = Mathf.Max(
-                0f,
-                satelliteIncomingDamageMultiplier);
-            DisabledRecoveryFlatHullPerSecond = Mathf.Max(
-                0f,
-                disabledRecoveryFlatHullPerSecond);
-            DisabledRecoveryMaxHullFractionPerSecond = Mathf.Max(
-                0f,
-                disabledRecoveryMaxHullFractionPerSecond);
+            SatelliteIncomingDamageMultiplier = Mathf.Max(0f, satelliteIncomingDamageMultiplier);
+            DisabledRecoveryFlatHullPerSecond = Mathf.Max(0f, disabledRecoveryFlatHullPerSecond);
+            DisabledRecoveryMaxHullFractionPerSecond = Mathf.Max(0f, disabledRecoveryMaxHullFractionPerSecond);
             Sectors = sectors;
         }
     }
@@ -287,10 +276,6 @@ public static class OrreryRuntime
         return inactiveState;
     }
 
-    /// <summary>
-    /// Activates or refreshes one owner with already-resolved stable build data.
-    /// Class-selection/progression code owns when this is called.
-    /// </summary>
     public static void Activate(GameShip owner, ResolvedState resolved)
     {
         if (owner == null)
@@ -343,6 +328,12 @@ public static class OrreryRuntime
         if (owner == null)
             return;
 
+        // Dispose active/hidden spell machinery synchronously with the class
+        // lifecycle. Waiting for OrreryController.FixedUpdate leaves a stale
+        // activation window after respec/class switch and can strand a live FF
+        // projectile or Tesla beam while Core already considers the class gone.
+        OrrerySpellRuntime.Forget(owner);
+
         owners.Remove(owner);
         OrreryCasting.Forget(owner);
         OrreryOrbit.Forget(owner);
@@ -354,9 +345,9 @@ public static class OrreryRuntime
 
     public static void Reset()
     {
-        // World/session teardown also resets the shared combat core through its
-        // own verified transport lifecycle. Do not repopulate combat owner state
-        // here by attempting per-owner resets after that global reset has run.
+        // Reset hidden spell machinery before dropping logical owner tables so
+        // native projectile/beam cleanup still has its authoritative owner data.
+        OrrerySpellRuntime.Reset();
         owners.Clear();
         OrreryCasting.Reset();
         OrreryOrbit.Reset();
