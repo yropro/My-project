@@ -26,9 +26,10 @@ public static class OrreryInput
     private static GameShip primaryHeldOwner;
     private static int primaryStartedFrame = -1;
 
-    // Indexed activatable input is edge-driven natively, but retain the index so
-    // only the matching stop releases FF/LL. This also prevents unrelated native
-    // StopActivating calls from becoming a spell release.
+    // InputController always forwards ActivateActivatable through the indexed
+    // GameShip path, even when currentActivatable is -1 because no numbered
+    // activatable is selected. Orrery still owns that semantic input, so retain
+    // exactly the raw index that began invocation and match it on release.
     private static GameShip invokeHeldOwner;
     private static int invokeHeldIndex = -1;
 
@@ -121,22 +122,21 @@ public static class OrreryInput
 
     /// <summary>
     /// Called from Orrery's GameShip.StartActivating(int) patch. While Orrery is
-    /// active, indexed activatable input is consumed exactly as the previous
-    /// InputController patch consumed UpdateActivateActivatable. Only the selected
-    /// activatable index invokes; other numbered activatable presses stay inert.
+    /// active, the raw currentActivatable index is the semantic invoke input.
+    /// A value of -1 is valid here: native InputController still sends that value
+    /// on RMB when no numbered activatable is selected, and Orrery must invoke.
     /// </summary>
     public static bool HandleNativeStartByIndex(GameShip owner, int index)
     {
         if (!IsLocalOrreryOwner(owner))
             return false;
 
-        // Consume malformed/non-selected indexed activatable input while Orrery
-        // owns the local activatable control surface.
-        if (owner.activatables == null || index < 0 || index >= owner.activatables.Count ||
-            index != owner.currentActivatable)
-        {
+        // This hook is specifically the native ActivateActivatable path. Match
+        // the value InputController supplied, including -1. Numbered activatable
+        // hotkeys can still reach StartActivating(int), but their index differs
+        // from currentActivatable unless they are the currently selected item.
+        if (index != owner.currentActivatable)
             return true;
-        }
 
         // InputController processes FirePrimary before ActivateActivatable. The
         // combined PrimaryAndActivatable binding therefore reaches both native
