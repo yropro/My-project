@@ -243,12 +243,22 @@ public static class OrreryPresentationNetwork
     }
 
     /// <summary>
-    /// Explicit per-send dispatch for codecs whose presentation state must advance
-    /// on an actual ship-state send rather than on gameplay FixedUpdate cadence.
-    /// Keep this intentionally manual and tiny.
+    /// Samples the local Orrery presentation immediately before Core serializes
+    /// this ship-state packet. Existing transition/fixed-tick publishers may have
+    /// preloaded the same slot ids; Core's latest-value semantics make this final
+    /// sample authoritative without creating duplicate wire records.
     /// </summary>
     public static void PublishForSend()
     {
+        CoreOwnerContext context = CoreClassRuntime.CurrentContext;
+        GameShip owner = context != null && context.IsValid &&
+            context.ClassId == CoreClassId.Orrery
+                ? context.Ship
+                : null;
+
+        if (owner != null && OrreryRuntime.IsActive(owner))
+            OrreryNetwork.PublishLocal(owner);
+
         OrreryPlasmaBoltPresentation.Publish();
     }
 
