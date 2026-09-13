@@ -22,7 +22,8 @@ public static class OrreryShatterbolt
         "Base/Items/Special/Frost Nova Pulse";
     // Keep completed impact history briefly available through packet loss.
     // This presentation tail never delays shuffle or permits more damage.
-    private const float PresentationTailSeconds = 1f;
+    private const float PresentationTailSeconds =
+        OrrerySpellCompendium.Shatterbolt.PresentationTailSeconds;
 
     public struct PresentationSnapshot
     {
@@ -657,7 +658,6 @@ public static class OrreryShatterbolt
         float bestUnhitDistance = float.PositiveInfinity;
         GameShip bestRepeat = null;
         float bestRepeatDistance = float.PositiveInfinity;
-
         for (int i = 0; i < state.CandidateCount; i++)
         {
             GameShip candidate = state.CandidateShips[i];
