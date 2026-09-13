@@ -445,7 +445,7 @@ public static class OrreryShatterbolt
     {
         DamageProfile profile = state.LightningDamage;
         GameShip targetShip = target as GameShip;
-        bool crit = Modifier.CritRoll(profile.CritChance, targetShip);
+        bool crit = CoreNativeCriticalHits.CritRoll(profile.CritChance, targetShip);
         float chainMultiplier = state.ImpactCount > 0
             ? Mathf.Max(0f, 1f + state.LightningProfile.ChainDamageBonus)
             : 1f;
@@ -573,7 +573,7 @@ public static class OrreryShatterbolt
 
             explosion.HitTargets[explosion.HitCount++] = damageable;
             DamageProfile profile = explosion.Damage;
-            bool crit = Modifier.CritRoll(profile.CritChance, targetShip);
+            bool crit = CoreNativeCriticalHits.CritRoll(profile.CritChance, targetShip);
             float damage = crit
                 ? profile.NeutralDamage * (1f + profile.CritModifier)
                 : profile.NeutralDamage;

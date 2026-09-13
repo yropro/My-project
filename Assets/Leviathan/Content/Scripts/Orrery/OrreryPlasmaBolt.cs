@@ -328,7 +328,7 @@ public static class OrreryPlasmaBolt
         OrreryCastInvocation invocation,
         float spreadRadiusMeters)
     {
-        bool crit = Modifier.CritRoll(profile.CritChance, target);
+        bool crit = CoreNativeCriticalHits.CritRoll(profile.CritChance, target);
         float damage = crit
             ? profile.NeutralDamage * (1f + profile.CritModifier)
             : profile.NeutralDamage;

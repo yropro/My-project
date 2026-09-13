@@ -1471,7 +1471,7 @@ public static class LeviathanPredatorRuntime
         CombatContext combatContext = GetCombatContext(owner, target);
         ResolvedState configuration = GetResolvedState(owner);
         EffectiveStats stats = ResolveEffectiveStats(configuration, combatContext);
-        bool crit = Modifier.CritRoll(Mathf.Max(0f, source.GetCritChance() + stats.CritChanceBonus), target);
+        bool crit = CoreNativeCriticalHits.CritRoll(Mathf.Max(0f, source.GetCritChance() + stats.CritChanceBonus), target);
         if (crit) ApplyNativeCrit(source, owner);
         if (!ValidEnemy(owner, target)) return;
         // Damage is the native aggregate before its 0.2-second tick / blade split.

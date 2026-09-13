@@ -862,7 +862,7 @@ public static class LeviathanConstrictor
                     perContactWeight
                 );
 
-                bool crit = Modifier.CritRoll(critChance, target);
+                bool crit = CoreNativeCriticalHits.CritRoll(critChance, target);
 
                 // Native Assault applies on-crit effects before reading Damage,
                 // allowing OnCritDamageIncrease to affect the triggering hit.

@@ -24,9 +24,10 @@ public static class CoreShieldGrant
         if (before >= shield.ShieldMax)
             return 0f;
 
-        target.Heal(
+        CoreNativeCriticalHits.Heal(
+            target,
             amount,
-            false,
+            0,
             fromPosition,
             null,
             true,

@@ -390,12 +390,12 @@ public static class OrrerySpellRuntime
             if (targetShip != null && targetShip.IsDodging())
                 return;
 
-            bool crit = Modifier.CritRoll(launcher.GetCritChance(), targetShip);
+            bool crit = CoreNativeCriticalHits.CritRoll(launcher.GetCritChance(), targetShip);
             RouteNativeDamage(
                 state,
                 damageable,
                 launcher.damageType,
-                launcher.GetDamageData(crit, false),
+                CoreNativeCriticalHits.GetDamageData(launcher, crit, false),
                 launcher.GetStatusEffectChance(),
                 crit,
                 hitPoint,
@@ -830,7 +830,7 @@ public static class OrrerySpellRuntime
                 continue;
             }
 
-            bool crit = Modifier.CritRoll(critChance, targetShip);
+            bool crit = CoreNativeCriticalHits.CritRoll(critChance, targetShip);
             float damage = crit
                 ? neutralDamage * (1f + critModifier)
                 : neutralDamage;

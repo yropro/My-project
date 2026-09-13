@@ -1601,7 +1601,7 @@ public static class LeviathanStarfireRuntime
             {
                 if (ChargeField != null)
                     ChargeField.SetValue(torch, 1f);
-                packet = torch.GetDamageData(crit);
+                packet = CoreNativeCriticalHits.GetDamageData(torch, crit);
             }
             finally
             {
@@ -1613,7 +1613,7 @@ public static class LeviathanStarfireRuntime
         {
             Launcher launcher = source as Launcher;
             if (launcher != null)
-                packet = launcher.GetDamageData(crit, false);
+                packet = CoreNativeCriticalHits.GetDamageData(launcher, crit, false);
         }
 
         if (packet == null || packet.Length == 0)
@@ -1678,7 +1678,7 @@ public static class LeviathanStarfireRuntime
             return false;
         }
 
-        bool crit = Modifier.CritRoll(context.critChance, target);
+        bool crit = CoreNativeCriticalHits.CritRoll(context.critChance, target);
         DamageData[] packet = BuildNormalizedDamagePacket(
             context.source,
             crit,
@@ -3873,7 +3873,7 @@ public static class LeviathanStarfireRuntime
             state.DamageMultiplier *
             (1f + critChance * critModifier);
 
-        bool crit = Modifier.CritRoll(critChance, target);
+        bool crit = CoreNativeCriticalHits.CritRoll(critChance, target);
         DamageData[] damage = BuildNormalizedDamagePacket(
             source,
             crit,

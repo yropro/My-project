@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using StarVortex;
 using System;
 using System.Collections.Generic;
@@ -3252,7 +3252,7 @@ public static class LeviathanStellarConverter
 
     public static void ScaleForkDamagePacket(
         DamageBeam beam,
-        bool crit,
+        int critTier,
         ref DamageData[] damage)
     {
         ForkBeamState state;
@@ -3276,7 +3276,7 @@ public static class LeviathanStellarConverter
         // native ChainDamage. Descendants remain normal non-primary DamageBeams
         // and therefore inherit the source weapon's native ChainDamage.
         DamageData[] mainPacket =
-            state.shot.source.GetDamageData(crit, false);
+            CoreNativeCriticalHits.GetDamageData(state.shot.source, critTier, false);
         if (mainPacket == null)
             return;
 
@@ -4899,8 +4899,8 @@ public static class LeviathanStellarConverter
         float critChance = Mathf.Clamp01(
             source.GetCritChance() * resolved.CritChanceMultiplier +
             resolved.CritChanceBonus);
-        bool crit = Modifier.CritRoll(critChance, target);
-        DamageData[] native = source.GetDamageData(crit, false);
+        bool crit = CoreNativeCriticalHits.CritRoll(critChance, target);
+        DamageData[] native = CoreNativeCriticalHits.GetDamageData(source, crit, false);
         if (native == null || native.Length == 0)
             return;
 
@@ -6326,12 +6326,12 @@ public static class LeviathanStellarConverterForkDamagePatch
 {
     public static void Postfix(
         DamageBeam __instance,
-        ref bool crit,
+        ref int critTier,
         ref DamageData[] __result)
     {
         LeviathanStellarConverter.ScaleForkDamagePacket(
             __instance,
-            crit,
+            critTier,
             ref __result);
     }
 }

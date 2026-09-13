@@ -2218,7 +2218,7 @@ public static class LeviathanSectionDamagePatch
                 typeof(DamageType),
                 typeof(DamageData[]),
                 typeof(float),
-                typeof(bool),
+                typeof(int),
                 typeof(Vector2),
                 typeof(GameShip),
                 typeof(bool)
@@ -2231,7 +2231,7 @@ public static class LeviathanSectionDamagePatch
         DamageType __0,
         DamageData[] __1,
         float __2,
-        bool __3,
+        int __3,
         Vector2 __4,
         GameShip __5,
         bool __6,
@@ -2332,7 +2332,8 @@ public static class LeviathanSectionDamagePatch
                 .CaptureCurrentCombinedHealth(player)
             : 0f;
 
-        __result = player.Damage(
+        __result = CoreNativeCriticalHits.Damage(
+            player,
             __0,
             redirectedDamage,
             statusEffectChance,
