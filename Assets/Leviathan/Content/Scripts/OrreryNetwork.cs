@@ -4,9 +4,9 @@ using UnityEngine;
 
 /// <summary>
 /// Orrery-owned presentation contract over the shared Core ship-state transport.
-/// Gameplay remains owner-authoritative. Base casting/satellite state has its own
-/// slot; spell-specific transient presentation lives in bounded separate slots so
-/// individual spells cannot consume the entire class casting budget.
+/// Gameplay remains owner-authoritative. Base casting/satellite state keeps its
+/// dedicated Core slot; transient spell presentation is delegated to explicit
+/// spell codecs over OrreryPresentationNetwork's six-record bank.
 /// </summary>
 public static class OrreryNetwork
 {
@@ -14,35 +14,9 @@ public static class OrreryNetwork
     public const byte PayloadVersion = 3;
     public const int MaxPresentedSatellites = 8;
 
-    // Core delivers all dynamic slots in one atomic snapshot. Slots 7-9 are
-    // one bounded Shatterbolt payload, never independent event streams.
-    private const byte SpellPresentationSlotId = 7;
-    private const byte ShatterboltHistorySlotId = 8;
-    private const byte ShatterboltHistoryTailSlotId = 9;
-    private const byte SpellPayloadVersion = 2;
     private const byte PayloadEndSentinel = 0xA7;
-
-    // Full world-space floats avoid range assumptions about moving owners and
-    // reacquired targets. Header: 4 bytes + orb XY (8) + resolved radius (4).
-    // First two impacts fit in slot 7; four each fit in slots 8 and 9.
-    // Total: 16 + 8 * impactCount, at most 96 bytes, <=32 per slot.
-    // Unused history slots are omitted. No per-send arrays or float boxing.
-    private const byte ShatterboltFlagPresent = 1 << 0;
-    private const byte ShatterboltFlagOrbActive = 1 << 1;
     private const int MaxNetworkedShatterboltImpacts =
         OrrerySpellCompendium.Shatterbolt.MaximumImpacts;
-
-    static OrreryNetwork()
-    {
-        CoreNetwork.RegisterSlot(
-            SpellPresentationSlotId,
-            CoreClassId.Orrery,
-            "Orrery spell presentation");
-        CoreNetwork.RegisterSlot(ShatterboltHistorySlotId,
-            CoreClassId.Orrery, "Shatterbolt impact history");
-        CoreNetwork.RegisterSlot(ShatterboltHistoryTailSlotId,
-            CoreClassId.Orrery, "Shatterbolt impact history tail");
-    }
 
     public struct PresentationState
     {
@@ -222,47 +196,7 @@ public static class OrreryNetwork
         CoreNetwork.EndSlot(writer);
 
         if (state.ShatterboltPresent)
-            PublishShatterbolt(state);
-    }
-
-    private static void PublishShatterbolt(PresentationState state)
-    {
-        CoreNetwork.SlotWriter writer =
-            CoreNetwork.BeginSlot(SpellPresentationSlotId);
-
-        byte flags = ShatterboltFlagPresent;
-        if (state.ShatterboltOrbActive)
-            flags |= ShatterboltFlagOrbActive;
-
-        writer.Byte(SpellPayloadVersion);
-        writer.Byte(flags);
-        writer.Byte(state.ShatterboltCastSequence);
-        writer.Byte(state.ShatterboltImpactCount);
-
-        WritePosition(ref writer, state.ShatterboltOrbPosition);
-        WriteFloat(ref writer, state.ShatterboltExplosionRadiusMeters);
-        WriteImpacts(ref writer, state, 0, 2);
-        CoreNetwork.EndSlot(writer);
-
-        if (state.ShatterboltImpactCount > 2)
-        {
-            writer = CoreNetwork.BeginSlot(ShatterboltHistorySlotId);
-            WriteImpacts(ref writer, state, 2, 6);
-            CoreNetwork.EndSlot(writer);
-        }
-        if (state.ShatterboltImpactCount > 6)
-        {
-            writer = CoreNetwork.BeginSlot(ShatterboltHistoryTailSlotId);
-            WriteImpacts(ref writer, state, 6, 10);
-            CoreNetwork.EndSlot(writer);
-        }
-    }
-
-    private static void WriteImpacts(ref CoreNetwork.SlotWriter writer,
-        PresentationState state, int start, int end)
-    {
-        for (int i = start; i < end && i < state.ShatterboltImpactCount; i++)
-            WritePosition(ref writer, state.GetShatterboltImpact(i));
+            OrreryShatterboltPresentationCodec.Publish(owner, state);
     }
 
     public static bool TryReadRemote(
@@ -305,93 +239,10 @@ public static class OrreryNetwork
             return false;
         }
 
-        // Spell presentation is deliberately isolated. A malformed/missing spell
-        // slot suppresses only that spell's VFX, never otherwise-valid Orrery
+        // Spell presentation is deliberately isolated. A malformed/missing bank
+        // group suppresses only that spell's VFX, never otherwise-valid Orrery
         // satellite/casting presentation.
-        TryReadShatterbolt(remoteOwner, ref state);
-        return true;
-    }
-
-    private static bool TryReadShatterbolt(
-        GameShip remoteOwner,
-        ref PresentationState state)
-    {
-        CoreNetwork.SlotReader reader;
-        if (!CoreNetwork.TryReadSlot(
-                remoteOwner,
-                SpellPresentationSlotId,
-                out reader))
-        {
-            return false;
-        }
-
-        if (reader.Byte() != SpellPayloadVersion)
-            return false;
-
-        byte flags = reader.Byte();
-        const byte knownFlags =
-            ShatterboltFlagPresent | ShatterboltFlagOrbActive;
-        if ((flags & ~knownFlags) != 0 ||
-            (flags & ShatterboltFlagPresent) == 0)
-        {
-            return false;
-        }
-
-        byte castSequence = reader.Byte();
-        byte impactCount = reader.Byte();
-        if (impactCount > MaxNetworkedShatterboltImpacts)
-            return false;
-
-        int firstCount = Mathf.Min(impactCount, 2);
-        if (reader.Length != 16 + firstCount * 8)
-            return false;
-
-        // Read into a temporary value: malformed history must not partially
-        // enable presentation. All slots come from the same Core snapshot.
-        PresentationState decoded = state;
-        decoded.ShatterboltOrbPosition = ReadPosition(ref reader);
-        decoded.ShatterboltExplosionRadiusMeters = ReadFloat(ref reader);
-        if (!IsFinite(decoded.ShatterboltOrbPosition) ||
-            !IsFinite(decoded.ShatterboltExplosionRadiusMeters) ||
-            decoded.ShatterboltExplosionRadiusMeters <= 0f ||
-            !ReadImpacts(ref reader, ref decoded, 0, firstCount))
-            return false;
-
-        if (impactCount > 2)
-        {
-            int count = Mathf.Min(impactCount - 2, 4);
-            if (!CoreNetwork.TryReadSlot(remoteOwner, ShatterboltHistorySlotId, out reader) ||
-                reader.Length != count * 8 ||
-                !ReadImpacts(ref reader, ref decoded, 2, count))
-                return false;
-        }
-        if (impactCount > 6)
-        {
-            int count = impactCount - 6;
-            if (!CoreNetwork.TryReadSlot(remoteOwner, ShatterboltHistoryTailSlotId, out reader) ||
-                reader.Length != count * 8 ||
-                !ReadImpacts(ref reader, ref decoded, 6, count))
-                return false;
-        }
-
-        decoded.ShatterboltPresent = true;
-        decoded.ShatterboltOrbActive = (flags & ShatterboltFlagOrbActive) != 0;
-        decoded.ShatterboltCastSequence = castSequence;
-        decoded.ShatterboltImpactCount = impactCount;
-        state = decoded;
-        return true;
-    }
-
-    private static bool ReadImpacts(ref CoreNetwork.SlotReader reader,
-        ref PresentationState state, int start, int count)
-    {
-        for (int i = start; i < start + count; i++)
-        {
-            Vector2 position = ReadPosition(ref reader);
-            if (!IsFinite(position))
-                return false;
-            state.SetShatterboltImpact(i, position);
-        }
+        OrreryShatterboltPresentationCodec.TryRead(remoteOwner, ref state);
         return true;
     }
 

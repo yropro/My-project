@@ -62,7 +62,7 @@ public static class OrreryPresentationNetwork
         byte[] payload,
         int payloadLength)
     {
-        if (codecId == 0 || groupId > MaximumGroupId ||
+        if (codecId == 0 || generation == 0u || groupId > MaximumGroupId ||
             partCount < 1 || partCount > MaximumPartsPerGroup ||
             firstRecordIndex < 0 || firstRecordIndex + partCount > RecordCount ||
             payload == null || payloadLength < 0 || payloadLength > payload.Length ||
@@ -227,18 +227,18 @@ public static class OrreryPresentationNetwork
     }
 
     /// <summary>
-    /// Registers the portion of the physical bank already migrated away from
-    /// spell-local CoreNetwork ownership. Records 0-2 remain temporarily owned
-    /// by the legacy Shatterbolt path until its codec migration.
+    /// All six physical records now belong to this transport bank. A record has
+    /// no spell meaning until a codec writes a self-identifying framed payload.
     /// </summary>
     public static void EnsureInitialized()
     {
-        CoreNetwork.RegisterSlot(Record3SlotId, CoreClassId.Orrery,
-            "Orrery presentation record 3");
-        CoreNetwork.RegisterSlot(Record4SlotId, CoreClassId.Orrery,
-            "Orrery presentation record 4");
-        CoreNetwork.RegisterSlot(Record5SlotId, CoreClassId.Orrery,
-            "Orrery presentation record 5");
+        for (int i = 0; i < RecordCount; i++)
+        {
+            CoreNetwork.RegisterSlot(
+                GetSlotId(i),
+                CoreClassId.Orrery,
+                "Orrery presentation record " + i);
+        }
     }
 
     private static byte PackDescriptor(byte groupId, int partIndex, int partCount)
