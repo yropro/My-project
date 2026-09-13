@@ -7,6 +7,42 @@
 /// </summary>
 public static class OrrerySpellCompendium
 {
+    public static class MagmaCannon
+    {
+        public const float IntegratedReferenceSeconds = 1f;
+        public const float DamageMultiplier = 1f;
+        public const float VelocityMultiplier = 0.65f;
+        public const float TurnDegreesPerSecond = 120f;
+        public const float ProjectileVisualScale = 2f;
+        public const float ExplosionRadiusMeters = 40f;
+        public const float LifetimeSeconds = 2f;
+        public const float SpawnGraceSeconds = 0.15f;
+    }
+
+    public static class TeslaCoil
+    {
+        public const float InitialDpsMultiplier = 2f;
+        public const float MinimumDpsMultiplier = 1f;
+        public const float FadeSeconds = 1f;
+        public const float RangeMultiplier = 1f;
+        public const float BeamWidthMultiplier = 1f;
+        public const float ChainRangeMultiplier = 1f;
+        public const int ChainCountAdjustment = 0;
+    }
+
+    public static class ConeOfCold
+    {
+        public const float IntegratedReferenceSeconds = 1f;
+        public const float DamageMultiplier = 1f;
+        public const float ConeRangeMeters = 60f;
+        public const float ConeAngleDegrees = 30f;
+        public const float FreezeChanceAdditive = 0.50f;
+        public const int VisualProjectileCount = 9;
+        public const int VisualSpreadDegrees = 30;
+        public const float VisualVelocityMultiplier = 1.30f;
+        public const float VisualProjectileScale = 1f;
+    }
+
     public static class ColdFusion
     {
         // Identity
@@ -137,5 +173,6 @@ public static class OrrerySpellCompendium
         public const float ProjectileVisualScale = 1f;
         public const float ProjectileSpinDegreesPerSecond = 360f;
         public const float ExplosionVisualScale = 1f;
+        public const float PresentationTailSeconds = 1f;
     }
 }
