@@ -22,6 +22,7 @@ public static class OrreryPresentationNetwork
 
     // Explicit codec ids. Keep this list intentionally small and manual.
     public const byte CodecShatterbolt = 1;
+    public const byte CodecPlasmaBolt = 2;
 
     // Record framing:
     //   every part: byte codec, byte descriptor
@@ -227,8 +228,8 @@ public static class OrreryPresentationNetwork
     }
 
     /// <summary>
-    /// All six physical records now belong to this transport bank. A record has
-    /// no spell meaning until a codec writes a self-identifying framed payload.
+    /// All six physical records belong to this transport bank. A record has no
+    /// spell meaning until an explicit codec writes a self-identifying group.
     /// </summary>
     public static void EnsureInitialized()
     {
@@ -239,6 +240,16 @@ public static class OrreryPresentationNetwork
                 CoreClassId.Orrery,
                 "Orrery presentation record " + i);
         }
+    }
+
+    /// <summary>
+    /// Explicit per-send dispatch for codecs whose presentation state must advance
+    /// on an actual ship-state send rather than on gameplay FixedUpdate cadence.
+    /// Keep this intentionally manual and tiny.
+    /// </summary>
+    public static void PublishForSend()
+    {
+        OrreryPlasmaBoltPresentation.Publish();
     }
 
     private static byte PackDescriptor(byte groupId, int partIndex, int partCount)
@@ -282,5 +293,14 @@ public static class OrreryPresentationNetworkRegisterSlotsPatch
     public static void Postfix()
     {
         OrreryPresentationNetwork.EnsureInitialized();
+    }
+}
+
+[HarmonyPatch(typeof(CoreNetwork), "AppendLocalExtension")]
+public static class OrreryPresentationNetworkSendPatch
+{
+    public static void Prefix()
+    {
+        OrreryPresentationNetwork.PublishForSend();
     }
 }
