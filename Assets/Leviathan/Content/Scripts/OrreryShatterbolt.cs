@@ -363,8 +363,6 @@ public static class OrreryShatterbolt
             DisposeSources(state);
             owners.Remove(owner);
         }
-
-        OrreryDamageRouter.Forget(owner);
     }
 
     public static void Reset()
@@ -375,7 +373,6 @@ public static class OrreryShatterbolt
             Forget(keys[i]);
         owners.Clear();
         frostNovaBase = null;
-        OrreryDamageRouter.Reset();
     }
 
     public static bool TryGetPresentation(
@@ -1244,7 +1241,6 @@ public static class OrreryShatterbolt
             return;
 
         DisposeSources(state);
-        OrreryDamageRouter.Forget(owner);
         owners.Remove(owner);
     }
 
