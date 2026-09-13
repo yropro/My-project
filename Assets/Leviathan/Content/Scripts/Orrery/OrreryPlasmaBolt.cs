@@ -1070,15 +1070,17 @@ public static class OrreryPlasmaBolt
             return true;
         }
 
-        // Stretched billboards follow particle velocity. Map their local +Z
-        // emission axis into the game's XY plane along the cast, rather than
-        // rotating a sky-to-ground effect around a guessed prefab axis.
+        // The imported _H atlas runs horizontally. A local XY billboard has
+        // explicit endpoints; Stretch mode offsets its quad along velocity.
         Transform root = state.BoltVisualObject.transform;
         root.position = (Vector3)((start + end) * 0.5f);
-        root.rotation = Quaternion.LookRotation((Vector3)(delta / length), Vector3.forward);
+        root.rotation = Quaternion.Euler(0f, 0f,
+            Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
         root.localScale = Vector3.one;
         float width = Mathf.Max(0.01f, OrreryUnits.MetersToWorld(widthMeters) *
             OrrerySpellCompendium.PlasmaBolt.ZapWidthMultiplier);
+        float lifetime = Mathf.Max(0.01f,
+            OrrerySpellCompendium.PlasmaBolt.ZapVisualLifetimeSeconds);
 
         for (int i = 0; i < state.ZapParticles.Length; i++)
         {
@@ -1089,28 +1091,37 @@ public static class OrreryPlasmaBolt
             main.playOnAwake = false;
             main.simulationSpace = ParticleSystemSimulationSpace.Local;
             main.scalingMode = ParticleSystemScalingMode.Local;
-            main.startSpeed = 0.001f;
-            main.startSize3D = false;
-            main.startSize = width;
+            main.startSpeed = 0f;
+            main.startDelay = 0f;
+            main.startLifetime = lifetime;
+            main.startSize3D = true;
+            main.startSizeX = length;
+            main.startSizeY = width;
+            main.startSizeZ = 1f;
+            main.startRotation3D = false;
+            main.startRotation = 0f;
             main.gravityModifier = 0f;
             main.stopAction = ParticleSystemStopAction.None;
             var shape = particles.shape;
             shape.enabled = false;
+            var emission = particles.emission;
+            emission.enabled = false;
             ParticleSystemRenderer renderer = state.ZapRenderers[i];
-            renderer.renderMode = ParticleSystemRenderMode.Stretch;
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.alignment = ParticleSystemRenderSpace.Local;
             renderer.velocityScale = 0f;
             renderer.cameraVelocityScale = 0f;
             renderer.lengthScale = length / width;
             renderer.pivot = Vector3.zero;
             renderer.sortingOrder = OrrerySpellCompendium.PlasmaBolt.ZapSortingOrder;
-            // Keep the artist's red gradients, flicker, custom vertex streams,
-            // texture animation and emission timing on all four Zap layers.
+            // One stationary particle per layer. The authored color, erosion
+            // and atlas curves now run across the configured cast lifetime.
             particles.Play(false);
+            particles.Emit(1);
             particles.Simulate(0.001f, false, false, false);
             particles.Play(false);
         }
-        state.BoltVisibleUntil = Time.time +
-            OrrerySpellCompendium.PlasmaBolt.ZapVisualLifetimeSeconds;
+        state.BoltVisibleUntil = Time.time + lifetime;
         return true;
     }
 

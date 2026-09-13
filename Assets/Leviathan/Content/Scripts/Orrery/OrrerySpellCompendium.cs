@@ -86,8 +86,10 @@ public static class OrrerySpellCompendium
         public const float BoltVisualLifetimeSeconds = 0.12f;
         public const string ZapPrefabPath =
             "Assets/Leviathan/Content/Scripts/Orrery/PlasmaBoltVFX/OrreryPlasmaBoltZap.prefab";
-        public const float ZapWidthMultiplier = 1f;
-        public const float ZapVisualLifetimeSeconds = 0.65f;
+        // Compensates for transparent margins around the lightning in its atlas.
+        // Visual width tracks the resolved hitbox width, including spell scaling.
+        public const float ZapWidthMultiplier = 2f;
+        public const float ZapVisualLifetimeSeconds = 0.5f;
         public const int ZapSortingOrder = 20;
     }
 
