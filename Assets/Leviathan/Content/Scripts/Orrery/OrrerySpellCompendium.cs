@@ -147,9 +147,22 @@ public static class OrrerySpellCompendium
         public const int ZapSortingOrder = 20;
 
         // Presentation audio. The clip may be absent during development; Core
-        // fails closed with one warning and requires no dummy AudioClip.
-        public const string ThunderClipName = "thunder";
+        // fails closed with one warning and requires no dummy AudioClip. Keep the
+        // fade start as a normal tuning knob; the clip's actual length determines
+        // the remaining fade duration automatically.
+        public const float ThunderFadeOutStartSeconds = 2.235f;
+        public static readonly string ThunderClipName = "thunder";
         public const float ThunderVolume = 1.00f;
+
+        static PlasmaBolt()
+        {
+            // Register lazily on first Plasma Bolt use so local and remote
+            // presentation both configure the same clip without a separate
+            // bootstrap, Harmony patch, or network event.
+            CoreAudioRuntime.SetFadeOutStartSeconds(
+                ThunderClipName,
+                ThunderFadeOutStartSeconds);
+        }
     }
 
     public static class Shatterbolt
