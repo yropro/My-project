@@ -90,14 +90,15 @@ public static class OrrerySpellLifetime
     }
 
     /// <summary>
-    /// World-global teardown for migrated persistent Orrery spell runtimes. Shared
-    /// Orrery services remain owned by their class/runtime boundaries rather than
-    /// being hidden inside an arbitrary spell cleanup path.
+    /// World-global teardown for migrated persistent Orrery spell runtimes and
+    /// the shared owner-agnostic services those runtimes use. Remote presentation
+    /// remains owned by its presentation-specific world lifecycle.
     /// </summary>
     public static void ResetWorld()
     {
         OrreryShatterbolt.Reset();
         OrreryPlasmaBolt.Reset();
+        OrreryDamageRouter.Reset();
         lastLocalOwner = null;
     }
 }
