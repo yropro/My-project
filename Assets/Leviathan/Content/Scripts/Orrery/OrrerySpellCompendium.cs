@@ -143,7 +143,9 @@ public static class OrrerySpellCompendium
         // Compensates for transparent margins around the lightning in its atlas.
         // Visual width tracks the resolved hitbox width, including spell scaling.
         public const float ZapWidthMultiplier = 2f;
-        public const float ZapVisualLifetimeSeconds = 0.5f;
+        public const int ZapVisualStrikeCount = 3;
+        public const float ZapVisualLifetimeSeconds = 1f;
+        public const float ZapVisualStrikeLifetimeSeconds = 0.2f;
         public const int ZapSortingOrder = 20;
 
         // Presentation audio. The clip may be absent during development; Core

@@ -1090,6 +1090,16 @@ public static class OrreryPlasmaBolt
             OrrerySpellCompendium.PlasmaBolt.ZapWidthMultiplier);
         float lifetime = Mathf.Max(0.01f,
             OrrerySpellCompendium.PlasmaBolt.ZapVisualLifetimeSeconds);
+        int strikeCount = Mathf.Max(1,
+            OrrerySpellCompendium.PlasmaBolt.ZapVisualStrikeCount);
+        float strikeLifetime = Mathf.Clamp(
+            OrrerySpellCompendium.PlasmaBolt.ZapVisualStrikeLifetimeSeconds,
+            0.01f, lifetime);
+        float strikeInterval = strikeCount > 1
+            ? (lifetime - strikeLifetime) / (strikeCount - 1) : 0f;
+        var bursts = new ParticleSystem.Burst[strikeCount];
+        for (int i = 0; i < strikeCount; i++)
+            bursts[i] = new ParticleSystem.Burst(i * strikeInterval, (short)1);
 
         for (int i = 0; i < state.ZapParticles.Length; i++)
         {
@@ -1097,12 +1107,13 @@ public static class OrreryPlasmaBolt
             particles.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = particles.main;
             main.loop = false;
+            main.duration = lifetime;
             main.playOnAwake = false;
             main.simulationSpace = ParticleSystemSimulationSpace.Local;
             main.scalingMode = ParticleSystemScalingMode.Local;
             main.startSpeed = 0f;
             main.startDelay = 0f;
-            main.startLifetime = lifetime;
+            main.startLifetime = strikeLifetime;
             main.startSize3D = true;
             main.startSizeX = length;
             main.startSizeY = width;
@@ -1114,7 +1125,10 @@ public static class OrreryPlasmaBolt
             var shape = particles.shape;
             shape.enabled = false;
             var emission = particles.emission;
-            emission.enabled = false;
+            emission.enabled = true;
+            emission.rateOverTime = 0f;
+            emission.rateOverDistance = 0f;
+            emission.SetBursts(bursts);
             ParticleSystemRenderer renderer = state.ZapRenderers[i];
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
             renderer.alignment = ParticleSystemRenderSpace.Local;
@@ -1123,10 +1137,10 @@ public static class OrreryPlasmaBolt
             renderer.lengthScale = length / width;
             renderer.pivot = Vector3.zero;
             renderer.sortingOrder = OrrerySpellCompendium.PlasmaBolt.ZapSortingOrder;
-            // One stationary particle per layer. The authored color, erosion
-            // and atlas curves now run across the configured cast lifetime.
+            // Presentation-only strikes at 0, 0.4 and 0.8 seconds by default.
+            // Each burst replays the authored color, erosion and atlas curves;
+            // no damage or burn logic is invoked by this particle schedule.
             particles.Play(false);
-            particles.Emit(1);
             particles.Simulate(0.001f, false, false, false);
             particles.Play(false);
         }
