@@ -106,12 +106,12 @@ public static class OrrerySpellRegistry
             null));
 
         Register(new SpellDefinition(
-            5,
-            "Fire + Lightning",
-            Pair(OrreryElement.Fire, OrreryElement.Lightning),
+            OrrerySpellCompendium.PlasmaBolt.Id,
+            OrrerySpellCompendium.PlasmaBolt.Name,
+            OrrerySpellCompendium.PlasmaBolt.Recipe,
             OrrerySpellExecutionKind.Custom,
-            0,
-            null));
+            OrreryCombat.EffectIds.PlasmaBolt,
+            OrreryPlasmaBolt.Execute));
 
         Register(new SpellDefinition(
             OrrerySpellCompendium.Shatterbolt.Id,

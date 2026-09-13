@@ -7,7 +7,7 @@ using UnityEngine;
 /// Remote-only Shatterbolt presentation.
 ///
 /// Gameplay stays entirely owner-authoritative. The Orrery network slot carries a
-/// quantized orb position plus the complete bounded impact history for the current
+/// world-space orb position plus the complete bounded impact history for the current
 /// cast, so packet coalescing cannot erase a fast intermediate hop.
 /// </summary>
 public static class OrreryShatterboltRemotePresentation
@@ -32,6 +32,7 @@ public static class OrreryShatterboltRemotePresentation
     {
         public bool Active;
         public float AgeSeconds;
+        public float RadiusMeters;
         public Wave Wave;
         public bool WaveWasEnabled;
         public CircleCollider2D Collider;
@@ -109,7 +110,8 @@ public static class OrreryShatterboltRemotePresentation
             }
 
             for (int i = state.SeenImpactCount; i < impactCount; i++)
-                SpawnBurst(remoteOwner, state, network.GetShatterboltImpact(i));
+                SpawnBurst(remoteOwner, state, network.GetShatterboltImpact(i),
+                    network.ShatterboltExplosionRadiusMeters);
             state.SeenImpactCount = impactCount;
 
             if (network.ShatterboltOrbActive)
@@ -282,7 +284,8 @@ public static class OrreryShatterboltRemotePresentation
     private static void SpawnBurst(
         GameShip owner,
         RemoteState state,
-        Vector2 position)
+        Vector2 position,
+        float radiusMeters)
     {
         if (state == null || PoolController.instance == null)
             return;
@@ -328,6 +331,7 @@ public static class OrreryShatterboltRemotePresentation
 
         burst.Active = true;
         burst.AgeSeconds = 0f;
+        burst.RadiusMeters = radiusMeters;
         burst.Wave = wave;
         burst.WaveWasEnabled = wave.enabled;
         burst.Collider = circle;
@@ -337,6 +341,7 @@ public static class OrreryShatterboltRemotePresentation
 
         wave.enabled = false;
         circle.enabled = false;
+        OrreryShatterboltWavePresentation.ResetMask(wave);
         wave.transform.localScale = Vector3.zero;
     }
 
@@ -348,10 +353,6 @@ public static class OrreryShatterboltRemotePresentation
         float expansionMetersPerSecond = Mathf.Max(
             0.001f,
             OrrerySpellCompendium.Shatterbolt.ExplosionExpansionMetersPerSecond);
-        float duration = Mathf.Max(
-            0.01f,
-            OrrerySpellCompendium.Shatterbolt.ExplosionRadiusMeters /
-                expansionMetersPerSecond);
         float dt = Mathf.Max(0f, deltaTime);
 
         for (int i = 0; i < state.Bursts.Length; i++)
@@ -361,8 +362,10 @@ public static class OrreryShatterboltRemotePresentation
                 continue;
 
             burst.AgeSeconds += dt;
+            float duration = Mathf.Max(0.01f,
+                burst.RadiusMeters / expansionMetersPerSecond);
             float radiusMeters = Mathf.Min(
-                OrrerySpellCompendium.Shatterbolt.ExplosionRadiusMeters,
+                burst.RadiusMeters,
                 burst.AgeSeconds * expansionMetersPerSecond);
             float radiusWorld = radiusMeters * OrreryUnits.WorldUnitsPerMeter;
 
@@ -454,6 +457,35 @@ public static class OrreryShatterboltRemotePresentation
         }
 
         Object.Destroy(visualObject);
+    }
+}
+
+// Native Wave.ResetObject restores color/scale, but Wave.Init is what normally
+// clears its obstruction shader mask. Both Shatterbolt presenters skip Init to
+// avoid native gameplay. Reset only that visual property, preserving other
+// material properties. Native reuse initializes its own gameplay mask normally.
+internal static class OrreryShatterboltWavePresentation
+{
+    private static readonly int blockRadiusId = Shader.PropertyToID("_BlockRadius");
+    private static readonly float[] unblockedRadii = CreateUnblockedRadii();
+    private static readonly MaterialPropertyBlock properties = new MaterialPropertyBlock();
+
+    private static float[] CreateUnblockedRadii()
+    {
+        float[] radii = new float[128];
+        for (int i = 0; i < radii.Length; i++)
+            radii[i] = 1000000f;
+        return radii;
+    }
+
+    public static void ResetMask(Wave wave)
+    {
+        SpriteRenderer renderer;
+        if (wave == null || !wave.TryGetComponent<SpriteRenderer>(out renderer))
+            return;
+        renderer.GetPropertyBlock(properties);
+        properties.SetFloatArray(blockRadiusId, unblockedRadii);
+        renderer.SetPropertyBlock(properties);
     }
 }
 

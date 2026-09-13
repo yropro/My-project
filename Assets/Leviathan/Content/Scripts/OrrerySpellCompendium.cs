@@ -7,6 +7,32 @@
 /// </summary>
 public static class OrrerySpellCompendium
 {
+    public static class PlasmaBolt
+    {
+        public const ushort Id = 5;
+        public const string Name = "Plasma Bolt";
+        public static readonly OrreryRecipeKey Recipe = default(OrreryRecipeKey)
+            .Add(OrreryElement.Fire).Add(OrreryElement.Lightning);
+        public const float IntegratedReferenceSeconds = 1f;
+        public const float LightningDamageMultiplier = 2f;
+        public const float BoltLengthMeters = 120f;
+        public const float BoltWidthMeters = 25f;
+        public const float SpreadRadiusMeters = 50f;
+        public const float BurnDurationSeconds = 5f;
+        public const float ReinfectionLockoutSeconds = 10f;
+        public const float BurnTickIntervalSeconds = 0.5f;
+        public const int BurnTickCount = 10;
+        public const float SpreadScanIntervalSeconds = 0.25f;
+        // Concurrent storage bounds only: no generation or total-spread limit.
+        public const int MaxActiveInfections = 64;
+        public const int MaxPendingImpacts = 16;
+        public const float PendingOutcomeTimeoutSeconds = 5f;
+        public const int BoltVisualPointCount = 12;
+        public const float BoltVisualJitterMeters = 3.5f;
+        public const float BoltCoreWidthFraction = 0.22f;
+        public const float BoltVisualLifetimeSeconds = 0.12f;
+    }
+
     public static class Shatterbolt
     {
         // Identity

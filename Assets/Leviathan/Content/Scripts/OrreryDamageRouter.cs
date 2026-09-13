@@ -13,7 +13,9 @@ using UnityEngine;
 public static class OrreryDamageRouter
 {
     private delegate bool RouteDamageDelegate(
-        IDamageable damageable,
+        // Native IDamageable is internal. Delegate argument contravariance
+        // accepts public Damageable, which implements that interface.
+        Damageable damageable,
         Damageable.DamageType damageType,
         Damageable.DamageData[] damageData,
         float statusEffectChance,
@@ -100,7 +102,8 @@ public static class OrreryDamageRouter
 
             ParameterInfo[] parameters = method.GetParameters();
             if (parameters.Length != 14 ||
-                parameters[0].ParameterType != typeof(IDamageable) ||
+                parameters[0].ParameterType.FullName != "StarVortex.IDamageable" ||
+                !parameters[0].ParameterType.IsAssignableFrom(typeof(Damageable)) ||
                 parameters[1].ParameterType != typeof(Damageable.DamageType) ||
                 parameters[2].ParameterType != typeof(Damageable.DamageData[]))
             {

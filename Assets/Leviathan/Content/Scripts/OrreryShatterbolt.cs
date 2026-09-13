@@ -21,6 +21,9 @@ public static class OrreryShatterbolt
         "Base/Items/SecondaryWeapon/Frozen Orb Launcher";
     private const string FrostNovaPath =
         "Base/Items/Special/Frost Nova Pulse";
+    // Keep completed impact history briefly available through packet loss.
+    // This presentation tail never delays shuffle or permits more damage.
+    private const float PresentationTailSeconds = 1f;
 
     public struct PresentationSnapshot
     {
@@ -29,6 +32,7 @@ public static class OrreryShatterbolt
         public byte CastSequence;
         public byte ImpactCount;
         public Vector2 OrbPosition;
+        public float ExplosionRadiusMeters;
         public Vector2 Impact0;
         public Vector2 Impact1;
         public Vector2 Impact2;
@@ -125,6 +129,7 @@ public static class OrreryShatterbolt
         public float LegElapsedSeconds;
         public int ImpactCount;
         public int ImpactLimit;
+        public float PresentationUntil;
         public readonly Vector2[] ImpactPositions =
             new Vector2[OrrerySpellCompendium.Shatterbolt.MaximumImpacts];
         public readonly GameShip[] DirectHistory =
@@ -278,7 +283,7 @@ public static class OrreryShatterbolt
 
         if (!object.ReferenceEquals(owner, lastTickOwner))
         {
-            if (lastTickOwner != null)
+            if (!object.ReferenceEquals(lastTickOwner, null))
                 Forget(lastTickOwner);
             lastTickOwner = owner;
         }
@@ -299,11 +304,19 @@ public static class OrreryShatterbolt
             return;
         }
 
+        // Cancellation must win before an existing burst can deal another hit.
+        if (state.CastActive && (state.Invocation.Execution == null ||
+            !state.Invocation.Execution.IsValid))
+        {
+            AbortCast(owner, state);
+            return;
+        }
+
         TickExplosions(owner, state, deltaTime);
 
         if (!state.CastActive)
         {
-            if (HasActiveExplosions(state))
+            if (HasActiveExplosions(state) || Time.time < state.PresentationUntil)
             {
                 OrreryNetwork.PublishLocal(owner);
             }
@@ -317,13 +330,6 @@ public static class OrreryShatterbolt
             return;
         }
 
-        if (state.Invocation.Execution == null ||
-            !state.Invocation.Execution.IsValid)
-        {
-            AbortCast(owner, state);
-            return;
-        }
-
         GameShip target = state.CurrentTarget;
         if (!IsValidTarget(owner, target))
         {
@@ -334,7 +340,8 @@ public static class OrreryShatterbolt
                 return;
             }
             state.CurrentTarget = target;
-            state.LegElapsedSeconds = 0f;
+            // Reacquiring does not restart the leg's lifetime. Repeated target
+            // deaths must not keep one cast alive indefinitely.
         }
 
         float dt = Mathf.Max(0f, deltaTime);
@@ -371,7 +378,7 @@ public static class OrreryShatterbolt
 
     public static void Forget(GameShip owner)
     {
-        if (owner == null)
+        if (object.ReferenceEquals(owner, null))
             return;
 
         OwnerState state;
@@ -425,6 +432,8 @@ public static class OrreryShatterbolt
                 1,
                 OrrerySpellCompendium.Shatterbolt.MaximumImpacts));
         snapshot.OrbPosition = state.ProjectilePosition;
+        snapshot.ExplosionRadiusMeters = state.IceProfile.ApplyRangeBonus(
+            OrrerySpellCompendium.Shatterbolt.ExplosionRadiusMeters);
 
         int count = Mathf.Min(snapshot.ImpactCount, state.ImpactPositions.Length);
         for (int i = 0; i < count; i++)
@@ -1117,6 +1126,7 @@ public static class OrreryShatterbolt
         // Shatterbolt's bounded mechanical expansion own gameplay.
         wave.enabled = false;
         circle.enabled = false;
+        OrreryShatterboltWavePresentation.ResetMask(wave);
         wave.transform.localScale = Vector3.zero;
     }
 
@@ -1220,6 +1230,8 @@ public static class OrreryShatterbolt
 
         state.CastActive = false;
         state.CurrentTarget = null;
+        state.PresentationUntil = state.ImpactCount > 0
+            ? Time.time + PresentationTailSeconds : 0f;
         CleanupOrbVisual(state);
 
         if (state.Invocation.Execution != null &&
@@ -1256,7 +1268,8 @@ public static class OrreryShatterbolt
 
     private static void CleanupIdleState(GameShip owner, OwnerState state)
     {
-        if (state.CastActive || HasActiveExplosions(state))
+        if (state.CastActive || HasActiveExplosions(state) ||
+            Time.time < state.PresentationUntil)
             return;
 
         DisposeSources(state);
@@ -1268,6 +1281,7 @@ public static class OrreryShatterbolt
     {
         state.Invocation = default(OrreryCastInvocation);
         state.CastActive = false;
+        state.PresentationUntil = 0f;
         state.CurrentTarget = null;
         state.ProjectilePosition = Vector2.zero;
         state.LegElapsedSeconds = 0f;
@@ -1352,5 +1366,14 @@ public static class OrreryShatterboltWorldDestroyedPatch
     public static void Prefix()
     {
         OrreryShatterbolt.Reset();
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "OnDestroy")]
+public static class OrreryShatterboltOwnerDestroyedPatch
+{
+    public static void Prefix(GameShip __instance)
+    {
+        OrreryShatterbolt.Forget(__instance);
     }
 }
