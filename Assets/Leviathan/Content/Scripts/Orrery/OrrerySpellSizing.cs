@@ -13,28 +13,40 @@ using UnityEngine;
 /// </summary>
 public static class OrrerySpellSizing
 {
+    // Compatibility aliases only. Editable spell knobs live in
+    // OrrerySpellCompendium so there is one human-facing tuning sheet.
     public static class Tuning
     {
         // FF: native ExplosiveProjectile uses this same radius for physics and
         // ExplosiveArea visual scale, so gameplay and explosion presentation stay
-        // coupled by default. Root projectile scale affects native collision too,
-        // so this is intentionally a physical + visual chunky-missile knob.
-        public const float FireballExplosionRadiusMeters = 40f;
-        public const float FireballProjectileScaleMultiplier = 2f;
+        // coupled by default. Root projectile scale affects native collision too.
+        public const float FireballExplosionRadiusMeters =
+            OrrerySpellCompendium.MagmaCannon.ExplosionRadiusMeters;
+        public const float FireballProjectileScaleMultiplier =
+            OrrerySpellCompendium.MagmaCannon.ProjectileVisualScale;
 
-        // II: mechanical cone range/angle remain OrrerySpellRuntime tuning. These
-        // values only make the presentation burst derive from those dimensions.
-        public const float CryoVisualRangeMultiplier = 1f;
-        public const float CryoVisualAngleMultiplier = 1f;
-        public const float CryoVisualProjectileScaleMultiplier = 1f;
+        // II presentation derives from the mechanical cone plus explicit visual
+        // multipliers. The travelling wave has its own compendium presentation knobs.
+        public const float CryoVisualRangeMultiplier =
+            OrrerySpellCompendium.ConeOfCold.BaseVisualRangeMultiplier;
+        public const float CryoVisualAngleMultiplier =
+            OrrerySpellCompendium.ConeOfCold.BaseVisualAngleMultiplier;
+        public const float CryoVisualProjectileScaleMultiplier =
+            OrrerySpellCompendium.ConeOfCold.VisualProjectileScale;
 
-        // LL: defaults intentionally mirror the native Tesla Coil asset but are
-        // expressed as Orrery-authored values. Beam length already derives from
-        // MaxRange natively, so there is no separate visual-length lie.
-        public const float TeslaRangeMeters = 195f;
-        public const int TeslaChainCount = 1;
-        public const float TeslaChainRangeMeters = 97.5f;
-        public const float TeslaChainDamageMultiplier = 0.50f;
+        // LL authoritative geometry / chain behavior.
+        public const float TeslaRangeMeters =
+            OrrerySpellCompendium.TeslaCoil.RangeMeters;
+        public const int TeslaChainCount =
+            OrrerySpellCompendium.TeslaCoil.ChainCount;
+        public const float TeslaChainRangeMeters =
+            OrrerySpellCompendium.TeslaCoil.ChainRangeMeters;
+        public const float TeslaChainDamageMultiplier =
+            OrrerySpellCompendium.TeslaCoil.ChainDamageMultiplier;
+
+        // The older OrreryTeslaBeamWidthPatch already owns the single editable
+        // beam-width knob. Keep this overlapping legacy sizing pass neutral so a
+        // future BeamWidthMultiplier change is applied exactly once.
         public const float TeslaBeamVisualWidthMultiplier = 1f;
     }
 
