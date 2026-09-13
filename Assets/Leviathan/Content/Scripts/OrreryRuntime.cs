@@ -332,6 +332,7 @@ public static class OrreryRuntime
         // lifecycle. Waiting for OrreryController.FixedUpdate leaves a stale
         // activation window after respec/class switch and can strand a live FF
         // projectile or Tesla beam while Core already considers the class gone.
+        OrrerySpellLifetime.ForgetOwner(owner);
         OrrerySpellRuntime.Forget(owner);
         OrrerySectorPresentation.Hide(owner);
 
