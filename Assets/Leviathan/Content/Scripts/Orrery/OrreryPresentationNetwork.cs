@@ -231,8 +231,11 @@ public static class OrreryPresentationNetwork
     /// All six physical records belong to this transport bank. A record has no
     /// spell meaning until an explicit codec writes a self-identifying group.
     /// </summary>
+    private static bool initialized;
+
     public static void EnsureInitialized()
     {
+        if (initialized) return;
         for (int i = 0; i < RecordCount; i++)
         {
             CoreNetwork.RegisterSlot(
@@ -240,6 +243,7 @@ public static class OrreryPresentationNetwork
                 CoreClassId.Orrery,
                 "Orrery presentation record " + i);
         }
+        initialized = true;
     }
 
     /// <summary>
@@ -294,15 +298,6 @@ public static class OrreryPresentationNetwork
             ((uint)reader.Byte() << 8) |
             ((uint)reader.Byte() << 16) |
             ((uint)reader.Byte() << 24);
-    }
-}
-
-[HarmonyPatch(typeof(CoreNetwork), "RegisterDefaultSlots")]
-public static class OrreryPresentationNetworkRegisterSlotsPatch
-{
-    public static void Postfix()
-    {
-        OrreryPresentationNetwork.EnsureInitialized();
     }
 }
 

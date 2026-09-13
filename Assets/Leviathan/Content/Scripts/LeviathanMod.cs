@@ -44,12 +44,17 @@ public class LeviathanMod : IStarVortexMod
         // Upgrade's key lookup before any UI or Pilot code can request them.
         LeviathanSkillSystem.Register();
 
+        // Transport schemas must exist before publishers or lifecycle callbacks.
+        // Registration cannot rely on Harmony hooks: PatchAll runs below.
+        // These calls are idempotent and independent of policy registration.
+        CoreNetwork.RegisterDefaultSlots();
+        OrreryPresentationNetwork.EnsureInitialized();
+
         // Catalogs and slot identities must exist before any lifecycle callback.
         if (CoreSpecializationPolicies.Get(CoreClassId.Leviathan) == null)
         {
             CoreSpecializationPolicies.Register(new LeviathanSpecializationPolicy());
             CoreSpecializationPolicies.Register(new OrrerySpecializationPolicy());
-            CoreNetwork.RegisterDefaultSlots();
             CoreClassRuntime.RegisterLocalClass(CoreClassId.Leviathan,
                 pilot => pilot != null && pilot.GetUpgradeLevel(LeviathanSpecializationCurrency.UpgradeKey) >= 1,
                 new CoreClassLifecycle(

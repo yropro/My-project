@@ -193,14 +193,18 @@ public static class CoreNetwork
             throw new InvalidOperationException("Invalid/duplicate network slot: " + id);
         slots.Add(id, new SlotRegistration { Owner = ownerClass, Purpose = purpose });
     }
+    private static bool defaultSlotsRegistered;
+
     public static void RegisterDefaultSlots()
     {
+        if (defaultSlotsRegistered) return;
         RegisterSlot(SlotStellarConverter, CoreClassId.Leviathan, "Stellar Converter");
         RegisterSlot(SlotStarfire, CoreClassId.Leviathan, "Starfire");
         RegisterSlot(SlotPredator, CoreClassId.Leviathan, "Predator");
         RegisterSlot(SlotConstrictor, CoreClassId.Leviathan, "Constrictor");
         RegisterSlot(SlotBehemoth, CoreClassId.Leviathan, "Behemoth");
         RegisterSlot(SlotOrrery, CoreClassId.Orrery, "Orrery casting");
+        defaultSlotsRegistered = true;
     }
 
     public const byte SlotStellarConverter = 1;
