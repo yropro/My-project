@@ -68,9 +68,9 @@ public static class OrrerySpellCompendium
             .Add(OrreryElement.Fire).Add(OrreryElement.Lightning);
         public const float IntegratedReferenceSeconds = 1f;
         public const float LightningDamageMultiplier = 2f;
-        public const float BoltLengthMeters = 120f;
+        public const float BoltLengthMeters = 220f;
         public const float BoltWidthMeters = 25f;
-        public const float SpreadRadiusMeters = 50f;
+        public const float SpreadRadiusMeters = 42f;
         public const float BurnDurationSeconds = 5f;
         public const float ReinfectionLockoutSeconds = 10f;
         public const float BurnTickIntervalSeconds = 0.5f;

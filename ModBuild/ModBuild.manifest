@@ -1,7 +1,10 @@
 ManifestFileVersion: 0
-CRC: 473380452
+CRC: 737005182
 AssetBundleManifest:
   AssetBundleInfos:
     Info_0:
       Name: leviathan
+      Dependencies: {}
+    Info_1:
+      Name: leviathanplasmavfx.bundle
       Dependencies: {}

@@ -4,12 +4,18 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 {
 	Properties
 	{
-		[HideInInspector] _AlphaCutoff("Alpha Cutoff ", Range(0, 1)) = 0.5
 		[HideInInspector] _EmissionColor("Emission Color", Color) = (1,1,1,1)
+		[HideInInspector] _AlphaCutoff("Alpha Cutoff ", Range(0, 1)) = 0.5
+		[Space(33)][Header(Zap)][Space(13)]_ZapTexture("Zap Texture", 2D) = "white" {}
 		_EmissiveIntensity("Emissive Intensity", Float) = 1
-		_TextureLerp("Texture Lerp", Float) = 0
-		_ErosionSmoothness("Erosion Smoothness", Float) = 1
-		_ParticleTexture("Particle Texture", 2D) = "white" {}
+		_ErosionSmoothness("Erosion Smoothness", Float) = 0.01
+		_TextureMultiply("Texture Multiply", Float) = 0
+		[Space(33)][Header(LUT)][Space(13)]_LUT("LUT", 2D) = "white" {}
+		_LUTAmplitude("LUT Amplitude", Float) = 1
+		_LUTOffset("LUT Offset", Float) = 0
+		_LUTErosion("LUT Erosion", Float) = 0
+		_LUTErosionOffset("LUT Erosion Offset", Float) = 0
+		_LUTErosionSmoothness("LUT Erosion Smoothness", Float) = 0.3
 		[Space(33)][Header(AR)][Space(13)]_Cull("Cull", Float) = 2
 		_Src("Src", Float) = 5
 		_Dst("Dst", Float) = 10
@@ -248,9 +254,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 positionOS : POSITION;
 				float3 normalOS : NORMAL;
-				float4 ase_color : COLOR;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
+				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 			};
 
@@ -267,22 +272,26 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				#ifdef ASE_FOG
 					float fogFactor : TEXCOORD3;
 				#endif
-				float4 ase_color : COLOR;
 				float4 ase_texcoord4 : TEXCOORD4;
-				float4 ase_texcoord5 : TEXCOORD5;
+				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			float4 _ParticleTexture_ST;
+			float4 _ZapTexture_ST;
 			float _Src;
 			float _Dst;
 			float _ZWrite;
 			float _ZTest;
 			float _Cull;
+			float _LUTErosionOffset;
+			float _LUTErosionSmoothness;
 			float _ErosionSmoothness;
-			float _TextureLerp;
+			float _LUTErosion;
+			float _LUTAmplitude;
+			float _LUTOffset;
+			float _TextureMultiply;
 			float _EmissiveIntensity;
 			#ifdef ASE_TESSELLATION
 				float _TessPhongStrength;
@@ -294,7 +303,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			#endif
 			CBUFFER_END
 
-			sampler2D _ParticleTexture;
+			sampler2D _LUT;
+			sampler2D _ZapTexture;
 
 
 			
@@ -305,12 +315,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
+				o.ase_texcoord4 = v.ase_texcoord;
 				o.ase_color = v.ase_color;
-				o.ase_texcoord4 = v.ase_texcoord1;
-				o.ase_texcoord5.xy = v.ase_texcoord.xy;
-				
-				//setting value to unused interpolator channels and avoid initialization warnings
-				o.ase_texcoord5.zw = 0;
 
 				#ifdef ASE_ABSOLUTE_VERTEX_POS
 					float3 defaultVertexValue = v.positionOS.xyz;
@@ -352,9 +358,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 vertex : INTERNALTESSPOS;
 				float3 normalOS : NORMAL;
-				float4 ase_color : COLOR;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
+				float4 ase_color : COLOR;
 
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 			};
@@ -372,9 +377,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				o.vertex = v.positionOS;
 				o.normalOS = v.normalOS;
-				o.ase_color = v.ase_color;
-				o.ase_texcoord1 = v.ase_texcoord1;
 				o.ase_texcoord = v.ase_texcoord;
+				o.ase_color = v.ase_color;
 				return o;
 			}
 
@@ -413,9 +417,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				VertexInput o = (VertexInput) 0;
 				o.positionOS = patch[0].vertex * bary.x + patch[1].vertex * bary.y + patch[2].vertex * bary.z;
 				o.normalOS = patch[0].normalOS * bary.x + patch[1].normalOS * bary.y + patch[2].normalOS * bary.z;
-				o.ase_color = patch[0].ase_color * bary.x + patch[1].ase_color * bary.y + patch[2].ase_color * bary.z;
-				o.ase_texcoord1 = patch[0].ase_texcoord1 * bary.x + patch[1].ase_texcoord1 * bary.y + patch[2].ase_texcoord1 * bary.z;
 				o.ase_texcoord = patch[0].ase_texcoord * bary.x + patch[1].ase_texcoord * bary.y + patch[2].ase_texcoord * bary.z;
+				o.ase_color = patch[0].ase_color * bary.x + patch[1].ase_color * bary.y + patch[2].ase_color * bary.z;
 				#if defined(ASE_PHONG_TESSELLATION)
 				float3 pp[3];
 				for (int i = 0; i < 3; ++i)
@@ -459,18 +462,22 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 					#endif
 				#endif
 
-				float3 temp_output_36_0 = (IN.ase_color).rgb;
-				float3 temp_cast_0 = (IN.ase_texcoord4.z).xxx;
-				float3 temp_cast_1 = (( IN.ase_texcoord4.z + _ErosionSmoothness )).xxx;
-				float2 uv_ParticleTexture = IN.ase_texcoord5.xy * _ParticleTexture_ST.xy + _ParticleTexture_ST.zw;
-				float3 smoothstepResult27 = smoothstep( temp_cast_0 , temp_cast_1 , tex2D( _ParticleTexture, uv_ParticleTexture ).rgb);
-				float3 temp_output_33_0 = saturate( smoothstepResult27 );
-				float3 lerpResult38 = lerp( temp_output_36_0 , ( temp_output_33_0 * temp_output_36_0 ) , _TextureLerp);
+				float temp_output_46_0 = ( IN.ase_texcoord4.z + _LUTErosionOffset );
+				float2 uv_ZapTexture = IN.ase_texcoord4.xy * _ZapTexture_ST.xy + _ZapTexture_ST.zw;
+				float4 tex2DNode10 = tex2D( _ZapTexture, uv_ZapTexture );
+				float smoothstepResult45 = smoothstep( temp_output_46_0 , ( temp_output_46_0 + _LUTErosionSmoothness ) , tex2DNode10.g);
+				float smoothstepResult27 = smoothstep( IN.ase_texcoord4.z , ( IN.ase_texcoord4.z + _ErosionSmoothness ) , tex2DNode10.g);
+				float temp_output_33_0 = saturate( smoothstepResult27 );
+				float lerpResult41 = lerp( smoothstepResult45 , temp_output_33_0 , _LUTErosion);
+				float2 temp_cast_0 = (( ( lerpResult41 * _LUTAmplitude ) + _LUTOffset )).xx;
+				float3 temp_output_35_0 = ( tex2D( _LUT, temp_cast_0 ).rgb * (IN.ase_color).rgb );
+				float2 temp_cast_1 = (( ( lerpResult41 * _LUTAmplitude ) + _LUTOffset )).xx;
+				float3 lerpResult39 = lerp( temp_output_35_0 , ( temp_output_35_0 * temp_output_33_0 ) , _TextureMultiply);
 				
 				float3 BakedAlbedo = 0;
 				float3 BakedEmission = 0;
-				float3 Color = ( lerpResult38 * _EmissiveIntensity );
-				float Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) ).x;
+				float3 Color = ( lerpResult39 * _EmissiveIntensity );
+				float Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) );
 				float AlphaClipThreshold = 0.5;
 				float AlphaClipThresholdShadow = 0.5;
 
@@ -549,7 +556,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 positionOS : POSITION;
 				float3 normalOS : NORMAL;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -566,21 +572,25 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				float4 shadowCoord : TEXCOORD2;
 				#endif
 				float4 ase_texcoord3 : TEXCOORD3;
-				float4 ase_texcoord4 : TEXCOORD4;
 				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			float4 _ParticleTexture_ST;
+			float4 _ZapTexture_ST;
 			float _Src;
 			float _Dst;
 			float _ZWrite;
 			float _ZTest;
 			float _Cull;
+			float _LUTErosionOffset;
+			float _LUTErosionSmoothness;
 			float _ErosionSmoothness;
-			float _TextureLerp;
+			float _LUTErosion;
+			float _LUTAmplitude;
+			float _LUTOffset;
+			float _TextureMultiply;
 			float _EmissiveIntensity;
 			#ifdef ASE_TESSELLATION
 				float _TessPhongStrength;
@@ -592,7 +602,7 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			#endif
 			CBUFFER_END
 
-			sampler2D _ParticleTexture;
+			sampler2D _ZapTexture;
 
 
 			
@@ -603,12 +613,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-				o.ase_texcoord3 = v.ase_texcoord1;
-				o.ase_texcoord4.xy = v.ase_texcoord.xy;
+				o.ase_texcoord3 = v.ase_texcoord;
 				o.ase_color = v.ase_color;
-				
-				//setting value to unused interpolator channels and avoid initialization warnings
-				o.ase_texcoord4.zw = 0;
 
 				#ifdef ASE_ABSOLUTE_VERTEX_POS
 					float3 defaultVertexValue = v.positionOS.xyz;
@@ -646,7 +652,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 vertex : INTERNALTESSPOS;
 				float3 normalOS : NORMAL;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_color : COLOR;
 
@@ -666,7 +671,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				o.vertex = v.positionOS;
 				o.normalOS = v.normalOS;
-				o.ase_texcoord1 = v.ase_texcoord1;
 				o.ase_texcoord = v.ase_texcoord;
 				o.ase_color = v.ase_color;
 				return o;
@@ -707,7 +711,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				VertexInput o = (VertexInput) 0;
 				o.positionOS = patch[0].vertex * bary.x + patch[1].vertex * bary.y + patch[2].vertex * bary.z;
 				o.normalOS = patch[0].normalOS * bary.x + patch[1].normalOS * bary.y + patch[2].normalOS * bary.z;
-				o.ase_texcoord1 = patch[0].ase_texcoord1 * bary.x + patch[1].ase_texcoord1 * bary.y + patch[2].ase_texcoord1 * bary.z;
 				o.ase_texcoord = patch[0].ase_texcoord * bary.x + patch[1].ase_texcoord * bary.y + patch[2].ase_texcoord * bary.z;
 				o.ase_color = patch[0].ase_color * bary.x + patch[1].ase_color * bary.y + patch[2].ase_color * bary.z;
 				#if defined(ASE_PHONG_TESSELLATION)
@@ -749,14 +752,13 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 					#endif
 				#endif
 
-				float3 temp_cast_0 = (IN.ase_texcoord3.z).xxx;
-				float3 temp_cast_1 = (( IN.ase_texcoord3.z + _ErosionSmoothness )).xxx;
-				float2 uv_ParticleTexture = IN.ase_texcoord4.xy * _ParticleTexture_ST.xy + _ParticleTexture_ST.zw;
-				float3 smoothstepResult27 = smoothstep( temp_cast_0 , temp_cast_1 , tex2D( _ParticleTexture, uv_ParticleTexture ).rgb);
-				float3 temp_output_33_0 = saturate( smoothstepResult27 );
+				float2 uv_ZapTexture = IN.ase_texcoord3.xy * _ZapTexture_ST.xy + _ZapTexture_ST.zw;
+				float4 tex2DNode10 = tex2D( _ZapTexture, uv_ZapTexture );
+				float smoothstepResult27 = smoothstep( IN.ase_texcoord3.z , ( IN.ase_texcoord3.z + _ErosionSmoothness ) , tex2DNode10.g);
+				float temp_output_33_0 = saturate( smoothstepResult27 );
 				
 
-				float Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) ).x;
+				float Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) );
 				float AlphaClipThreshold = 0.5;
 
 				#ifdef _ALPHATEST_ON
@@ -833,7 +835,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 positionOS : POSITION;
 				float3 normalOS : NORMAL;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -843,21 +844,25 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 positionCS : SV_POSITION;
 				float4 ase_texcoord : TEXCOORD0;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			float4 _ParticleTexture_ST;
+			float4 _ZapTexture_ST;
 			float _Src;
 			float _Dst;
 			float _ZWrite;
 			float _ZTest;
 			float _Cull;
+			float _LUTErosionOffset;
+			float _LUTErosionSmoothness;
 			float _ErosionSmoothness;
-			float _TextureLerp;
+			float _LUTErosion;
+			float _LUTAmplitude;
+			float _LUTOffset;
+			float _TextureMultiply;
 			float _EmissiveIntensity;
 			#ifdef ASE_TESSELLATION
 				float _TessPhongStrength;
@@ -869,7 +874,7 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			#endif
 			CBUFFER_END
 
-			sampler2D _ParticleTexture;
+			sampler2D _ZapTexture;
 
 
 			
@@ -891,12 +896,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-				o.ase_texcoord = v.ase_texcoord1;
-				o.ase_texcoord1.xy = v.ase_texcoord.xy;
+				o.ase_texcoord = v.ase_texcoord;
 				o.ase_color = v.ase_color;
-				
-				//setting value to unused interpolator channels and avoid initialization warnings
-				o.ase_texcoord1.zw = 0;
 
 				#ifdef ASE_ABSOLUTE_VERTEX_POS
 					float3 defaultVertexValue = v.positionOS.xyz;
@@ -926,7 +927,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 vertex : INTERNALTESSPOS;
 				float3 normalOS : NORMAL;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_color : COLOR;
 
@@ -946,7 +946,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				o.vertex = v.positionOS;
 				o.normalOS = v.normalOS;
-				o.ase_texcoord1 = v.ase_texcoord1;
 				o.ase_texcoord = v.ase_texcoord;
 				o.ase_color = v.ase_color;
 				return o;
@@ -987,7 +986,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				VertexInput o = (VertexInput) 0;
 				o.positionOS = patch[0].vertex * bary.x + patch[1].vertex * bary.y + patch[2].vertex * bary.z;
 				o.normalOS = patch[0].normalOS * bary.x + patch[1].normalOS * bary.y + patch[2].normalOS * bary.z;
-				o.ase_texcoord1 = patch[0].ase_texcoord1 * bary.x + patch[1].ase_texcoord1 * bary.y + patch[2].ase_texcoord1 * bary.z;
 				o.ase_texcoord = patch[0].ase_texcoord * bary.x + patch[1].ase_texcoord * bary.y + patch[2].ase_texcoord * bary.z;
 				o.ase_color = patch[0].ase_color * bary.x + patch[1].ase_color * bary.y + patch[2].ase_color * bary.z;
 				#if defined(ASE_PHONG_TESSELLATION)
@@ -1011,14 +1009,13 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				SurfaceDescription surfaceDescription = (SurfaceDescription)0;
 
-				float3 temp_cast_0 = (IN.ase_texcoord.z).xxx;
-				float3 temp_cast_1 = (( IN.ase_texcoord.z + _ErosionSmoothness )).xxx;
-				float2 uv_ParticleTexture = IN.ase_texcoord1.xy * _ParticleTexture_ST.xy + _ParticleTexture_ST.zw;
-				float3 smoothstepResult27 = smoothstep( temp_cast_0 , temp_cast_1 , tex2D( _ParticleTexture, uv_ParticleTexture ).rgb);
-				float3 temp_output_33_0 = saturate( smoothstepResult27 );
+				float2 uv_ZapTexture = IN.ase_texcoord.xy * _ZapTexture_ST.xy + _ZapTexture_ST.zw;
+				float4 tex2DNode10 = tex2D( _ZapTexture, uv_ZapTexture );
+				float smoothstepResult27 = smoothstep( IN.ase_texcoord.z , ( IN.ase_texcoord.z + _ErosionSmoothness ) , tex2DNode10.g);
+				float temp_output_33_0 = saturate( smoothstepResult27 );
 				
 
-				surfaceDescription.Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) ).x;
+				surfaceDescription.Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) );
 				surfaceDescription.AlphaClipThreshold = 0.5;
 
 				#if _ALPHATEST_ON
@@ -1101,7 +1098,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 positionOS : POSITION;
 				float3 normalOS : NORMAL;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -1111,21 +1107,25 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 positionCS : SV_POSITION;
 				float4 ase_texcoord : TEXCOORD0;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			float4 _ParticleTexture_ST;
+			float4 _ZapTexture_ST;
 			float _Src;
 			float _Dst;
 			float _ZWrite;
 			float _ZTest;
 			float _Cull;
+			float _LUTErosionOffset;
+			float _LUTErosionSmoothness;
 			float _ErosionSmoothness;
-			float _TextureLerp;
+			float _LUTErosion;
+			float _LUTAmplitude;
+			float _LUTOffset;
+			float _TextureMultiply;
 			float _EmissiveIntensity;
 			#ifdef ASE_TESSELLATION
 				float _TessPhongStrength;
@@ -1137,7 +1137,7 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			#endif
 			CBUFFER_END
 
-			sampler2D _ParticleTexture;
+			sampler2D _ZapTexture;
 
 
 			
@@ -1158,12 +1158,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-				o.ase_texcoord = v.ase_texcoord1;
-				o.ase_texcoord1.xy = v.ase_texcoord.xy;
+				o.ase_texcoord = v.ase_texcoord;
 				o.ase_color = v.ase_color;
-				
-				//setting value to unused interpolator channels and avoid initialization warnings
-				o.ase_texcoord1.zw = 0;
 
 				#ifdef ASE_ABSOLUTE_VERTEX_POS
 					float3 defaultVertexValue = v.positionOS.xyz;
@@ -1191,7 +1187,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 vertex : INTERNALTESSPOS;
 				float3 normalOS : NORMAL;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_color : COLOR;
 
@@ -1211,7 +1206,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				o.vertex = v.positionOS;
 				o.normalOS = v.normalOS;
-				o.ase_texcoord1 = v.ase_texcoord1;
 				o.ase_texcoord = v.ase_texcoord;
 				o.ase_color = v.ase_color;
 				return o;
@@ -1252,7 +1246,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				VertexInput o = (VertexInput) 0;
 				o.positionOS = patch[0].vertex * bary.x + patch[1].vertex * bary.y + patch[2].vertex * bary.z;
 				o.normalOS = patch[0].normalOS * bary.x + patch[1].normalOS * bary.y + patch[2].normalOS * bary.z;
-				o.ase_texcoord1 = patch[0].ase_texcoord1 * bary.x + patch[1].ase_texcoord1 * bary.y + patch[2].ase_texcoord1 * bary.z;
 				o.ase_texcoord = patch[0].ase_texcoord * bary.x + patch[1].ase_texcoord * bary.y + patch[2].ase_texcoord * bary.z;
 				o.ase_color = patch[0].ase_color * bary.x + patch[1].ase_color * bary.y + patch[2].ase_color * bary.z;
 				#if defined(ASE_PHONG_TESSELLATION)
@@ -1276,14 +1269,13 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				SurfaceDescription surfaceDescription = (SurfaceDescription)0;
 
-				float3 temp_cast_0 = (IN.ase_texcoord.z).xxx;
-				float3 temp_cast_1 = (( IN.ase_texcoord.z + _ErosionSmoothness )).xxx;
-				float2 uv_ParticleTexture = IN.ase_texcoord1.xy * _ParticleTexture_ST.xy + _ParticleTexture_ST.zw;
-				float3 smoothstepResult27 = smoothstep( temp_cast_0 , temp_cast_1 , tex2D( _ParticleTexture, uv_ParticleTexture ).rgb);
-				float3 temp_output_33_0 = saturate( smoothstepResult27 );
+				float2 uv_ZapTexture = IN.ase_texcoord.xy * _ZapTexture_ST.xy + _ZapTexture_ST.zw;
+				float4 tex2DNode10 = tex2D( _ZapTexture, uv_ZapTexture );
+				float smoothstepResult27 = smoothstep( IN.ase_texcoord.z , ( IN.ase_texcoord.z + _ErosionSmoothness ) , tex2DNode10.g);
+				float temp_output_33_0 = saturate( smoothstepResult27 );
 				
 
-				surfaceDescription.Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) ).x;
+				surfaceDescription.Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) );
 				surfaceDescription.AlphaClipThreshold = 0.5;
 
 				#if _ALPHATEST_ON
@@ -1377,7 +1369,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 positionOS : POSITION;
 				float3 normalOS : NORMAL;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -1389,21 +1380,25 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				float4 clipPosV : TEXCOORD0;
 				float3 normalWS : TEXCOORD1;
 				float4 ase_texcoord2 : TEXCOORD2;
-				float4 ase_texcoord3 : TEXCOORD3;
 				float4 ase_color : COLOR;
 				UNITY_VERTEX_INPUT_INSTANCE_ID
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
 
 			CBUFFER_START(UnityPerMaterial)
-			float4 _ParticleTexture_ST;
+			float4 _ZapTexture_ST;
 			float _Src;
 			float _Dst;
 			float _ZWrite;
 			float _ZTest;
 			float _Cull;
+			float _LUTErosionOffset;
+			float _LUTErosionSmoothness;
 			float _ErosionSmoothness;
-			float _TextureLerp;
+			float _LUTErosion;
+			float _LUTAmplitude;
+			float _LUTOffset;
+			float _TextureMultiply;
 			float _EmissiveIntensity;
 			#ifdef ASE_TESSELLATION
 				float _TessPhongStrength;
@@ -1415,7 +1410,7 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			#endif
 			CBUFFER_END
 
-			sampler2D _ParticleTexture;
+			sampler2D _ZapTexture;
 
 
 			
@@ -1434,12 +1429,8 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-				o.ase_texcoord2 = v.ase_texcoord1;
-				o.ase_texcoord3.xy = v.ase_texcoord.xy;
+				o.ase_texcoord2 = v.ase_texcoord;
 				o.ase_color = v.ase_color;
-				
-				//setting value to unused interpolator channels and avoid initialization warnings
-				o.ase_texcoord3.zw = 0;
 
 				#ifdef ASE_ABSOLUTE_VERTEX_POS
 					float3 defaultVertexValue = v.positionOS.xyz;
@@ -1470,7 +1461,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 			{
 				float4 vertex : INTERNALTESSPOS;
 				float3 normalOS : NORMAL;
-				float4 ase_texcoord1 : TEXCOORD1;
 				float4 ase_texcoord : TEXCOORD0;
 				float4 ase_color : COLOR;
 
@@ -1490,7 +1480,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				UNITY_TRANSFER_INSTANCE_ID(v, o);
 				o.vertex = v.positionOS;
 				o.normalOS = v.normalOS;
-				o.ase_texcoord1 = v.ase_texcoord1;
 				o.ase_texcoord = v.ase_texcoord;
 				o.ase_color = v.ase_color;
 				return o;
@@ -1531,7 +1520,6 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				VertexInput o = (VertexInput) 0;
 				o.positionOS = patch[0].vertex * bary.x + patch[1].vertex * bary.y + patch[2].vertex * bary.z;
 				o.normalOS = patch[0].normalOS * bary.x + patch[1].normalOS * bary.y + patch[2].normalOS * bary.z;
-				o.ase_texcoord1 = patch[0].ase_texcoord1 * bary.x + patch[1].ase_texcoord1 * bary.y + patch[2].ase_texcoord1 * bary.z;
 				o.ase_texcoord = patch[0].ase_texcoord * bary.x + patch[1].ase_texcoord * bary.y + patch[2].ase_texcoord * bary.z;
 				o.ase_color = patch[0].ase_color * bary.x + patch[1].ase_color * bary.y + patch[2].ase_color * bary.z;
 				#if defined(ASE_PHONG_TESSELLATION)
@@ -1561,14 +1549,13 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 				float4 ClipPos = IN.clipPosV;
 				float4 ScreenPos = ComputeScreenPos( IN.clipPosV );
 
-				float3 temp_cast_0 = (IN.ase_texcoord2.z).xxx;
-				float3 temp_cast_1 = (( IN.ase_texcoord2.z + _ErosionSmoothness )).xxx;
-				float2 uv_ParticleTexture = IN.ase_texcoord3.xy * _ParticleTexture_ST.xy + _ParticleTexture_ST.zw;
-				float3 smoothstepResult27 = smoothstep( temp_cast_0 , temp_cast_1 , tex2D( _ParticleTexture, uv_ParticleTexture ).rgb);
-				float3 temp_output_33_0 = saturate( smoothstepResult27 );
+				float2 uv_ZapTexture = IN.ase_texcoord2.xy * _ZapTexture_ST.xy + _ZapTexture_ST.zw;
+				float4 tex2DNode10 = tex2D( _ZapTexture, uv_ZapTexture );
+				float smoothstepResult27 = smoothstep( IN.ase_texcoord2.z , ( IN.ase_texcoord2.z + _ErosionSmoothness ) , tex2DNode10.g);
+				float temp_output_33_0 = saturate( smoothstepResult27 );
 				
 
-				float Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) ).x;
+				float Alpha = saturate( ( temp_output_33_0 * IN.ase_color.a ) );
 				float AlphaClipThreshold = 0.5;
 
 				#if _ALPHATEST_ON
@@ -1609,28 +1596,42 @@ Shader "Leviathan/Plasma Bolt Zap URP2D"
 }
 /*ASEBEGIN
 Version=19701
-Node;AmplifyShaderEditor.TexCoordVertexDataNode;26;-1920,768;Inherit;False;1;4;0;5;FLOAT4;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4
-Node;AmplifyShaderEditor.RangedFloatNode;30;-1280,1024;Inherit;False;Property;_ErosionSmoothness;Erosion Smoothness;2;0;Create;True;0;0;0;False;0;False;1;1;0;0;0;1;FLOAT;0
-Node;AmplifyShaderEditor.SimpleAddOpNode;28;-1280,896;Inherit;False;2;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
-Node;AmplifyShaderEditor.SamplerNode;40;-1920,384;Inherit;True;Property;_ParticleTexture;Particle Texture;3;0;Create;True;0;0;0;False;0;False;-1;f8344e393d5fedf40a53ee3a202d5f0c;f8344e393d5fedf40a53ee3a202d5f0c;True;0;False;white;Auto;False;Object;-1;Auto;Texture2D;8;0;SAMPLER2D;;False;1;FLOAT2;0,0;False;2;FLOAT;0;False;3;FLOAT2;0,0;False;4;FLOAT2;0,0;False;5;FLOAT;1;False;6;FLOAT;0;False;7;SAMPLERSTATE;;False;6;COLOR;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4;FLOAT3;5
-Node;AmplifyShaderEditor.SmoothstepOpNode;27;-1280,768;Inherit;False;3;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;2;FLOAT3;1,0,0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.VertexColorNode;25;-1920,0;Inherit;False;0;5;COLOR;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4
-Node;AmplifyShaderEditor.SaturateNode;33;-1024,768;Inherit;True;1;0;FLOAT3;0,0,0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.TexCoordVertexDataNode;26;-1920,768;Inherit;False;0;4;0;5;FLOAT4;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4
+Node;AmplifyShaderEditor.RangedFloatNode;30;-1408,1024;Inherit;False;Property;_ErosionSmoothness;Erosion Smoothness;2;0;Create;True;0;0;0;False;0;False;0.01;0.01;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleAddOpNode;28;-1408,896;Inherit;False;2;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SamplerNode;10;-1920,384;Inherit;True;Property;_ZapTexture;Zap Texture;0;0;Create;True;0;0;0;False;3;Space(33);Header(Zap);Space(13);False;-1;d3fe6c8361bf4bf49bf597008abb96c8;d3fe6c8361bf4bf49bf597008abb96c8;True;0;False;white;Auto;False;Object;-1;Auto;Texture2D;8;0;SAMPLER2D;;False;1;FLOAT2;0,0;False;2;FLOAT;0;False;3;FLOAT2;0,0;False;4;FLOAT2;0,0;False;5;FLOAT;1;False;6;FLOAT;0;False;7;SAMPLERSTATE;;False;6;COLOR;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4;FLOAT3;5
+Node;AmplifyShaderEditor.SmoothstepOpNode;27;-1408,768;Inherit;False;3;0;FLOAT;0;False;1;FLOAT;0;False;2;FLOAT;1;False;1;FLOAT;0
+Node;AmplifyShaderEditor.VertexColorNode;25;-1920,-512;Inherit;False;0;5;COLOR;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4
+Node;AmplifyShaderEditor.SaturateNode;33;-1152,768;Inherit;False;1;0;FLOAT;0;False;1;FLOAT;0
 Node;AmplifyShaderEditor.CommentaryNode;24;974,-50;Inherit;False;1252;162.95;Lush was here! <3;5;20;21;22;23;19;Lush was here! <3;0,0,0,1;0;0
-Node;AmplifyShaderEditor.SimpleMultiplyOpNode;34;-768,768;Inherit;False;2;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.RangedFloatNode;20;1280,0;Inherit;False;Property;_Src;Src;5;0;Create;True;0;0;0;True;0;False;5;5;0;0;0;1;FLOAT;0
-Node;AmplifyShaderEditor.RangedFloatNode;21;1536,0;Inherit;False;Property;_Dst;Dst;6;0;Create;True;0;0;0;True;0;False;10;10;0;0;0;1;FLOAT;0
-Node;AmplifyShaderEditor.RangedFloatNode;22;1792,0;Inherit;False;Property;_ZWrite;ZWrite;7;0;Create;True;0;0;0;True;0;False;0;0;0;0;0;1;FLOAT;0
-Node;AmplifyShaderEditor.RangedFloatNode;23;2048,0;Inherit;False;Property;_ZTest;ZTest;8;0;Create;True;0;0;0;True;0;False;2;2;0;0;0;1;FLOAT;0
-Node;AmplifyShaderEditor.RangedFloatNode;19;1024,0;Inherit;False;Property;_Cull;Cull;4;0;Create;True;0;0;0;True;3;Space(33);Header(AR);Space(13);False;2;2;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleMultiplyOpNode;34;-768,768;Inherit;False;2;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleMultiplyOpNode;12;-2432,0;Inherit;False;2;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleAddOpNode;13;-2176,0;Inherit;False;2;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;15;-2432,128;Inherit;False;Property;_LUTAmplitude;LUT Amplitude;5;0;Create;True;0;0;0;False;0;False;1;0;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;16;-2176,128;Inherit;False;Property;_LUTOffset;LUT Offset;6;0;Create;True;0;0;0;False;0;False;0;0;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;20;1280,0;Inherit;False;Property;_Src;Src;11;0;Create;True;0;0;0;True;0;False;5;5;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;21;1536,0;Inherit;False;Property;_Dst;Dst;12;0;Create;True;0;0;0;True;0;False;10;10;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;22;1792,0;Inherit;False;Property;_ZWrite;ZWrite;13;0;Create;True;0;0;0;True;0;False;0;0;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;23;2048,0;Inherit;False;Property;_ZTest;ZTest;14;0;Create;True;0;0;0;True;0;False;2;2;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;19;1024,0;Inherit;False;Property;_Cull;Cull;10;0;Create;True;0;0;0;True;3;Space(33);Header(AR);Space(13);False;2;2;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.ComponentMaskNode;36;-1664,-512;Inherit;False;True;True;True;False;1;0;COLOR;0,0,0,0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.SaturateNode;37;-512,768;Inherit;False;1;0;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleMultiplyOpNode;35;-1152,0;Inherit;False;2;2;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.SimpleMultiplyOpNode;38;-912,-304;Inherit;False;2;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0
 Node;AmplifyShaderEditor.SimpleMultiplyOpNode;17;-512,0;Inherit;False;2;2;0;FLOAT3;0,0,0;False;1;FLOAT;0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.RangedFloatNode;18;-512,128;Inherit;False;Property;_EmissiveIntensity;Emissive Intensity;0;0;Create;True;0;0;0;False;0;False;1;1;0;0;0;1;FLOAT;0
-Node;AmplifyShaderEditor.ComponentMaskNode;36;-1664,0;Inherit;False;True;True;True;False;1;0;COLOR;0,0,0,0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.SimpleMultiplyOpNode;35;-1280,0;Inherit;False;2;2;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.LerpOp;38;-896,-128;Inherit;False;3;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;2;FLOAT;0;False;1;FLOAT3;0
-Node;AmplifyShaderEditor.RangedFloatNode;39;-896,0;Inherit;False;Property;_TextureLerp;Texture Lerp;1;0;Create;True;0;0;0;False;0;False;0;0;0;0;0;1;FLOAT;0
-Node;AmplifyShaderEditor.SaturateNode;37;-512,768;Inherit;True;1;0;FLOAT3;0,0,0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.RangedFloatNode;18;-512,128;Inherit;False;Property;_EmissiveIntensity;Emissive Intensity;1;0;Create;True;0;0;0;False;0;False;1;1;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.LerpOp;39;-896,0;Inherit;False;3;0;FLOAT3;0,0,0;False;1;FLOAT3;0,0,0;False;2;FLOAT;0;False;1;FLOAT3;0
+Node;AmplifyShaderEditor.RangedFloatNode;40;-896,128;Inherit;False;Property;_TextureMultiply;Texture Multiply;3;0;Create;True;0;0;0;False;0;False;0;0;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.LerpOp;41;-1408,384;Inherit;False;3;0;FLOAT;0;False;1;FLOAT;0;False;2;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleAddOpNode;44;-1408,1408;Inherit;False;2;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SmoothstepOpNode;45;-1408,1280;Inherit;False;3;0;FLOAT;0;False;1;FLOAT;0;False;2;FLOAT;1;False;1;FLOAT;0
+Node;AmplifyShaderEditor.SimpleAddOpNode;46;-1664,1280;Inherit;False;2;2;0;FLOAT;0;False;1;FLOAT;0;False;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;42;-1408,512;Inherit;False;Property;_LUTErosion;LUT Erosion;7;0;Create;True;0;0;0;False;0;False;0;0;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.RangedFloatNode;48;-1664,1408;Inherit;False;Property;_LUTErosionOffset;LUT Erosion Offset;8;0;Create;True;0;0;0;False;0;False;0;0;0;0;0;1;FLOAT;0
+Node;AmplifyShaderEditor.SamplerNode;11;-1920,0;Inherit;True;Property;_LUT;LUT;4;0;Create;True;0;0;0;False;3;Space(33);Header(LUT);Space(13);False;-1;f4179423434cbd74e85a336802d71fb6;f4179423434cbd74e85a336802d71fb6;True;0;False;white;Auto;False;Object;-1;Auto;Texture2D;8;0;SAMPLER2D;;False;1;FLOAT2;0,0;False;2;FLOAT;0;False;3;FLOAT2;0,0;False;4;FLOAT2;0,0;False;5;FLOAT;1;False;6;FLOAT;0;False;7;SAMPLERSTATE;;False;6;COLOR;0;FLOAT;1;FLOAT;2;FLOAT;3;FLOAT;4;FLOAT3;5
+Node;AmplifyShaderEditor.RangedFloatNode;43;-1408,1536;Inherit;False;Property;_LUTErosionSmoothness;LUT Erosion Smoothness;9;0;Create;True;0;0;0;False;0;False;0.3;0.3;0;0;0;1;FLOAT;0
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;0;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;1;New Amplify Shader;2992e84f91cbeb14eab234972e07ea9d;True;ExtraPrePass;0;0;ExtraPrePass;5;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;0;False;;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;False;True;1;1;False;;0;False;;0;1;False;;0;False;;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;True;1;False;;True;3;False;;True;True;0;False;;0;False;;True;0;False;False;0;;0;0;Standard;0;False;0
+Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;1;0,0;Float;False;True;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;13;/_Vefects_/SH_Vefects_Zap_URP;2992e84f91cbeb14eab234972e07ea9d;True;Forward;0;1;Forward;8;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;True;True;0;True;_Cull;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Transparent=RenderType;Queue=Transparent=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;True;True;2;1;True;_Src;0;True;_Dst;1;1;False;;10;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;True;2;False;_ZWrite;True;3;True;_ZTest;True;True;0;False;;0;False;;True;1;LightMode=UniversalForwardOnly;False;False;0;;0;0;Standard;23;Surface;1;638683990565563346;  Blend;0;0;Two Sided;1;0;Forward Only;0;0;Alpha Clipping;0;638684218081414192;  Use Shadow Threshold;0;0;Cast Shadows;0;638683990592319291;Receive Shadows;0;638683990589091868;GPU Instancing;1;0;LOD CrossFade;1;0;Built-in Fog;1;0;Meta Pass;0;0;Extra Pre Pass;0;0;Tessellation;0;0;  Phong;0;0;  Strength;0.5,False,;0;  Type;0;0;  Tess;16,False,;0;  Min;10,False,;0;  Max;25,False,;0;  Edge Length;16,False,;0;  Max Displacement;25,False,;0;Vertex Position,InvertActionOnDeselection;1;0;0;10;False;True;False;True;False;False;True;True;True;False;False;;False;0
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;2;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;1;New Amplify Shader;2992e84f91cbeb14eab234972e07ea9d;True;ShadowCaster;0;2;ShadowCaster;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;0;False;;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;False;False;True;False;False;False;False;0;False;;False;False;False;False;False;False;False;False;False;True;1;False;;True;3;False;;False;True;1;LightMode=ShadowCaster;False;False;0;;0;0;Standard;0;False;0
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;3;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;1;New Amplify Shader;2992e84f91cbeb14eab234972e07ea9d;True;DepthOnly;0;3;DepthOnly;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;0;False;;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;False;False;True;False;False;False;False;0;False;;False;False;False;False;False;False;False;False;False;True;1;False;;False;False;True;1;LightMode=DepthOnly;False;False;0;;0;0;Standard;0;False;0
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;4;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;1;New Amplify Shader;2992e84f91cbeb14eab234972e07ea9d;True;Meta;0;4;Meta;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;0;False;;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;2;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;1;LightMode=Meta;False;False;0;;0;0;Standard;0;False;0
@@ -1639,25 +1640,41 @@ Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;6;0,0;Float;False;False;-1;
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;7;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;1;New Amplify Shader;2992e84f91cbeb14eab234972e07ea9d;True;ScenePickingPass;0;7;ScenePickingPass;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;0;False;;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;1;LightMode=Picking;False;False;0;;0;0;Standard;0;False;0
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;8;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;1;New Amplify Shader;2992e84f91cbeb14eab234972e07ea9d;True;DepthNormals;0;8;DepthNormals;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;0;False;;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;1;False;;True;3;False;;False;True;1;LightMode=DepthNormalsOnly;False;False;0;;0;0;Standard;0;False;0
 Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;9;0,0;Float;False;False;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;1;New Amplify Shader;2992e84f91cbeb14eab234972e07ea9d;True;DepthNormalsOnly;0;9;DepthNormalsOnly;0;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;False;True;0;False;;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Opaque=RenderType;Queue=Geometry=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;1;False;;True;3;False;;False;True;1;LightMode=DepthNormalsOnly;False;True;9;d3d11;metal;vulkan;xboxone;xboxseries;playstation;ps4;ps5;switch;0;;0;0;Standard;0;False;0
-Node;AmplifyShaderEditor.TemplateMultiPassMasterNode;1;0,0;Float;False;True;-1;2;UnityEditor.ShaderGraphUnlitGUI;0;13;/_Vefects_/SH_Vefects_Extra_Particles_URP;2992e84f91cbeb14eab234972e07ea9d;True;Forward;0;1;Forward;8;False;False;False;False;False;False;False;False;False;False;False;False;True;0;False;;True;True;0;True;_Cull;False;False;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;False;False;False;True;4;RenderPipeline=UniversalPipeline;RenderType=Transparent=RenderType;Queue=Transparent=Queue=0;UniversalMaterialType=Unlit;True;5;True;12;all;0;True;True;2;1;True;_Src;0;True;_Dst;1;1;False;;10;False;;False;False;False;False;False;False;False;False;False;False;False;False;False;False;True;True;True;True;True;0;False;;False;False;False;False;False;False;False;True;False;0;False;;255;False;;255;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;0;False;;False;True;2;False;_ZWrite;True;3;True;_ZTest;True;True;0;False;;0;False;;True;1;LightMode=UniversalForwardOnly;False;False;0;;0;0;Standard;23;Surface;1;638683990565563346;  Blend;0;0;Two Sided;1;0;Forward Only;0;0;Alpha Clipping;0;638684217953611656;  Use Shadow Threshold;0;0;Cast Shadows;0;638683990592319291;Receive Shadows;0;638683990589091868;GPU Instancing;1;0;LOD CrossFade;1;0;Built-in Fog;1;0;Meta Pass;0;0;Extra Pre Pass;0;0;Tessellation;0;0;  Phong;0;0;  Strength;0.5,False,;0;  Type;0;0;  Tess;16,False,;0;  Min;10,False,;0;  Max;25,False,;0;  Edge Length;16,False,;0;  Max Displacement;25,False,;0;Vertex Position,InvertActionOnDeselection;1;0;0;10;False;True;False;True;False;False;True;True;True;False;False;;False;0
 WireConnection;28;0;26;3
 WireConnection;28;1;30;0
-WireConnection;27;0;40;5
+WireConnection;27;0;10;2
 WireConnection;27;1;26;3
 WireConnection;27;2;28;0
 WireConnection;33;0;27;0
 WireConnection;34;0;33;0
 WireConnection;34;1;25;4
-WireConnection;17;0;38;0
-WireConnection;17;1;18;0
+WireConnection;12;0;41;0
+WireConnection;12;1;15;0
+WireConnection;13;0;12;0
+WireConnection;13;1;16;0
 WireConnection;36;0;25;0
-WireConnection;35;0;33;0
-WireConnection;35;1;36;0
-WireConnection;38;0;36;0
-WireConnection;38;1;35;0
-WireConnection;38;2;39;0
 WireConnection;37;0;34;0
+WireConnection;35;0;11;5
+WireConnection;35;1;36;0
+WireConnection;38;0;35;0
+WireConnection;38;1;33;0
+WireConnection;17;0;39;0
+WireConnection;17;1;18;0
+WireConnection;39;0;35;0
+WireConnection;39;1;38;0
+WireConnection;39;2;40;0
+WireConnection;41;0;45;0
+WireConnection;41;1;33;0
+WireConnection;41;2;42;0
+WireConnection;44;0;46;0
+WireConnection;44;1;43;0
+WireConnection;45;0;10;2
+WireConnection;45;1;46;0
+WireConnection;45;2;44;0
+WireConnection;46;0;26;3
+WireConnection;46;1;48;0
+WireConnection;11;1;13;0
 WireConnection;1;2;17;0
 WireConnection;1;3;37;0
 ASEEND*/
-//CHKSM=DBC9B35ABCD24BC9471DF7C0941F95A7B3A5A410
+//CHKSM=92634E8D88C07FF4B8D5306036B80470C2FDEED2

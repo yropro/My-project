@@ -1,0 +1,30 @@
+ManifestFileVersion: 0
+CRC: 300896767
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: ce725ed871e693cd132d27867c24565f
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: b9967223b14541a466e72429e9f710bc
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: ce725ed871e693cd132d27867c24565f
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 198
+  Script: {instanceID: 0}
+- Class: 199
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Leviathan/Content/Scripts/Orrery/PlasmaBoltVFX/OrreryPlasmaBoltZap.prefab
+Dependencies: []
