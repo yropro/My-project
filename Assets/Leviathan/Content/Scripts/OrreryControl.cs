@@ -37,24 +37,19 @@ public static class OrreryControl
         }
 
         float orbitalAngleDegrees = OrreryOrbit.GetAngleDegrees(owner, satelliteId);
-        if (!OrreryCasting.TryLock(
-                owner,
-                satelliteId,
-                orbitalAngleDegrees,
-                out capturedElement,
-                out formulaComplete))
-        {
-            return false;
-        }
-
-        OrreryNetwork.PublishLocal(owner);
-        return true;
+        return OrreryCasting.TryLock(
+            owner,
+            satelliteId,
+            orbitalAngleDegrees,
+            out capturedElement,
+            out formulaComplete);
     }
 
     /// <summary>
     /// Baseline invocation requires a complete formula. Unknown/unimplemented
     /// recipes are consumed and released cleanly, then use the same physical
     /// shuffle/rearm path as a successful cast rather than trapping cast state.
+    /// Presentation is sampled centrally at the next Core ship-state send.
     /// </summary>
     public static InvokeResult TryInvoke(GameShip owner)
     {
@@ -65,14 +60,11 @@ public static class OrreryControl
         if (!OrreryCasting.TryInvoke(owner, false, out invocation))
             return InvokeResult.Rejected;
 
-        OrreryNetwork.PublishLocal(owner);
-
         OrrerySpellRegistry.SpellDefinition spell;
         if (!OrrerySpellRegistry.TryResolve(invocation.Recipe, out spell) ||
             spell == null || !spell.Implemented)
         {
             OrreryCasting.CompleteInvocation(owner, invocation.Execution, 0);
-            OrreryNetwork.PublishLocal(owner);
             OrreryController.StartShuffle(owner);
             return InvokeResult.UnimplementedRecipe;
         }
@@ -80,7 +72,6 @@ public static class OrreryControl
         if (!OrrerySpellRegistry.TryExecute(owner, invocation))
         {
             OrreryCasting.Cancel(owner);
-            OrreryNetwork.PublishLocal(owner);
             OrreryController.StartShuffle(owner);
             return InvokeResult.ExecutionRejected;
         }
@@ -104,7 +95,6 @@ public static class OrreryControl
 
         bool hadFormula = OrreryCasting.GetLockedCount(owner) > 0;
         OrreryCasting.Cancel(owner);
-        OrreryNetwork.PublishLocal(owner);
         bool started = OrreryController.StartShuffle(owner);
         return hadFormula || started;
     }
