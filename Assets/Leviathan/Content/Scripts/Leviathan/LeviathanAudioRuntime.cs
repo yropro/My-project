@@ -9,6 +9,7 @@ public static class LeviathanAudioRuntime
     // Unity AudioClip.name normally omits the file extension.
     public const string DyingStarExplosionClipName = "seismic_charge";
     public const float DyingStarExplosionVolume = 1.00f;
+    public const float DyingStarExplosionSpatialBlend = 0.75f;
 
     /// <summary>
     /// Plays the Dying Star detonation cue. The historical method name is kept
@@ -21,6 +22,8 @@ public static class LeviathanAudioRuntime
             DyingStarExplosionClipName,
             position,
             DyingStarExplosionVolume,
-            "Leviathan Dying Star Explosion Audio");
+            "Leviathan Dying Star Explosion Audio",
+            true,
+            DyingStarExplosionSpatialBlend);
     }
 }
