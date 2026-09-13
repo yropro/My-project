@@ -99,6 +99,10 @@ public sealed class CoreAbilityExecution
             if (!accepted) End(CoreExecutionEndReason.CommitRejected);
             else if (!Owner.IsValid) End(CoreExecutionEndReason.OwnerInvalidated);
         }
+        if (!accepted || !Owner.IsValid) return false;
+        // Instant abilities may complete inside their successful commit callback.
+        // Completion is success, but must never reactivate the ended execution.
+        if (Phase == CoreExecutionPhase.Completed) return true;
         if (!IsValid) return false;
         Phase = CoreExecutionPhase.Active;
         return true;

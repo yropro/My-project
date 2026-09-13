@@ -203,9 +203,10 @@ public static class OrrerySatelliteRepair
                 ship.health = 1f;
             if (ship.health < hullTarget)
             {
-                ship.Heal(
+                CoreNativeCriticalHits.Heal(
+                    ship,
                     hullTarget - ship.health,
-                    false,
+                    0,
                     Vector2.zero,
                     null,
                     false,

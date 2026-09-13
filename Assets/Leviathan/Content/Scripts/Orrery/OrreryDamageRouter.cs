@@ -8,7 +8,7 @@ using UnityEngine;
 /// The native overload is internal, so the signature is resolved once by
 /// reflection and converted to a strongly typed delegate. Steady-state custom
 /// spell hits therefore avoid MethodInfo.Invoke argument arrays and value boxing.
-/// Legacy V0 spells can migrate onto this helper when they move to per-spell files.
+/// Shared by both the legacy spell runtime and per-spell implementations.
 /// </summary>
 public static class OrreryDamageRouter
 {
@@ -46,7 +46,7 @@ public static class OrreryDamageRouter
         Activatable slotSource)
     {
         if (owner == null || damageable == null || damageData == null ||
-            !EnsureNativeDamageRouter())
+            !EnsureAvailable())
         {
             return false;
         }
@@ -86,7 +86,7 @@ public static class OrreryDamageRouter
         routeDamageResolved = false;
     }
 
-    private static bool EnsureNativeDamageRouter()
+    internal static bool EnsureAvailable()
     {
         if (routeDamageResolved)
             return routeDamage != null;
@@ -106,7 +106,18 @@ public static class OrreryDamageRouter
                 !parameters[0].ParameterType.IsAssignableFrom(typeof(Damageable)) ||
                 parameters[1].ParameterType != typeof(Damageable.DamageType) ||
                 parameters[2].ParameterType != typeof(Damageable.DamageData[]) ||
-                parameters[4].ParameterType != typeof(int))
+                parameters[3].ParameterType != typeof(float) ||
+                parameters[4].ParameterType != typeof(int) ||
+                parameters[5].ParameterType != typeof(Vector2) ||
+                parameters[6].ParameterType != typeof(GameShip) ||
+                parameters[7].ParameterType != typeof(bool) ||
+                parameters[8].ParameterType != typeof(float) ||
+                parameters[9].ParameterType != typeof(Activatable) ||
+                parameters[10].ParameterType != typeof(float) ||
+                parameters[11].ParameterType != typeof(float) ||
+                parameters[12].ParameterType != typeof(bool) ||
+                parameters[13].ParameterType != typeof(float) ||
+                method.ReturnType != typeof(bool))
             {
                 continue;
             }

@@ -173,7 +173,7 @@ public static class OrreryPlasmaBoltPresentation
         {
             state.BoltInitialized = true;
             state.BoltGeneration = boltGeneration;
-            OrreryPlasmaBolt.ShowBoltVisual(state.Bolt, start, end, width);
+            OrreryPlasmaBolt.ShowBoltVisual(state.Bolt, owner, start, end, width);
         }
 
         if (hasBurnRefresh &&
@@ -206,7 +206,7 @@ public static class OrreryPlasmaBoltPresentation
             return;
         }
 
-        OrreryPlasmaBolt.HideExpiredBoltVisual(state.Bolt, Time.time);
+        OrreryPlasmaBolt.TickBoltVisual(state.Bolt, owner, Time.time);
         for (int i = 0; i < state.Burns.Length; i++)
         {
             BurnVisual burn = state.Burns[i];

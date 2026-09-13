@@ -78,6 +78,7 @@ public static class OrreryPlasmaBolt
         public ParticleSystemRenderer[] ZapRenderers;
         public readonly Vector3[] BoltPoints = new Vector3[OrrerySpellCompendium.PlasmaBolt.BoltVisualPointCount];
         public float BoltVisibleUntil;
+        public Vector2 LastCasterPosition;
     }
 
     private sealed class OwnerState
@@ -235,7 +236,7 @@ public static class OrreryPlasmaBolt
             if (target != null)
                 visualEnd = impactPoint;
 
-            ShowBoltVisual(state.Bolt, origin, visualEnd, geometry.WidthMeters);
+            ShowBoltVisual(state.Bolt, owner, origin, visualEnd, geometry.WidthMeters);
             state.BoltSequence++;
             state.BoltStart = origin;
             state.BoltEnd = visualEnd;
@@ -281,7 +282,7 @@ public static class OrreryPlasmaBolt
         float now = Time.time;
         float nowUnscaled = Time.unscaledTime;
 
-        HideExpiredBoltVisual(state.Bolt, now);
+        TickBoltVisual(state.Bolt, owner, now);
         DrainInitialHitOutcomes(owner, state);
         PrunePendingImpacts(state, nowUnscaled);
         TickInfections(owner, state, now);
@@ -989,10 +990,20 @@ public static class OrreryPlasmaBolt
 
     internal static void ShowBoltVisual(
         BoltVisualState state,
+        GameShip owner,
         Vector2 start,
         Vector2 end,
         float widthMeters)
     {
+        if (state == null || owner == null)
+            return;
+
+        // Remote snapshots contain cast-time world endpoints. Rebase the same
+        // stroke onto the caster's current presentation position on receipt.
+        Vector2 casterPosition = owner.transform.position;
+        end += casterPosition - start;
+        start = casterPosition;
+        state.LastCasterPosition = casterPosition;
         if (widthMeters > 0f)
         {
             CoreAudioRuntime.PlayPositionalOneShot(
@@ -1007,6 +1018,8 @@ public static class OrreryPlasmaBolt
 
         if (!EnsureBoltVisual(state))
             return;
+
+        state.BoltVisualObject.transform.position = (Vector3)start;
 
         Vector2 delta = end - start;
         Vector2 direction = delta.sqrMagnitude <= 0.000001f
@@ -1023,7 +1036,7 @@ public static class OrreryPlasmaBolt
             float envelope = Mathf.Sin(t * Mathf.PI);
             float jitter = Random.Range(-jitterWorld, jitterWorld) * envelope;
             Vector2 point = Vector2.Lerp(start, end, t) + perpendicular * jitter;
-            state.BoltPoints[i] = new Vector3(point.x, point.y, 0f);
+            state.BoltPoints[i] = (Vector3)(point - start);
         }
 
         float widthWorld = OrreryUnits.MetersToWorld(Mathf.Max(0f, widthMeters));
@@ -1137,7 +1150,7 @@ public static class OrreryPlasmaBolt
             renderer.lengthScale = length / width;
             renderer.pivot = Vector3.zero;
             renderer.sortingOrder = OrrerySpellCompendium.PlasmaBolt.ZapSortingOrder;
-            // Presentation-only strikes at 0, 0.4 and 0.8 seconds by default.
+            // Presentation-only strikes evenly spaced within the total lifetime.
             // Each burst replays the authored color, erosion and atlas curves;
             // no damage or burn logic is invoked by this particle schedule.
             particles.Play(false);
@@ -1182,7 +1195,7 @@ public static class OrreryPlasmaBolt
 
     private static void ConfigureLine(LineRenderer line, Material material)
     {
-        line.useWorldSpace = true;
+        line.useWorldSpace = false;
         line.numCapVertices = 2;
         line.numCornerVertices = 2;
         line.textureMode = LineTextureMode.Stretch;
@@ -1206,7 +1219,23 @@ public static class OrreryPlasmaBolt
         return boltMaterial;
     }
 
-    internal static void HideExpiredBoltVisual(BoltVisualState state, float now)
+    internal static void TickBoltVisual(BoltVisualState state, GameShip owner, float now)
+    {
+        if (state == null)
+            return;
+
+        HideExpiredBoltVisual(state, now);
+        if (owner == null || now >= state.BoltVisibleUntil || state.BoltVisualObject == null)
+            return;
+
+        // Follow translation only: turning the caster must not rotate a stroke
+        // away from its original cast direction or change its resolved length.
+        Vector2 position = owner.transform.position;
+        state.BoltVisualObject.transform.position += (Vector3)(position - state.LastCasterPosition);
+        state.LastCasterPosition = position;
+    }
+
+    private static void HideExpiredBoltVisual(BoltVisualState state, float now)
     {
         if (state == null || now < state.BoltVisibleUntil)
             return;

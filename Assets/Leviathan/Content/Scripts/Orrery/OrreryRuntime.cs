@@ -31,7 +31,7 @@ public static class OrreryRuntime
         // distinct player-authored satellite bodies to read clearly.
         public const float BaseOrbitRadiusMeters = 25f;
         public const float OrbitLaneSpacingMeters = 16f;
-        public const float BaseOrbitAngularSpeedDegreesPerSecond = 80f;
+        public const float BaseOrbitAngularSpeedDegreesPerSecond = 95f;
         public const float WheelBaseRotationOffsetDegrees = 0f;
         public const float WheelFollowSmoothTimeSeconds = 0f;
 

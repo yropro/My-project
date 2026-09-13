@@ -1082,7 +1082,7 @@ public static class OrreryShatterbolt
         // Shatterbolt's bounded mechanical expansion own gameplay.
         wave.enabled = false;
         circle.enabled = false;
-        OrreryShatterboltWavePresentation.ResetMask(wave);
+        OrreryWavePresentation.ResetMask(wave);
         wave.transform.localScale = Vector3.zero;
     }
 

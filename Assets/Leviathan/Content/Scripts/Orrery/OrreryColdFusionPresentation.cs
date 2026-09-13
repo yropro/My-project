@@ -149,6 +149,7 @@ public static class OrreryColdFusionPresentation
 
             wave.enabled = false;
             circle.enabled = false;
+            OrreryWavePresentation.ResetMask(wave);
             Color color = layer.BaseColor;
             color.a *= Mathf.Clamp01(
                 OrrerySpellCompendium.ColdFusion.HaloOpacity);

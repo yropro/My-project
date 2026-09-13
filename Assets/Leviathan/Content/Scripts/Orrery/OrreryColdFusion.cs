@@ -130,11 +130,24 @@ public static class OrreryColdFusion
         profile.WeaponCadenceMultiplier = snapshot.WeaponCadenceMultiplier;
         profile.ShieldGrantPerSecond = snapshot.ShieldGrantPerSecond;
 
-        return CoreTimedShipEffects.ApplyOrRefresh(
+        float speedBefore = target.MaxSpeed;
+        bool applied = CoreTimedShipEffects.ApplyOrRefresh(
             target,
             TimedEffectId,
             snapshot.DurationSeconds,
             profile);
+        if (applied)
+        {
+            Debug.Log("[Orrery/ColdFusion] Applied to '" + target.name +
+                "' for " + snapshot.DurationSeconds.ToString("F2") + "s; max speed " +
+                speedBefore.ToString("F2") + " -> " + target.MaxSpeed.ToString("F2") +
+                "; movement x" + CoreTimedShipEffects.GetMovementMultiplier(target).ToString("F2") +
+                ", heat x" + CoreTimedShipEffects.GetHeatGenerationMultiplier(target).ToString("F2") +
+                ", cadence x" + CoreTimedShipEffects.GetWeaponCadenceMultiplier(target).ToString("F2") +
+                "; shield grant " + snapshot.ShieldGrantPerSecond.ToString("F1") +
+                "/s, shield equipped=" + (target.shield != null) + ".");
+        }
+        return applied;
     }
 
     private static bool TryResolveCast(GameShip owner, out Snapshot snapshot)

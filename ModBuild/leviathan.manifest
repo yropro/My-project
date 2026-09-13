@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 2845882329
+CRC: 1646035080
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 120440d2c0686f75e08ebe44c5c9c8ec
+    Hash: 3467df8eb8398655dc3df9ae6596bf81
   TypeTreeHash:
     serializedVersion: 2
     Hash: 60826caf9e4093cf380398df28f8afe5
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: 120440d2c0686f75e08ebe44c5c9c8ec
+    Hash: 3467df8eb8398655dc3df9ae6596bf81
 HashAppended: 0
 ClassTypes:
 - Class: 83
@@ -78,4 +78,5 @@ SerializeReferenceClassIdentifiers:
 Assets:
 - Assets/Leviathan/Content/LeviathanTest.asset
 - Assets/Leviathan/Content/Audio/seismic_charge.wav
+- Assets/Leviathan/Content/Audio/thunder.wav
 Dependencies: []
