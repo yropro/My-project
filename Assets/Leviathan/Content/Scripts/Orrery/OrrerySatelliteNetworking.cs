@@ -14,11 +14,12 @@ using System.Collections.Generic;
 [HarmonyPatch(typeof(OrrerySatellites), nameof(OrrerySatellites.PublishLiveSatellites))]
 public static class OrrerySatelliteNetworkingPatch
 {
-    public static void Prefix(
+    public static void Postfix(
         GameShip owner,
-        IList<OrrerySatellites.PublishEntry> entries)
+        IList<OrrerySatellites.PublishEntry> entries,
+        bool __result)
     {
-        if (owner == null || entries == null)
+        if (!__result || owner == null || entries == null)
             return;
 
         for (int i = 0; i < entries.Count; i++)
