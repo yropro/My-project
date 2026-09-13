@@ -298,8 +298,6 @@ public static class OrreryPlasmaBolt
             DestroyBoltVisual(state.Bolt);
             owners.Remove(owner);
         }
-
-        OrreryDamageRouter.Forget(owner);
     }
 
     public static void Reset()
