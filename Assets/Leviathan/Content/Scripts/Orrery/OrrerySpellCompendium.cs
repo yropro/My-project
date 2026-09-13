@@ -10,19 +10,19 @@ public static class OrrerySpellCompendium
     public static class MagmaCannon
     {
         public const float IntegratedReferenceSeconds = 1f;
-        public const float DamageMultiplier = 1f;
+        public const float DamageMultiplier = 3f;
         public const float VelocityMultiplier = 0.65f;
-        public const float TurnDegreesPerSecond = 120f;
+        public const float TurnDegreesPerSecond = 150f;
         public const float ProjectileVisualScale = 2f;
         public const float ExplosionRadiusMeters = 40f;
-        public const float LifetimeSeconds = 2f;
+        public const float LifetimeSeconds = 5f;
         public const float SpawnGraceSeconds = 0.15f;
     }
 
     public static class TeslaCoil
     {
         // Channel envelope / donor normalization.
-        public const float InitialDpsMultiplier = 2f;
+        public const float InitialDpsMultiplier = 3f;
         public const float MinimumDpsMultiplier = 1f;
         public const float FadeSeconds = 1f;
         public const float RangeMultiplier = 1f;
@@ -32,7 +32,7 @@ public static class OrrerySpellCompendium
 
         // Authoritative Orrery geometry and native chain behavior.
         public const float RangeMeters = 195f;
-        public const int ChainCount = 1;
+        public const int ChainCount = 2;
         public const float ChainRangeMeters = 97.5f;
         public const float ChainDamageMultiplier = 0.50f;
     }
@@ -41,7 +41,7 @@ public static class OrrerySpellCompendium
     {
         // Mechanical cone and native presentation volley.
         public const float IntegratedReferenceSeconds = 1f;
-        public const float DamageMultiplier = 1f;
+        public const float DamageMultiplier = 2f;
         public const float ConeRangeMeters = 60f;
         public const float ConeAngleDegrees = 30f;
         public const float FreezeChanceAdditive = 0.50f;
@@ -180,7 +180,7 @@ public static class OrrerySpellCompendium
         // Damage. Percentages are relative to one second of Orrery reference DPS.
         public const float IntegratedReferenceSeconds = 1f;
         public const float LightningDamageMultiplier = 1.50f;
-        public const float IceExplosionDamageMultiplier = 2.00f;
+        public const float IceExplosionDamageMultiplier = 1.50f;
 
         // Targeting / chaining
         public const float InitialAcquisitionRangeMeters = 240f;
@@ -200,15 +200,15 @@ public static class OrrerySpellCompendium
         public const int MaxTargetsPerExplosion = 64;
 
         // Motion
-        public const float ProjectileSpeedMetersPerSecond = 120f;
-        public const float MaximumLegSeconds = 3f;
+        public const float ProjectileSpeedMetersPerSecond = 140f;
+        public const float MaximumLegSeconds = 3.5f;
 
         // Explosion
         public const float ExplosionRadiusMeters = 50f;
-        public const float ExplosionExpansionMetersPerSecond = 85f;
+        public const float ExplosionExpansionMetersPerSecond = 50f;
 
         // Presentation
-        public const float ProjectileVisualScale = 1f;
+        public const float ProjectileVisualScale = 1.5f;
         public const float ProjectileSpinDegreesPerSecond = 360f;
         public const float ExplosionVisualScale = 1f;
         public const float PresentationTailSeconds = 1f;
