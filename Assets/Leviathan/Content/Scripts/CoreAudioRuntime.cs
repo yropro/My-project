@@ -16,6 +16,17 @@ using UnityEngine;
 /// </summary>
 public static class CoreAudioRuntime
 {
+    // A partially spatial source keeps useful left/right positioning without the
+    // hard 100%-left/100%-right headphone effect of a fully 3D point source.
+    // Individual sounds can override this per call when a different presentation
+    // is appropriate.
+    public const float DefaultSpatialBlend = 0.75f;
+
+    // Negative distance overrides preserve SoundEffectPlayer.Attach()'s native
+    // min/max distance configuration. Positive values opt a sound into custom
+    // attenuation without changing the shared default.
+    public const float UseNativeDistance = -1f;
+
     // Extra lifetime after a one-shot should have completed before its temporary
     // positional audio object is destroyed.
     public const float PositionalAudioCleanupPaddingSeconds = 0.50f;
@@ -60,13 +71,19 @@ public static class CoreAudioRuntime
     /// Plays one spatial Effects-category sound through Star Vortex's native
     /// SoundEffectPlayer. Returns false when the requested clip is unavailable.
     /// Missing assets are safe and warn at most once per clip name.
+    ///
+    /// spatialBlend is clamped to Unity's 0..1 range. Negative min/max distance
+    /// values leave the native SoundEffectPlayer attenuation distances untouched.
     /// </summary>
     public static bool PlayPositionalOneShot(
         string clipName,
         Vector2 position,
         float volumeScale,
         string objectName = "Core Positional Audio",
-        bool warnIfMissing = true)
+        bool warnIfMissing = true,
+        float spatialBlend = DefaultSpatialBlend,
+        float minDistance = UseNativeDistance,
+        float maxDistance = UseNativeDistance)
     {
         AudioClip clip;
         if (!TryGetClip(clipName, out clip))
@@ -91,6 +108,21 @@ public static class CoreAudioRuntime
 
         SoundEffectPlayer player = audioObject.AddComponent<SoundEffectPlayer>();
         player.Attach(audioObject, SoundEffectPlayer.Category.Effects);
+
+        // Attach() creates/configures the native AudioSource. Apply only the
+        // presentation overrides Core explicitly owns; native mixer routing,
+        // rolloff mode and all other SoundEffectPlayer behavior remain intact.
+        AudioSource audioSource = audioObject.GetComponent<AudioSource>();
+        if (audioSource != null)
+        {
+            audioSource.spatialBlend = Mathf.Clamp01(spatialBlend);
+
+            if (minDistance >= 0f)
+                audioSource.minDistance = Mathf.Max(0f, minDistance);
+
+            if (maxDistance >= 0f)
+                audioSource.maxDistance = Mathf.Max(audioSource.minDistance, maxDistance);
+        }
 
         SoundEffectPlayer.SoundEffect effect =
             new SoundEffectPlayer.SoundEffect();
