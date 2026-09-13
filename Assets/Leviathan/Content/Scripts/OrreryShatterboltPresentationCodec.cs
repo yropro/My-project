@@ -31,25 +31,28 @@ public static class OrreryShatterboltPresentationCodec
         if (owner == null || !state.ShatterboltPresent)
             return;
 
+        int impactCount = Mathf.Clamp(
+            state.ShatterboltImpactCount,
+            0,
+            OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
+        int payloadLength = 6 +
+            (state.ShatterboltOrbActive ? 8 : 0) +
+            impactCount * 8;
+        if (payloadLength > MaxPayloadBytes)
+            return;
+
         int offset = 0;
         payloadScratch[offset++] = state.ShatterboltOrbActive
             ? FlagOrbActive
             : (byte)0;
-        payloadScratch[offset++] = state.ShatterboltImpactCount;
+        payloadScratch[offset++] = (byte)impactCount;
         WriteFloat(payloadScratch, ref offset, state.ShatterboltExplosionRadiusMeters);
 
         if (state.ShatterboltOrbActive)
             WritePosition(payloadScratch, ref offset, state.ShatterboltOrbPosition);
 
-        int impactCount = Mathf.Clamp(
-            state.ShatterboltImpactCount,
-            0,
-            OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
         for (int i = 0; i < impactCount; i++)
             WritePosition(payloadScratch, ref offset, state.GetShatterboltImpact(i));
-
-        if (offset > MaxPayloadBytes)
-            return;
 
         uint generation = ResolveGeneration(owner, state.ShatterboltCastSequence);
         OrreryPresentationNetwork.WriteGroup(
@@ -99,9 +102,7 @@ public static class OrreryShatterboltPresentationCodec
             return false;
 
         OrreryNetwork.PresentationState decoded = state;
-        // Existing remote presentation only needs a change token. The complete
-        // uint generation is validated by the bank before this codec runs; using
-        // its low byte here preserves that presenter's tiny state machine.
+        decoded.ShatterboltGeneration = reader.Generation;
         decoded.ShatterboltCastSequence = (byte)(reader.Generation & 0xFFu);
         decoded.ShatterboltImpactCount = (byte)impactCount;
         decoded.ShatterboltExplosionRadiusMeters = radiusMeters;

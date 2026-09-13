@@ -33,6 +33,7 @@ public static class OrreryNetwork
 
         public bool ShatterboltPresent;
         public bool ShatterboltOrbActive;
+        public uint ShatterboltGeneration;
         public byte ShatterboltCastSequence;
         public byte ShatterboltImpactCount;
         public Vector2 ShatterboltOrbPosition;

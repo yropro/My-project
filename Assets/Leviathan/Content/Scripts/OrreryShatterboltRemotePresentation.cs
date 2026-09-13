@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// Remote-only Shatterbolt presentation.
 ///
-/// Gameplay stays entirely owner-authoritative. The Orrery network slot carries a
+/// Gameplay stays entirely owner-authoritative. The Orrery presentation bank carries a
 /// world-space orb position plus the complete bounded impact history for the current
 /// cast, so packet coalescing cannot erase a fast intermediate hop.
 /// </summary>
@@ -43,8 +43,8 @@ public static class OrreryShatterboltRemotePresentation
 
     private sealed class RemoteState
     {
-        public bool SequenceInitialized;
-        public byte CastSequence;
+        public bool GenerationInitialized;
+        public uint Generation;
         public int SeenImpactCount;
         public OrbVisualState Orb;
         public readonly BurstVisualState[] Bursts =
@@ -88,12 +88,12 @@ public static class OrreryShatterboltRemotePresentation
 
         if (network.ShatterboltPresent)
         {
-            if (!state.SequenceInitialized ||
-                state.CastSequence != network.ShatterboltCastSequence)
+            if (!state.GenerationInitialized ||
+                state.Generation != network.ShatterboltGeneration)
             {
                 ClearState(state);
-                state.SequenceInitialized = true;
-                state.CastSequence = network.ShatterboltCastSequence;
+                state.GenerationInitialized = true;
+                state.Generation = network.ShatterboltGeneration;
             }
 
             int impactCount = Mathf.Clamp(
@@ -101,7 +101,7 @@ public static class OrreryShatterboltRemotePresentation
                 0,
                 OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
 
-            // A decreasing count within one sequence means we received a reset
+            // A decreasing count within one generation means we received a reset
             // transition; never reinterpret stale impact positions as new bursts.
             if (impactCount < state.SeenImpactCount)
             {
@@ -438,8 +438,8 @@ public static class OrreryShatterboltRemotePresentation
 
         CleanupOrb(state);
         ClearBursts(state);
-        state.SequenceInitialized = false;
-        state.CastSequence = 0;
+        state.GenerationInitialized = false;
+        state.Generation = 0u;
         state.SeenImpactCount = 0;
     }
 
