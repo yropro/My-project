@@ -46,6 +46,18 @@ public static class OrrerySpellCompendium
         public const float ShieldCurveBreakpointAmount = 3400f;
         public const float ShieldCurveSecondReferenceLevel = 30f;
         public const float ShieldCurveSecondReferenceAmount = 6800f;
+
+        // Presentation-only layered Frost Nova halos. Radius starts from the
+        // target ship's native shield/ship radius, so the effect hugs the target
+        // instead of using one fixed world size.
+        public const int HaloCount = 3;
+        public const float HaloRadiusMultiplier = 1.08f;
+        public const float MinimumHaloRadiusMeters = 12f;
+        public const float HaloLayerSpacingFraction = 0.10f;
+        public const float HaloOpacity = 0.42f;
+        public const float HaloRotationDegreesPerSecond = 22f;
+        public const float HaloOuterRotationMultiplier = 0.35f;
+        public const float HaloRadiusFollowSpeed = 8f;
     }
 
     public static class PlasmaBolt
