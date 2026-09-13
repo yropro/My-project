@@ -262,7 +262,6 @@ public static class OrreryShatterbolt
         state.CurrentTarget = initialTarget;
         state.ProjectilePosition = spawnPosition;
         state.LegElapsedSeconds = 0f;
-        OrreryNetwork.PublishLocal(owner);
         return true;
     }
 
@@ -290,17 +289,8 @@ public static class OrreryShatterbolt
 
         if (!state.CastActive)
         {
-            if (HasActiveExplosions(state) || Time.time < state.PresentationUntil)
-            {
-                OrreryNetwork.PublishLocal(owner);
-            }
-            else
-            {
+            if (!HasActiveExplosions(state) && Time.time >= state.PresentationUntil)
                 CleanupIdleState(owner, state);
-                // Publish once after removing the spell state so remote observers
-                // can clear their orb/persistent-presentation flag deterministically.
-                OrreryNetwork.PublishLocal(owner);
-            }
             return;
         }
 
@@ -340,14 +330,12 @@ public static class OrreryShatterbolt
             state.ProjectilePosition = targetPosition;
             UpdateOrbVisual(state, dt);
             HandleImpact(owner, state, target, targetPosition);
-            OrreryNetwork.PublishLocal(owner);
             return;
         }
 
         if (step > 0f)
             state.ProjectilePosition += toTarget.normalized * step;
         UpdateOrbVisual(state, dt);
-        OrreryNetwork.PublishLocal(owner);
     }
 
     public static void Forget(GameShip owner)
@@ -1215,7 +1203,6 @@ public static class OrreryShatterbolt
             OrreryCasting.Cancel(owner);
         }
 
-        OrreryNetwork.PublishLocal(owner);
         OrreryController.StartShuffle(owner);
 
         if (!HasActiveExplosions(state))
@@ -1229,7 +1216,6 @@ public static class OrreryShatterbolt
         CleanupOrbVisual(state);
         ClearExplosions(state);
         OrreryCasting.Cancel(owner);
-        OrreryNetwork.PublishLocal(owner);
         OrreryController.StartShuffle(owner);
         CleanupIdleState(owner, state);
     }
