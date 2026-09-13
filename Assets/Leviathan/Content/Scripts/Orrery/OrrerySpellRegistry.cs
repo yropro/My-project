@@ -70,9 +70,8 @@ public static class OrrerySpellRegistry
         if (defaultsRegistered)
             return;
 
-        // Baseline Orrery formulas use two satellites. The three pure-element
-        // recipes are the first executable spell families; mixed recipes keep
-        // their stable ids as their individual spell implementations come online.
+        // Baseline Orrery formulas use two satellites. Each formula keeps one
+        // stable spell id; mechanically unusual spells remain explicit executors.
         Register(new SpellDefinition(
             1,
             "Magma Cannon",
@@ -98,12 +97,12 @@ public static class OrrerySpellRegistry
             OrrerySpellRuntime.ExecuteCryo));
 
         Register(new SpellDefinition(
-            4,
-            "Fire + Ice",
-            Pair(OrreryElement.Fire, OrreryElement.Ice),
+            OrrerySpellCompendium.ColdFusion.Id,
+            OrrerySpellCompendium.ColdFusion.Name,
+            OrrerySpellCompendium.ColdFusion.Recipe,
             OrrerySpellExecutionKind.Custom,
             0,
-            null));
+            OrreryColdFusion.Execute));
 
         Register(new SpellDefinition(
             OrrerySpellCompendium.PlasmaBolt.Id,
