@@ -16,22 +16,29 @@ using UnityEngine;
 /// </summary>
 public static class OrreryCryoWavePresentation
 {
+    // Compatibility aliases only. Editable presentation knobs live in the
+    // ConeOfCold section of OrrerySpellCompendium.
     public static class Tuning
     {
         // Includes the original native volley. Four additional ranks follow it.
-        public const int VisualWaveCount = 5;
-        public const float VisualWaveIntervalSeconds = 0.10f;
+        public const int VisualWaveCount =
+            OrrerySpellCompendium.ConeOfCold.VisualWaveCount;
+        public const float VisualWaveIntervalSeconds =
+            OrrerySpellCompendium.ConeOfCold.VisualWaveIntervalSeconds;
 
-        // II's mechanical cone remains 60 m. Presentation deliberately carries
-        // farther so the cast reads as a travelling cold front rather than a puff.
-        public const float VisualRangeMeters = 180f;
-        public const float ProjectileScaleMultiplier = 1.50f;
+        // Presentation deliberately carries farther than the mechanical cone so
+        // the cast reads as a travelling cold front rather than a puff.
+        public const float VisualRangeMeters =
+            OrrerySpellCompendium.ConeOfCold.VisualRangeMeters;
+        public const float ProjectileScaleMultiplier =
+            OrrerySpellCompendium.ConeOfCold.WaveProjectileScaleMultiplier;
 
-        // Each individual native volley stays at the existing 30-degree spread
-        // so presentation-only safety classification remains simple. Offsetting
-        // successive ranks by +/-5 degrees gives an overall ~40-degree envelope.
-        public const float OuterAimOffsetDegrees = 5f;
-        public const float InnerAimOffsetDegrees = 2.5f;
+        // Each individual native volley stays at the existing 30-degree spread.
+        // Successive wave offsets create the wider overall visual envelope.
+        public const float OuterAimOffsetDegrees =
+            OrrerySpellCompendium.ConeOfCold.OuterAimOffsetDegrees;
+        public const float InnerAimOffsetDegrees =
+            OrrerySpellCompendium.ConeOfCold.InnerAimOffsetDegrees;
     }
 
     private sealed class Sequence
