@@ -40,6 +40,32 @@ public static class CoreAudioRuntime
     private static readonly HashSet<string> WarnedMissingClips =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+    // Presentation policy is intentionally separate from world-lifetime clip
+    // caches. Callers register policy once from their own class/spell tuning and
+    // it remains valid across world changes.
+    private static readonly Dictionary<string, float> FadeOutStartSeconds =
+        new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Configures an optional delayed fade-out for all uses of one custom clip.
+    /// A non-negative value keeps the sound at full volume until this many
+    /// playback seconds have elapsed, then fades linearly to zero at clip end.
+    /// A negative value removes the policy.
+    /// </summary>
+    public static void SetFadeOutStartSeconds(string clipName, float seconds)
+    {
+        if (string.IsNullOrEmpty(clipName))
+            return;
+
+        if (seconds < 0f)
+        {
+            FadeOutStartSeconds.Remove(clipName);
+            return;
+        }
+
+        FadeOutStartSeconds[clipName] = Mathf.Max(0f, seconds);
+    }
+
     /// <summary>
     /// Resolves an AudioClip by exact Unity asset basename. The first lookup is
     /// lazy; successful and unsuccessful results are cached until Reset().
@@ -74,6 +100,8 @@ public static class CoreAudioRuntime
     ///
     /// spatialBlend is clamped to Unity's 0..1 range. Negative min/max distance
     /// values leave the native SoundEffectPlayer attenuation distances untouched.
+    /// Registered delayed fade-outs use the native SoundEffectPlayer fade rather
+    /// than directly manipulating AudioSource volume.
     /// </summary>
     public static bool PlayPositionalOneShot(
         string clipName,
@@ -124,6 +152,16 @@ public static class CoreAudioRuntime
                 audioSource.maxDistance = Mathf.Max(audioSource.minDistance, maxDistance);
         }
 
+        float fadeOutStartSeconds;
+        bool fadeOut =
+            FadeOutStartSeconds.TryGetValue(clipName, out fadeOutStartSeconds) &&
+            fadeOutStartSeconds >= 0f &&
+            clip.length > 0f &&
+            fadeOutStartSeconds < clip.length;
+        float fadeSeconds = fadeOut
+            ? Mathf.Max(0f, clip.length - fadeOutStartSeconds)
+            : 0f;
+
         SoundEffectPlayer.SoundEffect effect =
             new SoundEffectPlayer.SoundEffect();
         effect.audioClip = clip;
@@ -134,14 +172,27 @@ public static class CoreAudioRuntime
         effect.fadePitch = false;
         effect.minPitch = 1f;
         effect.maxPitch = 1f;
-        effect.fadeVolume = false;
-        effect.minVolume = 1f;
+        effect.fadeVolume = fadeOut;
+        effect.minVolume = fadeOut ? 0f : 1f;
         effect.maxVolume = 1f;
-        effect.fadeSeconds = 0f;
+        effect.fadeSeconds = fadeSeconds;
 
-        // resetFade=true applies the explicit pitch/volume values above.
-        // priority=true preserves the previous custom-audio behavior.
-        player.Play(effect, true, true);
+        if (fadeOut)
+        {
+            // resetFade=false makes the native player begin immediately at its
+            // configured maximum instead of interpreting fadeVolume as a fade-in.
+            // Stop() later consumes the same native fade settings in reverse.
+            player.Play(effect, false, true);
+            CoreAudioDelayedFadeStop delayedFade =
+                audioObject.AddComponent<CoreAudioDelayedFadeStop>();
+            delayedFade.Arm(player, fadeOutStartSeconds);
+        }
+        else
+        {
+            // resetFade=true preserves the previous explicit pitch/volume setup.
+            // priority=true preserves the previous custom-audio behavior.
+            player.Play(effect, true, true);
+        }
 
         UnityEngine.Object.Destroy(
             audioObject,
@@ -281,6 +332,51 @@ public static class CoreAudioRuntime
         Clips.Clear();
         MissingClips.Clear();
         WarnedMissingClips.Clear();
+    }
+}
+
+/// <summary>
+/// Per-playback timer that asks the native SoundEffectPlayer to begin its authored
+/// fade-out after a caller-selected amount of playback time. Time.deltaTime keeps
+/// this aligned with the game's own fade/pause semantics.
+/// </summary>
+public sealed class CoreAudioDelayedFadeStop : MonoBehaviour
+{
+    private SoundEffectPlayer player;
+    private float triggerSeconds;
+    private float elapsedSeconds;
+    private bool triggered;
+
+    public void Arm(SoundEffectPlayer soundPlayer, float seconds)
+    {
+        player = soundPlayer;
+        triggerSeconds = Mathf.Max(0f, seconds);
+        elapsedSeconds = 0f;
+        triggered = false;
+
+        if (triggerSeconds <= 0f)
+            Trigger();
+    }
+
+    private void Update()
+    {
+        if (triggered || player == null)
+            return;
+
+        elapsedSeconds += Time.deltaTime;
+        if (elapsedSeconds >= triggerSeconds)
+            Trigger();
+    }
+
+    private void Trigger()
+    {
+        if (triggered)
+            return;
+
+        triggered = true;
+        if (player != null)
+            player.Stop();
+        Destroy(this);
     }
 }
 
