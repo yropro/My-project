@@ -1,0 +1,78 @@
+name: Restore Stellar Converter source encoding
+
+on:
+  push:
+    branches: [skill-trees]
+    paths:
+      - .github/workflows/restore-stellar-bom.yml
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore BOM and verify RouteDamage migration
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          converter = Path('Assets/Leviathan/Content/Scripts/Leviathan/LeviathanStellarConverter.cs')
+          data = converter.read_bytes()
+          if not data.startswith(b'\xef\xbb\xbf'):
+              converter.write_bytes(b'\xef\xbb\xbf' + data)
+
+          checks = {
+              'Assets/Leviathan/Content/Scripts/Leviathan/LeviathanPredator.cs': [
+                  'Damageable.DamageData[] packet, float status, int crit, Vector2 position,',
+                  'typeof(float), typeof(int), typeof(Vector2), typeof(GameShip), typeof(bool)',
+                  'stats.StatusChanceBonus), crit ? 1 : 0,',
+              ],
+              'Assets/Leviathan/Content/Scripts/Orrery/OrreryDamageRouter.cs': [
+                  'float statusEffectChance,\n        int crit,',
+                  'crit ? 1 : 0,',
+                  'parameters[4].ParameterType != typeof(int)',
+              ],
+              'Assets/Leviathan/Content/Scripts/Leviathan/LeviathanStarfire.cs': [
+                  'parameters[4].ParameterType == typeof(int)',
+                  'args[4] = crit ? 1 : 0;',
+              ],
+              'Assets/Leviathan/Content/Scripts/Leviathan/LeviathanConstrictor.cs': [
+                  'm.GetParameters()[4].ParameterType == typeof(int)',
+                  'crit ? 1 : 0,',
+              ],
+              'Assets/Leviathan/Content/Scripts/Leviathan/LeviathanStellarConverter.cs': [
+                  'm.GetParameters()[4].ParameterType == typeof(int)',
+                  'crit ? 1 : 0,',
+              ],
+              'Assets/Leviathan/Content/Scripts/CoreCombat.cs': [
+                  'p[4].ParameterType == typeof(int)',
+              ],
+          }
+          for rel, needles in checks.items():
+              text = Path(rel).read_text(encoding='utf-8-sig')
+              for needle in needles:
+                  if needle not in text:
+                      raise SystemExit(f'{rel}: missing expected migration text: {needle!r}')
+
+          note = Path('NATIVE_API_COMPATIBILITY.md')
+          if not note.is_file() or 'RouteDamage' not in note.read_text(encoding='utf-8'):
+              raise SystemExit('missing root native API compatibility note')
+          PY
+      - name: Remove one-shot workflow and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/restore-stellar-bom.yml
+          rmdir .github/workflows 2>/dev/null || true
+          rmdir .github 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "chore: preserve Stellar Converter source encoding"
+          git push origin HEAD:skill-trees
