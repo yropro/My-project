@@ -219,12 +219,6 @@ public static class OrreryColdFusionPresentation
         frostNovaBase = null;
     }
 
-    /// <summary>
-    /// Observe the reliable cross-owner grant on a remote peer. Clients receive
-    /// the same validated host-forwarded envelope; the host observes incoming
-    /// client grants after host validation. The caster also observes RequestGrant
-    /// directly for immediate local feedback.
-    /// </summary>
     public static void ObserveGrant(NetSession session, string json)
     {
         if (session == null || string.IsNullOrEmpty(json))
@@ -423,7 +417,7 @@ public static class OrreryColdFusionRequestPresentationPatch
 [HarmonyPatch(typeof(CoreCrossOwnerEffects), "ReceiveAtClient")]
 public static class OrreryColdFusionClientGrantPresentationPatch
 {
-    public static void Postfix(NetSession session, object connectionKey, string json)
+    public static void Postfix(NetSession session, string json)
     {
         OrreryColdFusionPresentation.ObserveGrant(session, json);
     }
