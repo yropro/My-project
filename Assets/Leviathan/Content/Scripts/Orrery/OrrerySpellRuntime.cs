@@ -15,34 +15,60 @@ using UnityEngine;
 /// </summary>
 public static class OrrerySpellRuntime
 {
+    // Compatibility aliases keep the runtime mechanically unchanged while the
+    // authoritative editable values live in OrrerySpellCompendium.
     public static class Tuning
     {
-        public const float FireballIntegratedReferenceSeconds = 1f;
-        public const float FireballDamageMultiplier = 1f;
-        public const float FireballVelocityMultiplier = 0.65f;
-        public const float FireballTurnDegreesPerSecond = 120f;
-        public const float FireballProjectileVisualScale = 2f;
-        public const float FireballExplosionRadiusMeters = 40f;
-        public const float FireballLifetimeSeconds = 2f;
-        public const float FireballSpawnGraceSeconds = 0.15f;
+        public const float FireballIntegratedReferenceSeconds =
+            OrrerySpellCompendium.MagmaCannon.IntegratedReferenceSeconds;
+        public const float FireballDamageMultiplier =
+            OrrerySpellCompendium.MagmaCannon.DamageMultiplier;
+        public const float FireballVelocityMultiplier =
+            OrrerySpellCompendium.MagmaCannon.VelocityMultiplier;
+        public const float FireballTurnDegreesPerSecond =
+            OrrerySpellCompendium.MagmaCannon.TurnDegreesPerSecond;
+        public const float FireballProjectileVisualScale =
+            OrrerySpellCompendium.MagmaCannon.ProjectileVisualScale;
+        public const float FireballExplosionRadiusMeters =
+            OrrerySpellCompendium.MagmaCannon.ExplosionRadiusMeters;
+        public const float FireballLifetimeSeconds =
+            OrrerySpellCompendium.MagmaCannon.LifetimeSeconds;
+        public const float FireballSpawnGraceSeconds =
+            OrrerySpellCompendium.MagmaCannon.SpawnGraceSeconds;
 
-        public const float CryoIntegratedReferenceSeconds = 1f;
-        public const float CryoDamageMultiplier = 1f;
-        public const float CryoConeRangeMeters = 60f;
-        public const float CryoConeAngleDegrees = 30f;
-        public const float CryoFreezeChanceAdditive = 0.50f;
-        public const int CryoVisualProjectileCount = 9;
-        public const int CryoVisualSpreadDegrees = 30;
-        public const float CryoVisualVelocityMultiplier = 1.30f;
-        public const float CryoVisualProjectileScale = 1f;
+        public const float CryoIntegratedReferenceSeconds =
+            OrrerySpellCompendium.ConeOfCold.IntegratedReferenceSeconds;
+        public const float CryoDamageMultiplier =
+            OrrerySpellCompendium.ConeOfCold.DamageMultiplier;
+        public const float CryoConeRangeMeters =
+            OrrerySpellCompendium.ConeOfCold.ConeRangeMeters;
+        public const float CryoConeAngleDegrees =
+            OrrerySpellCompendium.ConeOfCold.ConeAngleDegrees;
+        public const float CryoFreezeChanceAdditive =
+            OrrerySpellCompendium.ConeOfCold.FreezeChanceAdditive;
+        public const int CryoVisualProjectileCount =
+            OrrerySpellCompendium.ConeOfCold.VisualProjectileCount;
+        public const int CryoVisualSpreadDegrees =
+            OrrerySpellCompendium.ConeOfCold.VisualSpreadDegrees;
+        public const float CryoVisualVelocityMultiplier =
+            OrrerySpellCompendium.ConeOfCold.VisualVelocityMultiplier;
+        public const float CryoVisualProjectileScale =
+            OrrerySpellCompendium.ConeOfCold.VisualProjectileScale;
 
-        public const float TeslaInitialDpsMultiplier = 2f;
-        public const float TeslaMinimumDpsMultiplier = 1f;
-        public const float TeslaFadeSeconds = 1f;
-        public const float TeslaRangeMultiplier = 1f;
-        public const float TeslaBeamWidthMultiplier = 1f;
-        public const float TeslaChainRangeMultiplier = 1f;
-        public const int TeslaChainCountAdjustment = 0;
+        public const float TeslaInitialDpsMultiplier =
+            OrrerySpellCompendium.TeslaCoil.InitialDpsMultiplier;
+        public const float TeslaMinimumDpsMultiplier =
+            OrrerySpellCompendium.TeslaCoil.MinimumDpsMultiplier;
+        public const float TeslaFadeSeconds =
+            OrrerySpellCompendium.TeslaCoil.FadeSeconds;
+        public const float TeslaRangeMultiplier =
+            OrrerySpellCompendium.TeslaCoil.RangeMultiplier;
+        public const float TeslaBeamWidthMultiplier =
+            OrrerySpellCompendium.TeslaCoil.BeamWidthMultiplier;
+        public const float TeslaChainRangeMultiplier =
+            OrrerySpellCompendium.TeslaCoil.ChainRangeMultiplier;
+        public const int TeslaChainCountAdjustment =
+            OrrerySpellCompendium.TeslaCoil.ChainCountAdjustment;
     }
 
     private const string InfernoCannonPath = "Base/Items/PrimaryWeapon/Inferno Cannon";
