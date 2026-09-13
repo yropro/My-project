@@ -84,6 +84,11 @@ public static class OrrerySpellCompendium
         public const float BoltVisualJitterMeters = 3.5f;
         public const float BoltCoreWidthFraction = 0.22f;
         public const float BoltVisualLifetimeSeconds = 0.12f;
+        public const string ZapPrefabPath =
+            "Assets/Leviathan/Content/Scripts/Orrery/PlasmaBoltVFX/OrreryPlasmaBoltZap.prefab";
+        public const float ZapWidthMultiplier = 1f;
+        public const float ZapVisualLifetimeSeconds = 0.65f;
+        public const int ZapSortingOrder = 20;
     }
 
     public static class Shatterbolt

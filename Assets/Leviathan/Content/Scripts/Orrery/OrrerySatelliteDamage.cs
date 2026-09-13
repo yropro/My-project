@@ -27,7 +27,7 @@ public static class OrrerySatelliteDamagePatch
                 typeof(Damageable.DamageType),
                 typeof(Damageable.DamageData[]),
                 typeof(float),
-                typeof(bool),
+                typeof(int),
                 typeof(Vector2),
                 typeof(GameShip),
                 typeof(bool)

@@ -18,7 +18,7 @@ public static class OrrerySatelliteSpin
         // Normal idle spin is intentionally slower than the 45 deg/s baseline
         // orbital motion. Sign is derived automatically as opposite the satellite's
         // actual orbit direction.
-        public const float NormalSpinDegreesPerSecond = 15f;
+        public const float NormalSpinDegreesPerSecond = 19f;
 
         // Spell completion/shuffle begins with a brief fast spin, then eases back
         // to the normal magnitude over the existing shuffle interval.

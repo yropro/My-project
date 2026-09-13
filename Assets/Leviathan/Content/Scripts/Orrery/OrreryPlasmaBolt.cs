@@ -74,6 +74,8 @@ public static class OrreryPlasmaBolt
     {
         public GameObject BoltVisualObject;
         public LineRenderer BoltOuter, BoltCore;
+        public ParticleSystem[] ZapParticles;
+        public ParticleSystemRenderer[] ZapRenderers;
         public readonly Vector3[] BoltPoints = new Vector3[OrrerySpellCompendium.PlasmaBolt.BoltVisualPointCount];
         public float BoltVisibleUntil;
     }
@@ -116,6 +118,8 @@ public static class OrreryPlasmaBolt
     private static readonly Dictionary<GameShip, OwnerState> owners =
         new Dictionary<GameShip, OwnerState>(4);
     private static Material boltMaterial;
+    private static GameObject zapPrefab;
+    private static bool warnedMissingZap;
     private static bool warnedMissingMeaningfulHistory;
 
     // Six active targets per actual network send. At 20Hz even a full 64-target
@@ -313,6 +317,8 @@ public static class OrreryPlasmaBolt
             Object.Destroy(boltMaterial);
             boltMaterial = null;
         }
+        zapPrefab = null;
+        warnedMissingZap = false;
     }
 
     // ---------------------------------------------------------------------
@@ -987,6 +993,9 @@ public static class OrreryPlasmaBolt
         Vector2 end,
         float widthMeters)
     {
+        if (ShowZapVisual(state, start, end, widthMeters))
+            return;
+
         if (!EnsureBoltVisual(state))
             return;
 
@@ -1020,6 +1029,89 @@ public static class OrreryPlasmaBolt
             OrrerySpellCompendium.PlasmaBolt.BoltVisualLifetimeSeconds;
 
 
+    }
+
+    private static bool ShowZapVisual(BoltVisualState state, Vector2 start,
+        Vector2 end, float widthMeters)
+    {
+        if (state == null)
+            return false;
+
+        if (state.ZapParticles == null || state.BoltVisualObject == null)
+        {
+            if (zapPrefab == null)
+                zapPrefab = ModContent.Load<GameObject>(
+                    OrrerySpellCompendium.PlasmaBolt.ZapPrefabPath);
+            if (zapPrefab == null)
+            {
+                if (!warnedMissingZap)
+                {
+                    warnedMissingZap = true;
+                    Debug.LogWarning("[Orrery] Plasma Bolt Zap bundle is missing. Build AssetBundles and Package Mod to include leviathanplasmavfx.bundle. Using the fallback bolt.");
+                }
+                return false;
+            }
+
+            DestroyBoltVisual(state);
+            state.BoltVisualObject = Object.Instantiate(zapPrefab);
+            state.BoltVisualObject.name = "Orrery Plasma Bolt Zap";
+            state.ZapParticles = state.BoltVisualObject.GetComponentsInChildren<ParticleSystem>(true);
+            state.ZapRenderers = new ParticleSystemRenderer[state.ZapParticles.Length];
+            for (int i = 0; i < state.ZapParticles.Length; i++)
+                state.ZapRenderers[i] = state.ZapParticles[i].GetComponent<ParticleSystemRenderer>();
+        }
+
+        Vector2 delta = end - start;
+        float length = delta.magnitude;
+        if (length <= 0.0001f)
+        {
+            state.BoltVisibleUntil = Time.time;
+            HideExpiredBoltVisual(state, Time.time);
+            return true;
+        }
+
+        // Stretched billboards follow particle velocity. Map their local +Z
+        // emission axis into the game's XY plane along the cast, rather than
+        // rotating a sky-to-ground effect around a guessed prefab axis.
+        Transform root = state.BoltVisualObject.transform;
+        root.position = (Vector3)((start + end) * 0.5f);
+        root.rotation = Quaternion.LookRotation((Vector3)(delta / length), Vector3.forward);
+        root.localScale = Vector3.one;
+        float width = Mathf.Max(0.01f, OrreryUnits.MetersToWorld(widthMeters) *
+            OrrerySpellCompendium.PlasmaBolt.ZapWidthMultiplier);
+
+        for (int i = 0; i < state.ZapParticles.Length; i++)
+        {
+            ParticleSystem particles = state.ZapParticles[i];
+            particles.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = particles.main;
+            main.loop = false;
+            main.playOnAwake = false;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            main.scalingMode = ParticleSystemScalingMode.Local;
+            main.startSpeed = 0.001f;
+            main.startSize3D = false;
+            main.startSize = width;
+            main.gravityModifier = 0f;
+            main.stopAction = ParticleSystemStopAction.None;
+            var shape = particles.shape;
+            shape.enabled = false;
+            ParticleSystemRenderer renderer = state.ZapRenderers[i];
+            renderer.renderMode = ParticleSystemRenderMode.Stretch;
+            renderer.velocityScale = 0f;
+            renderer.cameraVelocityScale = 0f;
+            renderer.lengthScale = length / width;
+            renderer.pivot = Vector3.zero;
+            renderer.sortingOrder = OrrerySpellCompendium.PlasmaBolt.ZapSortingOrder;
+            // Keep the artist's red gradients, flicker, custom vertex streams,
+            // texture animation and emission timing on all four Zap layers.
+            particles.Play(false);
+            particles.Simulate(0.001f, false, false, false);
+            particles.Play(false);
+        }
+        state.BoltVisibleUntil = Time.time +
+            OrrerySpellCompendium.PlasmaBolt.ZapVisualLifetimeSeconds;
+        return true;
     }
 
     private static bool EnsureBoltVisual(BoltVisualState state)
@@ -1085,6 +1177,12 @@ public static class OrreryPlasmaBolt
         if (state == null || now < state.BoltVisibleUntil)
             return;
 
+        if (state.ZapParticles != null && state.BoltVisibleUntil > 0f)
+        {
+            for (int i = 0; i < state.ZapParticles.Length; i++)
+                state.ZapParticles[i].Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+        state.BoltVisibleUntil = 0f;
         if (state.BoltOuter != null)
             state.BoltOuter.enabled = false;
         if (state.BoltCore != null)
@@ -1101,6 +1199,8 @@ public static class OrreryPlasmaBolt
         state.BoltVisualObject = null;
         state.BoltOuter = null;
         state.BoltCore = null;
+        state.ZapParticles = null;
+        state.ZapRenderers = null;
         state.BoltVisibleUntil = 0f;
     }
 
