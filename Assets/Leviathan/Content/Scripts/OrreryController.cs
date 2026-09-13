@@ -498,8 +498,7 @@ public sealed class OrreryController : MonoBehaviour
         GameShip owner = currentOwner;
         if (owner != null)
         {
-            OrreryShatterbolt.Forget(owner);
-            OrreryPlasmaBolt.Forget(owner);
+            OrrerySpellLifetime.ForgetOwner(owner);
             OrrerySpellRuntime.Forget(owner);
             OrreryCasting.Cancel(owner);
             OrrerySatellites.InvalidateLiveSatellites(owner);
