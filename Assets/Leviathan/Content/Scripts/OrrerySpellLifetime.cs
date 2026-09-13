@@ -1,4 +1,6 @@
+using HarmonyLib;
 using StarVortex;
+using UnityEngine;
 
 /// <summary>
 /// Orrery spell-lifetime orchestration boundary.
@@ -8,11 +10,9 @@ using StarVortex;
 /// behaves while alive. Keep this dispatcher deliberately explicit; it is not a
 /// generic spell engine or registry.
 ///
-/// Migration note: this coordinator is intentionally not wired to a Harmony or
-/// MonoBehaviour tick yet. Shatterbolt and Plasma Bolt still own their existing
-/// live bridges, so invoking this fixed-step entry point before those bridges are
-/// removed would double-tick gameplay. The next migration chunks can move those
-/// bridges here one spell at a time.
+/// Migration note: Shatterbolt is now owned by this lifetime boundary. Plasma
+/// Bolt intentionally remains on its existing bridge until its own migration
+/// chunk, so it must not be dispatched or torn down here yet.
 /// </summary>
 public static class OrrerySpellLifetime
 {
@@ -52,7 +52,6 @@ public static class OrrerySpellLifetime
     private static void FixedTickOwner(GameShip owner, float deltaTime)
     {
         OrreryShatterbolt.FixedTick(owner, deltaTime);
-        OrreryPlasmaBolt.FixedTick(owner, deltaTime);
     }
 
     /// <summary>
@@ -66,21 +65,50 @@ public static class OrrerySpellLifetime
             return;
 
         OrreryShatterbolt.Forget(owner);
-        OrreryPlasmaBolt.Forget(owner);
 
         if (object.ReferenceEquals(lastLocalOwner, owner))
             lastLocalOwner = null;
     }
 
     /// <summary>
-    /// World-global teardown for persistent Orrery spell runtimes. Shared Orrery
-    /// services remain owned by their class/runtime boundaries rather than being
-    /// hidden inside an arbitrary spell cleanup path.
+    /// World-global teardown for migrated persistent Orrery spell runtimes. Shared
+    /// Orrery services remain owned by their class/runtime boundaries rather than
+    /// being hidden inside an arbitrary spell cleanup path.
     /// </summary>
     public static void ResetWorld()
     {
         OrreryShatterbolt.Reset();
-        OrreryPlasmaBolt.Reset();
         lastLocalOwner = null;
+    }
+}
+
+/// <summary>
+/// Single fixed-step bridge for persistent Orrery spell lifetime orchestration.
+/// Individual spell files do not own their own controller FixedUpdate patches.
+/// </summary>
+[HarmonyPatch(typeof(OrreryController), "FixedUpdate")]
+public static class OrrerySpellLifetimeFixedTickPatch
+{
+    public static void Postfix()
+    {
+        OrrerySpellLifetime.FixedTickLocal(Time.fixedDeltaTime);
+    }
+}
+
+[HarmonyPatch(typeof(WorldController), "OnDestroy")]
+public static class OrrerySpellLifetimeWorldDestroyedPatch
+{
+    public static void Prefix()
+    {
+        OrrerySpellLifetime.ResetWorld();
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "OnDestroy")]
+public static class OrrerySpellLifetimeOwnerDestroyedPatch
+{
+    public static void Prefix(GameShip __instance)
+    {
+        OrrerySpellLifetime.ForgetOwner(__instance);
     }
 }

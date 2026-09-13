@@ -1,4 +1,3 @@
-using HarmonyLib;
 using StarVortex;
 using System.Collections.Generic;
 using UnityEngine;
@@ -167,7 +166,6 @@ public static class OrreryShatterbolt
 
     private static readonly Dictionary<GameShip, OwnerState> owners =
         new Dictionary<GameShip, OwnerState>(4);
-    private static GameShip lastTickOwner;
     private static PulseItemBase frostNovaBase;
 
     public static bool Execute(
@@ -266,30 +264,6 @@ public static class OrreryShatterbolt
         state.LegElapsedSeconds = 0f;
         OrreryNetwork.PublishLocal(owner);
         return true;
-    }
-
-    /// <summary>
-    /// Called from the small fixed-step Harmony bridge below. It tracks the one
-    /// locally authoritative Orrery owner and also guarantees old-owner cleanup if
-    /// class context changes without another Shatterbolt cast occurring.
-    /// </summary>
-    public static void TickLocal(float deltaTime)
-    {
-        CoreOwnerContext context = CoreClassRuntime.CurrentContext;
-        GameShip owner = context != null && context.IsValid &&
-            context.ClassId == CoreClassId.Orrery
-                ? context.Ship
-                : null;
-
-        if (!object.ReferenceEquals(owner, lastTickOwner))
-        {
-            if (!object.ReferenceEquals(lastTickOwner, null))
-                Forget(lastTickOwner);
-            lastTickOwner = owner;
-        }
-
-        if (owner != null)
-            FixedTick(owner, deltaTime);
     }
 
     public static void FixedTick(GameShip owner, float deltaTime)
@@ -391,8 +365,6 @@ public static class OrreryShatterbolt
         }
 
         OrreryDamageRouter.Forget(owner);
-        if (object.ReferenceEquals(lastTickOwner, owner))
-            lastTickOwner = null;
     }
 
     public static void Reset()
@@ -402,7 +374,6 @@ public static class OrreryShatterbolt
         for (int i = 0; i < keys.Length; i++)
             Forget(keys[i]);
         owners.Clear();
-        lastTickOwner = null;
         frostNovaBase = null;
         OrreryDamageRouter.Reset();
     }
@@ -1342,38 +1313,5 @@ public static class OrreryShatterbolt
             ? Vector2.zero
             : (Vector2)owner.transform.position +
                 (Vector2)owner.transform.right * 10f;
-    }
-}
-
-/// <summary>
-/// Temporary bridge while the original FF/II/LL runtime is still monolithic.
-/// New per-spell files use this fixed-step hook; when the old spells migrate the
-/// bridge can become the ordinary Orrery spell driver instead of proliferating
-/// one MonoBehaviour per spell.
-/// </summary>
-[HarmonyPatch(typeof(OrreryController), "FixedUpdate")]
-public static class OrreryShatterboltFixedTickPatch
-{
-    public static void Postfix()
-    {
-        OrreryShatterbolt.TickLocal(Time.fixedDeltaTime);
-    }
-}
-
-[HarmonyPatch(typeof(WorldController), "OnDestroy")]
-public static class OrreryShatterboltWorldDestroyedPatch
-{
-    public static void Prefix()
-    {
-        OrreryShatterbolt.Reset();
-    }
-}
-
-[HarmonyPatch(typeof(GameShip), "OnDestroy")]
-public static class OrreryShatterboltOwnerDestroyedPatch
-{
-    public static void Prefix(GameShip __instance)
-    {
-        OrreryShatterbolt.Forget(__instance);
     }
 }
