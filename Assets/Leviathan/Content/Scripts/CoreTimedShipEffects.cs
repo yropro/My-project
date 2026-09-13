@@ -358,7 +358,7 @@ public static class CoreTimedShipEffectsGameShipModifierPatch
         Modifier.Type __0,
         ref float __result)
     {
-        if (__instance == null)
+        if (__instance == null || !__instance.IsPlayer())
             return;
 
         switch (__0)
@@ -379,8 +379,8 @@ public static class CoreTimedShipEffectsGameShipModifierPatch
 }
 
 /// <summary>
-/// Thruster acceleration/dodge/boost live on the equipped Thruster rather than
-/// GameShip.ApplyModifier. Patch the three resolved global getters so temporary
+/// Thruster acceleration/dodge/boost/maneuverability live on the equipped Thruster rather than
+/// GameShip.ApplyModifier. Patch the resolved global getters so temporary
 /// movement effects compose after native item rolls and before GameShip's own
 /// FrozenStatusEffect percentage fields are applied.
 /// </summary>
@@ -395,12 +395,17 @@ public static class CoreTimedShipEffectsThrusterPatch
             typeof(Thruster), nameof(Thruster.DodgeFactor));
         yield return AccessTools.PropertyGetter(
             typeof(Thruster), nameof(Thruster.BoostFactor));
+        yield return AccessTools.PropertyGetter(
+            typeof(Thruster), nameof(Thruster.ControlMultiplier));
     }
 
     public static void Postfix(Thruster __instance, ref float __result)
     {
-        if (__instance == null || __instance.parentShip == null)
+        if (__instance == null || __instance.parentShip == null ||
+            !__instance.parentShip.IsPlayer())
+        {
             return;
+        }
 
         __result *= CoreTimedShipEffects.GetMovementMultiplier(
             __instance.parentShip);
@@ -417,8 +422,11 @@ public static class CoreTimedShipEffectsLauncherCadencePatch
 {
     public static void Postfix(Launcher __instance, ref float __result)
     {
-        if (__instance == null || __instance.parentShip == null)
+        if (__instance == null || __instance.parentShip == null ||
+            !__instance.parentShip.IsPlayer())
+        {
             return;
+        }
 
         float cadence = CoreTimedShipEffects.GetWeaponCadenceMultiplier(
             __instance.parentShip);
@@ -436,14 +444,28 @@ public static class CoreTimedShipEffectsLauncherCadencePatch
 [HarmonyPatch(typeof(GameShip), "UpdateHeat")]
 public static class CoreTimedShipEffectsHeatPatch
 {
+    public struct PatchState
+    {
+        public bool Active;
+        public float OriginalHeatPerSecond;
+    }
+
     public static void Prefix(
         GameShip __instance,
         ref float ___heatPerSecond,
-        out float __state)
+        out PatchState __state)
     {
-        __state = ___heatPerSecond;
+        __state = default(PatchState);
+        if (__instance == null || !__instance.IsPlayer())
+            return;
+
         float multiplier =
             CoreTimedShipEffects.GetHeatGenerationMultiplier(__instance);
+        if (Mathf.Approximately(multiplier, 1f))
+            return;
+
+        __state.Active = true;
+        __state.OriginalHeatPerSecond = ___heatPerSecond;
         ___heatPerSecond *= multiplier;
         CoreTimedShipEffects.EnterHeatUpdate(__instance);
     }
@@ -451,14 +473,16 @@ public static class CoreTimedShipEffectsHeatPatch
     public static Exception Finalizer(
         GameShip __instance,
         ref float ___heatPerSecond,
-        float __state,
+        PatchState __state,
         Exception __exception)
     {
-        // Finalizer runs on both normal and exceptional exits, so the temporary
-        // native-field substitution and thread-static scope can never leak into
-        // a later ship update.
-        ___heatPerSecond = __state;
-        CoreTimedShipEffects.ExitHeatUpdate(__instance);
+        if (__state.Active)
+        {
+            // Finalizer runs on both normal and exceptional exits, so the
+            // temporary field substitution and scope cannot leak to later ticks.
+            ___heatPerSecond = __state.OriginalHeatPerSecond;
+            CoreTimedShipEffects.ExitHeatUpdate(__instance);
+        }
         return __exception;
     }
 }
@@ -481,13 +505,16 @@ public static class CoreTimedShipEffectsDisplaceHeatPatch
     }
 }
 
-[HarmonyPatch(typeof(GameShip), nameof(GameShip.FixedUpdate))]
+[HarmonyPatch(typeof(WorldController), nameof(WorldController.FixedUpdate))]
 public static class CoreTimedShipEffectsFixedTickPatch
 {
-    public static void Postfix(GameShip __instance)
+    public static void Postfix(WorldController __instance)
     {
-        if (__instance != null && __instance.IsPlayer())
-            CoreTimedShipEffects.Tick(__instance, Time.fixedDeltaTime);
+        GameShip player = __instance == null
+            ? null
+            : __instance.GetCurrentPlayerShip();
+        if (player != null && player.IsPlayer())
+            CoreTimedShipEffects.Tick(player, Time.fixedDeltaTime);
     }
 }
 
