@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using StarVortex;
 using System;
 using System.Collections.Generic;
@@ -756,7 +756,8 @@ public static class LeviathanStellarConverter
             .FirstOrDefault(m =>
                 m.Name == "RouteDamage" &&
                 m.GetParameters().Length == 14 &&
-                m.GetParameters()[2].ParameterType == typeof(DamageData[]));
+                m.GetParameters()[2].ParameterType == typeof(DamageData[]) &&
+                m.GetParameters()[4].ParameterType == typeof(int));
 
     private static readonly MethodInfo ConduitRelayHitMethod =
         typeof(Conduit)
@@ -4946,7 +4947,7 @@ public static class LeviathanStellarConverter
                 source.damageType,
                 damage,
                 statusChance,
-                crit,
+                crit ? 1 : 0,
                 hitPosition,
                 owner,
                 bypass,
@@ -6345,7 +6346,8 @@ public static class LeviathanStellarConverterContinuousStatusPatch
             .FirstOrDefault(m =>
                 m.Name == "RouteDamage" &&
                 m.GetParameters().Length == 14 &&
-                m.GetParameters()[2].ParameterType == typeof(DamageData[]));
+                m.GetParameters()[2].ParameterType == typeof(DamageData[]) &&
+                m.GetParameters()[4].ParameterType == typeof(int));
     }
 
     public static void Postfix(object[] __args)

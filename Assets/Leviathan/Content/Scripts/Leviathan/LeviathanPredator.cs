@@ -1229,7 +1229,7 @@ public static class LeviathanPredatorRuntime
     // Verified against Assault.StartAttack/GetDamageData and NetCombat.RouteDamage.
     // Bind private native boundaries once, rather than reflecting/boxing each hit.
     private delegate bool RoutePacket(GameShip target, Damageable.DamageType type,
-        Damageable.DamageData[] packet, float status, bool crit, Vector2 position,
+        Damageable.DamageData[] packet, float status, int crit, Vector2 position,
         GameShip owner, bool bypass, float knockback, Activatable source,
         float impaleDps, float impaleDuration, bool forceLocal, float impaleRotation);
     private delegate void RelayPacket(Activatable source, GameShip owner,
@@ -1238,7 +1238,7 @@ public static class LeviathanPredatorRuntime
     private static readonly RoutePacket RouteNative = AccessTools.MethodDelegate<RoutePacket>(
         AccessTools.Method(typeof(NetCombat), "RouteDamage", new[] {
             NativeDamageable, typeof(Damageable.DamageType), typeof(Damageable.DamageData[]),
-            typeof(float), typeof(bool), typeof(Vector2), typeof(GameShip), typeof(bool),
+            typeof(float), typeof(int), typeof(Vector2), typeof(GameShip), typeof(bool),
             typeof(float), typeof(Activatable), typeof(float), typeof(float), typeof(bool), typeof(float) }));
     private static readonly Action<Activatable, GameShip> ApplyNativeCrit =
         AccessTools.MethodDelegate<Action<Activatable, GameShip>>(
@@ -1518,7 +1518,7 @@ public static class LeviathanPredatorRuntime
         try
         {
             killed = RouteNative(target, source.damageType, runtime.DamagePacket,
-                Mathf.Max(0f, source.StatusEffectChance + stats.StatusChanceBonus), crit,
+                Mathf.Max(0f, source.StatusEffectChance + stats.StatusChanceBonus), crit ? 1 : 0,
                 point, owner, bypass, 0f, source, 0f, 0f, false, 0f);
         }
         finally

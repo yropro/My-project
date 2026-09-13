@@ -2146,7 +2146,8 @@ public static class CoreCombatRouteDamagePatch
             if (method.Name != "RouteDamage") continue;
             ParameterInfo[] p = method.GetParameters();
             if (p.Length == 14 &&
-                p[2].ParameterType == typeof(Damageable.DamageData[]))
+                p[2].ParameterType == typeof(Damageable.DamageData[]) &&
+                p[4].ParameterType == typeof(int))
             {
                 return method;
             }

@@ -537,7 +537,8 @@ public static class LeviathanStarfireRuntime
             ParameterInfo[] parameters = methods[i].GetParameters();
             if (methods[i].Name == "RouteDamage" &&
                 parameters.Length == 14 &&
-                parameters[2].ParameterType == typeof(DamageData[]))
+                parameters[2].ParameterType == typeof(DamageData[]) &&
+                parameters[4].ParameterType == typeof(int))
             {
                 return methods[i];
             }
@@ -590,7 +591,7 @@ public static class LeviathanStarfireRuntime
         args[1] = damageType;
         args[2] = damage;
         args[3] = statusChance;
-        args[4] = crit;
+        args[4] = crit ? 1 : 0;
         args[5] = hitPoint;
         args[6] = owner;
         args[7] = bypassDamageLimit;

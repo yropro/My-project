@@ -19,7 +19,7 @@ public static class OrreryDamageRouter
         Damageable.DamageType damageType,
         Damageable.DamageData[] damageData,
         float statusEffectChance,
-        bool crit,
+        int crit,
         Vector2 fromPosition,
         GameShip fromShip,
         bool bypassDamageLimit,
@@ -58,7 +58,7 @@ public static class OrreryDamageRouter
                 damageType,
                 damageData,
                 statusEffectChance,
-                crit,
+                crit ? 1 : 0,
                 fromPosition,
                 owner,
                 bypassDamageLimit,
@@ -105,7 +105,8 @@ public static class OrreryDamageRouter
                 parameters[0].ParameterType.FullName != "StarVortex.IDamageable" ||
                 !parameters[0].ParameterType.IsAssignableFrom(typeof(Damageable)) ||
                 parameters[1].ParameterType != typeof(Damageable.DamageType) ||
-                parameters[2].ParameterType != typeof(Damageable.DamageData[]))
+                parameters[2].ParameterType != typeof(Damageable.DamageData[]) ||
+                parameters[4].ParameterType != typeof(int))
             {
                 continue;
             }

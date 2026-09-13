@@ -193,7 +193,8 @@ public static class LeviathanConstrictor
                 m => m.Name == "RouteDamage" &&
                      m.GetParameters().Length == 14 &&
                      m.GetParameters()[2].ParameterType ==
-                        typeof(Damageable.DamageData[])
+                        typeof(Damageable.DamageData[]) &&
+                     m.GetParameters()[4].ParameterType == typeof(int)
             );
 
     private static readonly MethodInfo ApplyOnCritStatusEffectsMethod =
@@ -1130,7 +1131,7 @@ public static class LeviathanConstrictor
                 damageType,
                 damageData,
                 statusEffectChance,
-                crit,
+                crit ? 1 : 0,
                 fromPosition,
                 fromShip,
                 bypassDamageLimit,
