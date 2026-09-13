@@ -1,3 +1,5 @@
+using HarmonyLib;
+
 /// <summary>
 /// Fixed physical transport bank for transient Orrery presentation state.
 ///
@@ -22,5 +24,29 @@ public static class OrreryPresentationNetwork
         if (recordIndex < 0 || recordIndex >= RecordCount)
             return 0;
         return (byte)(Record0SlotId + recordIndex);
+    }
+
+    /// <summary>
+    /// Registers the portion of the physical bank already migrated away from
+    /// spell-local CoreNetwork ownership. Records 0-2 remain temporarily owned
+    /// by the legacy Shatterbolt path until its codec migration.
+    /// </summary>
+    public static void EnsureInitialized()
+    {
+        CoreNetwork.RegisterSlot(Record3SlotId, CoreClassId.Orrery,
+            "Orrery presentation record 3");
+        CoreNetwork.RegisterSlot(Record4SlotId, CoreClassId.Orrery,
+            "Orrery presentation record 4");
+        CoreNetwork.RegisterSlot(Record5SlotId, CoreClassId.Orrery,
+            "Orrery presentation record 5");
+    }
+}
+
+[HarmonyPatch(typeof(CoreNetwork), "RegisterDefaultSlots")]
+public static class OrreryPresentationNetworkRegisterSlotsPatch
+{
+    public static void Postfix()
+    {
+        OrreryPresentationNetwork.EnsureInitialized();
     }
 }

@@ -5,14 +5,16 @@ using System.Reflection;
 using UnityEngine;
 
 /// <summary>
-/// Presentation only. Slot 10: version, packet/cast sequences, bolt flag,
-/// start/end and width (26 bytes). Slot 11: up to six net-id/remaining-time
+/// Presentation only. Bank record 3: version, packet/cast sequences, bolt flag,
+/// start/end and width (26 bytes). Bank record 4: up to six net-id/remaining-time
 /// pairs (31 bytes). Burns rotate on actual sends and expire without refresh.
-/// Core commits both slots atomically. No damage or infection decisions here.
+/// Core commits both records atomically. No damage or infection decisions here.
 /// </summary>
 public static class OrreryPlasmaBoltPresentation
 {
-    private const byte HeaderSlot = 10, BurnSlot = 11, Version = 1;
+    private const byte HeaderSlot = OrreryPresentationNetwork.Record3SlotId;
+    private const byte BurnSlot = OrreryPresentationNetwork.Record4SlotId;
+    private const byte Version = 1;
     private const int BatchSize = 6;
     private const float RefreshTimeout = 1.25f;
     private static readonly uint[] targetScratch = new uint[BatchSize];
@@ -40,14 +42,6 @@ public static class OrreryPlasmaBoltPresentation
     }
 
     private static readonly Dictionary<GameShip, RemoteState> remotes = new Dictionary<GameShip, RemoteState>(4);
-
-    static OrreryPlasmaBoltPresentation()
-    {
-        CoreNetwork.RegisterSlot(HeaderSlot, CoreClassId.Orrery, "Plasma Bolt presentation");
-        CoreNetwork.RegisterSlot(BurnSlot, CoreClassId.Orrery, "Plasma Burn refresh batch");
-    }
-
-    public static void EnsureInitialized() { }
 
     public static void Publish()
     {
@@ -214,12 +208,6 @@ public static class OrreryPlasmaBoltPresentation
 public static class OrreryPlasmaBoltSendPatch
 {
     public static void Prefix() { OrreryPlasmaBoltPresentation.Publish(); }
-}
-
-[HarmonyPatch(typeof(CoreNetwork), "RegisterDefaultSlots")]
-public static class OrreryPlasmaBoltRegisterSlotsPatch
-{
-    public static void Postfix() { OrreryPlasmaBoltPresentation.EnsureInitialized(); }
 }
 
 [HarmonyPatch(typeof(RemoteShipDriver), "Render")]
