@@ -145,6 +145,11 @@ public static class OrrerySpellCompendium
         public const float ZapWidthMultiplier = 2f;
         public const float ZapVisualLifetimeSeconds = 0.5f;
         public const int ZapSortingOrder = 20;
+
+        // Presentation audio. The clip may be absent during development; Core
+        // fails closed with one warning and requires no dummy AudioClip.
+        public const string ThunderClipName = "thunder";
+        public const float ThunderVolume = 1.00f;
     }
 
     public static class Shatterbolt
