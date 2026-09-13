@@ -3,8 +3,7 @@
 **Project:** Star Vortex — Orrery / Celestial Mage / Sphereweaver  
 **Status:** CANONICAL IMPLEMENTATION STANDARD  
 **Applies to:** all new Orrery spells and all maintenance/refactors touching Orrery persistent runtime behavior  
-**Established from live implementation:** `skill-trees` through `6d6e56e52d0d2389e459c359fb1502cc485e5758`  
-**Historical design/migration rationale:** `spell_lifetime_agent.md`
+**Established from live implementation:** `skill-trees` through `6d6e56e52d0d2389e459c359fb1502cc485e5758`
 
 ---
 
@@ -303,7 +302,35 @@ Double ticking is a hard regression.
 
 ---
 
-# 12. Legacy `OrrerySpellRuntime`
+# 12. Time Sources Are Semantic
+
+The lifetime boundary supplies `Time.fixedDeltaTime` to fixed-step spell runtimes and must pass it through unchanged.
+
+Do not use a lifecycle refactor as an excuse to normalize every timer onto one clock. Existing and future spells may legitimately use different Unity time sources for different semantics:
+
+- `Time.fixedDeltaTime` for fixed-step integration,
+- `Time.time` for authored gameplay/presentation timestamps,
+- `Time.unscaledTime` for confirmation deadlines or other semantics that intentionally survive time scaling.
+
+For example, Shatterbolt presentation-tail expiry and Plasma's pending-outcome/burn timing do not become interchangeable merely because both are timers.
+
+Changing a spell's time source is a behavior change and requires its own explicit review/testing. It is not lifetime cleanup.
+
+---
+
+# 13. Error Isolation: Do Not Blanket-Catch Runtime Ticks
+
+Do not wrap every spell dispatch in a broad `try/catch` merely to keep the lifetime loop running.
+
+A swallowed exception can leave half-mutated gameplay state, native adapters, pooled presentation objects, or semantic state alive while hiding the programming error that caused it.
+
+Defensive exception handling is appropriate only around a specific native/API boundary that is known to require it, and should remain near that boundary.
+
+The normal lifetime dispatcher should stay transparent: if a spell runtime has a programming error during development, it should be visible rather than silently converted into corrupted persistent state.
+
+---
+
+# 14. Legacy `OrrerySpellRuntime`
 
 The existing FF/II/LL `OrrerySpellRuntime` remains a separate legacy path for now.
 
@@ -315,7 +342,7 @@ A future migration of legacy FF/II/LL into the same boundary should be treated a
 
 ---
 
-# 13. When a New Lifecycle Phase Is Actually Needed
+# 15. When a New Lifecycle Phase Is Actually Needed
 
 If a future mechanic genuinely needs a lifecycle phase not currently supplied—for example a shared `LateTick` or non-fixed presentation update—do **not** give that spell an isolated Harmony patch by default.
 
@@ -332,7 +359,7 @@ Do not add empty interfaces or force every spell to implement every phase.
 
 ---
 
-# 14. New Spell Implementation Checklist
+# 16. New Spell Implementation Checklist
 
 Before considering a persistent spell implementation complete, verify:
 
@@ -351,6 +378,7 @@ Before considering a persistent spell implementation complete, verify:
 [ ] Shuffle does not freeze existing tails.
 [ ] Runtime state is bounded.
 [ ] No steady-state per-tick allocations were introduced by lifecycle plumbing.
+[ ] Existing time-source semantics were preserved unless deliberately changed/tested.
 [ ] Gameplay remains owner-authoritative.
 [ ] Remote presentation cannot apply gameplay.
 [ ] Exactly one authoritative tick path exists.
@@ -358,7 +386,51 @@ Before considering a persistent spell implementation complete, verify:
 
 ---
 
-# 15. Refactor Guardrails
+# 17. Regression Validation
+
+Architecture changes and new persistent spells must be tested for timing and teardown regressions, not merely compilation.
+
+## Shatterbolt reference checks
+
+Verify ordinary and inherited-chain behavior, target death/reacquisition, final burst behavior, shuffle on cast completion, post-cast Frost Burst completion, presentation-tail retirement, and immediate class-exit cleanup of orb/bursts/hidden sources.
+
+Strong double-tick symptoms include:
+
+- projectile travel appearing roughly twice as fast,
+- Frost Bursts expanding roughly twice as fast,
+- shortened presentation tail,
+- duplicated damage or presentation publication.
+
+## Plasma Bolt reference checks
+
+Verify the initial bolt occurs once, formula completion still succeeds, confirmed actual initial damage remains the burn budget, burn duration/total remain exact, spread cadence and reinfection lockout remain correct, target destruction releases faux-burning presentation before native pooled-child teardown, and burns survive initial cast completion but die on owner/class teardown.
+
+Strong double-tick/lifetime symptoms include:
+
+- burn completing in roughly half its intended duration,
+- spread scanning/propagating too rapidly,
+- pending combat confirmations being consumed or pruned unexpectedly,
+- accelerated visual retirement.
+
+## Owner/class transition checks
+
+With a persistent effect alive, leave Orrery, replace the local owner, or otherwise trigger class teardown. Expected result: authoritative runtime state and spell-owned native/pooled resources are cleaned immediately, and old-owner effects do not resume if Orrery is entered again.
+
+## World transition checks
+
+Unload/reload while representative persistent states are alive: traveling projectile, expanding child effect, pending combat confirmation, active target-attached effect, and retiring presentation. Expected result: no stale owner references, leaked gameplay state, or VFX carried into the next world; the next Orrery activation works normally.
+
+## Ship destruction checks
+
+Destroy the Orrery owner and representative spell targets. Both `GameShip.Destroyed` and `OnDestroy` may notify cleanup; behavior must remain correct and idempotent.
+
+## Legacy regression check
+
+Until legacy FF/II/LL are deliberately migrated, verify Magma Cannon, Cone of Cold, and Tesla still use their existing scheduling and have not acquired an extra tick path.
+
+---
+
+# 18. Refactor Guardrails
 
 Before changing this architecture, require a concrete problem demonstrated by live spell implementations.
 
@@ -395,7 +467,7 @@ If a proposed abstraction cannot explain how it preserves those properties, do n
 
 ---
 
-# 16. Review Rule for Future Agents
+# 19. Review Rule for Future Agents
 
 When implementing or reviewing an Orrery spell, search the new code for these warning signs:
 
@@ -426,16 +498,10 @@ That is the standard.
 
 ---
 
-# 17. Relationship to Historical Documentation
+# 20. Documentation Ownership
 
-`spell_lifetime_agent.md` records the reasoning, alternatives, migration plan, and validation detail that led to this architecture.
+This file is the canonical lifetime architecture reference.
 
-This document records the **post-migration rule**.
+Historical migration plans are intentionally not retained as competing implementation guidance after their durable rules and regression checks have been incorporated here.
 
-When the two are read together:
-
-- use `spell_lifetime_agent.md` to understand *why* the boundary exists,
-- use `ORRERY_SPELL_LIFETIME_STANDARD.md` to decide *how new code must integrate today*,
-- always treat current live source as authoritative for exact method names/signatures.
-
-If future implementation materially changes the lifetime architecture after an explicit architecture review, update this standard in the same change. Do not allow code and lifetime documentation to drift apart.
+Always treat current live source as authoritative for exact method names/signatures. If future implementation materially changes the lifetime architecture after an explicit architecture review, update this standard in the same change. Do not allow code and lifetime documentation to drift apart.
