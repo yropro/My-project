@@ -1,4 +1,3 @@
-using HarmonyLib;
 using StarVortex;
 using System.Collections.Generic;
 using UnityEngine;
@@ -116,7 +115,6 @@ public static class OrreryPlasmaBolt
 
     private static readonly Dictionary<GameShip, OwnerState> owners =
         new Dictionary<GameShip, OwnerState>(4);
-    private static GameShip lastTickOwner;
     private static Material boltMaterial;
     private static bool warnedMissingMeaningfulHistory;
 
@@ -264,25 +262,6 @@ public static class OrreryPlasmaBolt
         }
     }
 
-    public static void TickLocal(float deltaTime)
-    {
-        CoreOwnerContext context = CoreClassRuntime.CurrentContext;
-        GameShip owner = context != null && context.IsValid &&
-            context.ClassId == CoreClassId.Orrery
-                ? context.Ship
-                : null;
-
-        if (!object.ReferenceEquals(owner, lastTickOwner))
-        {
-            if (!object.ReferenceEquals(lastTickOwner, null))
-                Forget(lastTickOwner);
-            lastTickOwner = owner;
-        }
-
-        if (owner != null)
-            FixedTick(owner, deltaTime);
-    }
-
     public static void FixedTick(GameShip owner, float deltaTime)
     {
         OwnerState state;
@@ -321,8 +300,6 @@ public static class OrreryPlasmaBolt
         }
 
         OrreryDamageRouter.Forget(owner);
-        if (object.ReferenceEquals(lastTickOwner, owner))
-            lastTickOwner = null;
     }
 
     public static void Reset()
@@ -332,7 +309,6 @@ public static class OrreryPlasmaBolt
         for (int i = 0; i < keys.Length; i++)
             Forget(keys[i]);
         owners.Clear();
-        lastTickOwner = null;
 
         if (boltMaterial != null)
         {
@@ -1301,49 +1277,5 @@ public static class OrreryPlasmaBolt
                 (Vector2)owner.transform.right *
                 OrreryUnits.MetersToWorld(
                     OrrerySpellCompendium.PlasmaBolt.BoltLengthMeters);
-    }
-}
-
-/// <summary>
-/// Same fixed-step integration boundary as the other explicit Orrery spells.
-/// </summary>
-[HarmonyPatch(typeof(OrreryController), "FixedUpdate")]
-public static class OrreryPlasmaBoltFixedTickPatch
-{
-    public static void Postfix()
-    {
-        OrreryPlasmaBolt.TickLocal(Time.fixedDeltaTime);
-    }
-}
-
-[HarmonyPatch(typeof(WorldController), "OnDestroy")]
-public static class OrreryPlasmaBoltWorldDestroyedPatch
-{
-    public static void Prefix()
-    {
-        OrreryPlasmaBolt.Reset();
-    }
-}
-
-[HarmonyPatch(typeof(GameShip), "OnDestroy")]
-public static class OrreryPlasmaBoltShipDestroyedPatch
-{
-    public static void Prefix(GameShip __instance)
-    {
-        OrreryPlasmaBolt.ForgetTarget(__instance);
-        OrreryPlasmaBolt.Forget(__instance);
-        OrreryPlasmaBoltPresentation.ForgetTarget(__instance);
-        OrreryPlasmaBoltPresentation.Forget(__instance);
-    }
-}
-
-// Native Destroyed returns/disowns pooled children before Unity OnDestroy.
-// Release our unassigned status layers before that native sweep runs.
-[HarmonyPatch(typeof(GameShip), "Destroyed")]
-public static class OrreryPlasmaBoltShipDyingPatch
-{
-    public static void Prefix(GameShip __instance)
-    {
-        OrreryPlasmaBoltShipDestroyedPatch.Prefix(__instance);
     }
 }

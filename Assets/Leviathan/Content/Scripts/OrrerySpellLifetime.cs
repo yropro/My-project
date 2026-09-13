@@ -10,9 +10,9 @@ using UnityEngine;
 /// behaves while alive. Keep this dispatcher deliberately explicit; it is not a
 /// generic spell engine or registry.
 ///
-/// Migration note: Shatterbolt is now owned by this lifetime boundary. Plasma
-/// Bolt intentionally remains on its existing bridge until its own migration
-/// chunk, so it must not be dispatched or torn down here yet.
+/// Shatterbolt and Plasma Bolt are both migrated here. Their spell files retain
+/// their mechanics, presentation state, combat provenance, and other spell-specific
+/// behavior; this layer only owns shared fixed-step and teardown timing.
 /// </summary>
 public static class OrrerySpellLifetime
 {
@@ -52,6 +52,7 @@ public static class OrrerySpellLifetime
     private static void FixedTickOwner(GameShip owner, float deltaTime)
     {
         OrreryShatterbolt.FixedTick(owner, deltaTime);
+        OrreryPlasmaBolt.FixedTick(owner, deltaTime);
     }
 
     /// <summary>
@@ -65,9 +66,27 @@ public static class OrrerySpellLifetime
             return;
 
         OrreryShatterbolt.Forget(owner);
+        OrreryPlasmaBolt.Forget(owner);
 
         if (object.ReferenceEquals(lastLocalOwner, owner))
             lastLocalOwner = null;
+    }
+
+    /// <summary>
+    /// Handles the wider ship-destruction boundary needed by spells with state
+    /// attached to arbitrary target ships. Plasma Burn target/presentation cleanup
+    /// must run before native pooled-child teardown, exactly as it did in the
+    /// spell-local Destroyed patch before migration.
+    /// </summary>
+    public static void ForgetShip(GameShip ship)
+    {
+        if (object.ReferenceEquals(ship, null))
+            return;
+
+        OrreryPlasmaBolt.ForgetTarget(ship);
+        ForgetOwner(ship);
+        OrreryPlasmaBoltPresentation.ForgetTarget(ship);
+        OrreryPlasmaBoltPresentation.Forget(ship);
     }
 
     /// <summary>
@@ -78,6 +97,7 @@ public static class OrrerySpellLifetime
     public static void ResetWorld()
     {
         OrreryShatterbolt.Reset();
+        OrreryPlasmaBolt.Reset();
         lastLocalOwner = null;
     }
 }
@@ -109,6 +129,17 @@ public static class OrrerySpellLifetimeOwnerDestroyedPatch
 {
     public static void Prefix(GameShip __instance)
     {
-        OrrerySpellLifetime.ForgetOwner(__instance);
+        OrrerySpellLifetime.ForgetShip(__instance);
+    }
+}
+
+// Native Destroyed returns/disowns pooled children before Unity OnDestroy.
+// Release spell-owned target presentation before that native sweep runs.
+[HarmonyPatch(typeof(GameShip), "Destroyed")]
+public static class OrrerySpellLifetimeShipDyingPatch
+{
+    public static void Prefix(GameShip __instance)
+    {
+        OrrerySpellLifetime.ForgetShip(__instance);
     }
 }
