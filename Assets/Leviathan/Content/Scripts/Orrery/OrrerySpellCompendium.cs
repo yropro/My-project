@@ -21,6 +21,7 @@ public static class OrrerySpellCompendium
 
     public static class TeslaCoil
     {
+        // Channel envelope / donor normalization.
         public const float InitialDpsMultiplier = 2f;
         public const float MinimumDpsMultiplier = 1f;
         public const float FadeSeconds = 1f;
@@ -28,10 +29,17 @@ public static class OrrerySpellCompendium
         public const float BeamWidthMultiplier = 1f;
         public const float ChainRangeMultiplier = 1f;
         public const int ChainCountAdjustment = 0;
+
+        // Authoritative Orrery geometry and native chain behavior.
+        public const float RangeMeters = 195f;
+        public const int ChainCount = 1;
+        public const float ChainRangeMeters = 97.5f;
+        public const float ChainDamageMultiplier = 0.50f;
     }
 
     public static class ConeOfCold
     {
+        // Mechanical cone and native presentation volley.
         public const float IntegratedReferenceSeconds = 1f;
         public const float DamageMultiplier = 1f;
         public const float ConeRangeMeters = 60f;
@@ -41,6 +49,16 @@ public static class OrrerySpellCompendium
         public const int VisualSpreadDegrees = 30;
         public const float VisualVelocityMultiplier = 1.30f;
         public const float VisualProjectileScale = 1f;
+        public const float BaseVisualRangeMultiplier = 1f;
+        public const float BaseVisualAngleMultiplier = 1f;
+
+        // Presentation-only travelling cold-front wave.
+        public const int VisualWaveCount = 5;
+        public const float VisualWaveIntervalSeconds = 0.10f;
+        public const float VisualRangeMeters = 180f;
+        public const float WaveProjectileScaleMultiplier = 1.50f;
+        public const float OuterAimOffsetDegrees = 5f;
+        public const float InnerAimOffsetDegrees = 2.5f;
     }
 
     public static class ColdFusion
