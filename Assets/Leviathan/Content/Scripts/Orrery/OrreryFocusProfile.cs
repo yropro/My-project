@@ -30,6 +30,7 @@ public static class OrreryFocusProfile
         public float ChainRangeBonus;
         public float ChainDamageBonus;
         public float ProjectileVelocityBonus;
+        public float DurationBonus;
         public int AdditionalProjectileOrChainCount;
         public bool BypassDamageLimit;
 
@@ -79,6 +80,11 @@ public static class OrreryFocusProfile
         public float ApplyProjectileVelocityBonus(float value)
         {
             return value * Mathf.Max(0f, 1f + ProjectileVelocityBonus);
+        }
+
+        public float ApplyDurationBonus(float value)
+        {
+            return value * Mathf.Max(0f, 1f + DurationBonus);
         }
     }
 
@@ -255,6 +261,10 @@ public static class OrreryFocusProfile
 
                 case Modifier.Type.Velocity:
                     resolved.ProjectileVelocityBonus += value;
+                    break;
+
+                case Modifier.Type.EffectDuration:
+                    resolved.DurationBonus += value;
                     break;
             }
         }
