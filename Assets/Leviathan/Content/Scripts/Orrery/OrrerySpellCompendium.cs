@@ -7,6 +7,47 @@
 /// </summary>
 public static class OrrerySpellCompendium
 {
+    public static class ColdFusion
+    {
+        // Identity
+        public const ushort Id = 4;
+        public const string Name = "Cold Fusion";
+        public static readonly OrreryRecipeKey Recipe =
+            default(OrreryRecipeKey)
+                .Add(OrreryElement.Fire)
+                .Add(OrreryElement.Ice);
+
+        // Buff tuning. Duration bonuses extend the full effect while shield
+        // grant/sec remains based on BaseDurationSeconds, so duration is always
+        // beneficial rather than stretching the same shield budget thinner.
+        public const float BaseDurationSeconds = 8f;
+        public const float MovementBonusFraction = 0.20f;
+        public const float HeatGenerationReductionFraction = 0.30f;
+        public const float WeaponCadenceBonusFraction = 0.20f;
+        public const float ShieldBatteryMultiplier = 1.10f;
+
+        // Mixed Fire/Ice focus aggregation. 0 = Fire only, 1 = Ice only, 0.5 =
+        // equal average. This weight is used for both effective item level and
+        // compatible Effect Duration bonuses.
+        public const float MixedFocusIceWeight = 0.50f;
+        public const float DurationModifierScale = 1f;
+
+        // Ally nearest the cursor inside this local cursor search wins. A target
+        // must also be within MaximumTargetRangeMeters of the caster. If none is
+        // found, the spell buffs the caster.
+        public const float CursorTargetRadiusMeters = 120f;
+        public const float MaximumTargetRangeMeters = 300f;
+        public const int MaxCandidateShips = 16;
+
+        // Shield Battery-equivalent level curve. These are exposed separately so
+        // the support curve can be retuned without changing spell mechanics.
+        public const float ShieldCurveLevel1Amount = 1700f;
+        public const float ShieldCurveBreakpointLevel = 15f;
+        public const float ShieldCurveBreakpointAmount = 3400f;
+        public const float ShieldCurveSecondReferenceLevel = 30f;
+        public const float ShieldCurveSecondReferenceAmount = 6800f;
+    }
+
     public static class PlasmaBolt
     {
         public const ushort Id = 5;
