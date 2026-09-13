@@ -993,6 +993,15 @@ public static class OrreryPlasmaBolt
         Vector2 end,
         float widthMeters)
     {
+        if (widthMeters > 0f)
+        {
+            CoreAudioRuntime.PlayPositionalOneShot(
+                OrrerySpellCompendium.PlasmaBolt.ThunderClipName,
+                start,
+                OrrerySpellCompendium.PlasmaBolt.ThunderVolume,
+                "Orrery Plasma Bolt Thunder");
+        }
+
         if (ShowZapVisual(state, start, end, widthMeters))
             return;
 
