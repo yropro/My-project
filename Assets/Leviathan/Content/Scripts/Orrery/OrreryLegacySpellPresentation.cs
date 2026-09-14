@@ -334,22 +334,37 @@ public static class OrreryLegacySpellPresentation
                 ? baseState.SpellId
                 : (ushort)0;
 
-        if (activeSpellId == MagmaSpellId)
-            PublishMagma(capture);
-        else if (activeSpellId == TeslaSpellId)
+        // A reflected Magma projectile deliberately outlives its original Orrery
+        // cast. Keep publishing that native projectile from the original owner's
+        // custom presentation stream until it actually retires; hidden virtual
+        // launchers cannot register it in Star Vortex's native NetProjectile lane.
+        bool hasLiveMagmaProjectile =
+            capture.MagmaProjectile != null &&
+            capture.MagmaProjectile.gameObject != null &&
+            capture.MagmaProjectile.gameObject.activeInHierarchy &&
+            !capture.MagmaProjectile.IsDestroying() &&
+            !capture.MagmaProjectile.hasExploded;
+        bool hasMagmaExplosionTail =
+            capture.MagmaGeneration != 0u &&
+            Time.unscaledTime < capture.MagmaExplosionPublishUntil;
+
+        // Current active presentation gets first claim on the multiplex bank.
+        // Reflected Magma is independent, so a later Tesla channel can coexist
+        // with the still-flying reflected projectile instead of suppressing it.
+        if (activeSpellId == TeslaSpellId)
             PublishTesla(owner, capture);
+
+        if (activeSpellId == MagmaSpellId ||
+            hasLiveMagmaProjectile ||
+            hasMagmaExplosionTail)
+        {
+            PublishMagma(capture);
+        }
 
         if (capture.CryoGeneration != 0u &&
             Time.unscaledTime < capture.CryoPublishUntil)
         {
             PublishCryo(capture);
-        }
-
-        if (activeSpellId != MagmaSpellId &&
-            capture.MagmaGeneration != 0u &&
-            Time.unscaledTime < capture.MagmaExplosionPublishUntil)
-        {
-            PublishMagma(capture);
         }
     }
 
