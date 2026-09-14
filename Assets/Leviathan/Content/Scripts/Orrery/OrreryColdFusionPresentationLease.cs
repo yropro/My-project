@@ -205,14 +205,15 @@ public static class OrreryColdFusionPresentationLease
         GameShip target = ResolvePlayerShip(session, playerId);
         if (target != null)
         {
-            if (next.BoundShip != null &&
-                !object.ReferenceEquals(next.BoundShip, target))
-            {
+            bool rebound = next.BoundShip == null ||
+                !object.ReferenceEquals(next.BoundShip, target);
+
+            if (next.BoundShip != null && rebound)
                 OrreryColdFusionPresentation.Hide(next.BoundShip);
-            }
 
             next.BoundShip = target;
-            OrreryColdFusionPresentation.Show(target, remaining);
+            if (!duplicateGrant || rebound)
+                OrreryColdFusionPresentation.Show(target, remaining);
         }
 
         leases[index] = next;
