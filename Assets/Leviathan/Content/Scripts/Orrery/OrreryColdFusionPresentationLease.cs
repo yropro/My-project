@@ -17,9 +17,6 @@ using UnityEngine;
 /// </summary>
 public static class OrreryColdFusionPresentationLease
 {
-    // Co-op player counts are far below this in ordinary Star Vortex sessions.
-    // The fixed table keeps this presentation bridge allocation-stable and gives
-    // bounded behavior even if a future lobby configuration grows substantially.
     private const int MaxLeases = 16;
 
     private struct Lease
@@ -107,10 +104,9 @@ public static class OrreryColdFusionPresentationLease
             return;
         }
 
-        // ObserveLocalRequest is called synchronously from the RequestGrant
-        // postfix, after CoreCrossOwnerEffects has incremented nextSequence.
-        // Correlating that identity with the later reliable relay prevents the
-        // same grant from restarting its full visual duration after network RTT.
+        // This postfix runs synchronously after RequestGrant increments the source
+        // sequence. Reusing that identity lets the later reliable relay be treated
+        // as the same presentation event instead of restarting its duration.
         int sequence = ReadCurrentLocalGrantSequence();
         if (sequence <= 0)
             return;
@@ -187,10 +183,9 @@ public static class OrreryColdFusionPresentationLease
             next.SourcePlayerId == sourcePlayerId &&
             next.Sequence == sequence;
 
-        // CoreCrossOwnerEffects sequences are monotonic for one source during the
-        // session. An older relay can arrive after this target already advanced to
-        // a newer local observation; never let that stale same-source grant restart
-        // the presentation lease. Different sources are independent refreshes.
+        // One source owns a monotonic grant sequence for the session. Ignore an
+        // older same-source relay after a newer observation has already refreshed
+        // this target; grants from another source remain independent refreshes.
         if (matchingTarget >= 0 &&
             next.SourcePlayerId == sourcePlayerId &&
             sequence < next.Sequence)
@@ -269,11 +264,6 @@ public static class OrreryColdFusionPresentationLease
         }
     }
 
-    /// <summary>
-    /// Bare Unity destruction can be a harmless remote-replica replacement. Keep
-    /// the player-id lease in that case and let Tick attach it to the replacement
-    /// replica for only the authored remaining duration.
-    /// </summary>
     public static void OnShipDestroyed(GameShip ship)
     {
         if (object.ReferenceEquals(ship, null))
@@ -288,16 +278,13 @@ public static class OrreryColdFusionPresentationLease
                 continue;
             }
 
+            // OnDestroy may only be a replica replacement. Keep the player lease
+            // alive so Tick can bind it to the replacement for remaining duration.
             lease.BoundShip = null;
             leases[i] = lease;
         }
     }
 
-    /// <summary>
-    /// Native GameShip.Destroyed is an actual gameplay death/retirement boundary,
-    /// not merely a replica object replacement. The timed gameplay effect dies with
-    /// that ship, so its presentation lease must not migrate onto a respawned ship.
-    /// </summary>
     public static void OnShipDied(GameShip ship)
     {
         if (object.ReferenceEquals(ship, null))
@@ -312,6 +299,8 @@ public static class OrreryColdFusionPresentationLease
                 continue;
             }
 
+            // GameShip.Destroyed is a gameplay death/retirement boundary. Do not
+            // migrate this effect's presentation onto a respawned ship.
             OrreryColdFusionPresentation.Hide(ship);
             leases[i] = default(Lease);
         }
