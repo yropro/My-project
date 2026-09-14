@@ -45,6 +45,8 @@ public static class OrreryColdFusionPresentation
         new Dictionary<GameShip, AuraState>(8);
     private static readonly List<GameShip> cleanupScratch =
         new List<GameShip>(8);
+    private static bool warnedMissingWavePrefab;
+    private static bool warnedInvalidVisualShape;
 
     public static void Show(GameShip target, float durationSeconds)
     {
@@ -65,7 +67,16 @@ public static class OrreryColdFusionPresentation
         PulseItemBase frostNovaBase = OrreryContent.FrostNovaPulse;
         GameObject prefab = frostNovaBase == null ? null : frostNovaBase.wave;
         if (prefab == null)
+        {
+            if (frostNovaBase != null && !warnedMissingWavePrefab)
+            {
+                warnedMissingWavePrefab = true;
+                Debug.LogWarning(
+                    "[Orrery] Frost Nova Pulse has no wave prefab; " +
+                    "Cold Fusion aura presentation was omitted.");
+            }
             return;
+        }
 
         AuraState state = new AuraState();
         state.Target = target;
@@ -95,6 +106,14 @@ public static class OrreryColdFusionPresentation
                 circle.radius <= 0f ||
                 !visual.TryGetComponent<SpriteRenderer>(out sprite) || sprite == null)
             {
+                if (!warnedInvalidVisualShape)
+                {
+                    warnedInvalidVisualShape = true;
+                    Debug.LogWarning(
+                        "[Orrery] Frost Nova Pulse wave prefab is missing the Wave, " +
+                        "root SpriteRenderer, or valid CircleCollider2D required by " +
+                        "Cold Fusion; aura presentation was omitted.");
+                }
                 ReturnUnexpectedVisual(visual);
                 continue;
             }
