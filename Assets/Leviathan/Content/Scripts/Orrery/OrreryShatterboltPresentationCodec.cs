@@ -3,14 +3,14 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 
 /// <summary>
-/// Shatterbolt-specific codec over the dumb six-record Orrery presentation bank.
+/// Shatterbolt-specific codec over the shared multiplexed Orrery presentation bank.
 /// Owns only Shatterbolt payload meaning and its bounded cumulative-history wire
 /// shape. Gameplay and remote visual lifetime remain elsewhere.
 /// </summary>
 public static class OrreryShatterboltPresentationCodec
 {
     private const int FirstRecordIndex = 0;
-    private const int PartCount = 3;
+    private const int MaximumPartCount = 3;
     private const byte GroupId = 0;
     private const byte FlagOrbActive = 1 << 0;
     private const int MaxPayloadBytes = 86;
@@ -54,12 +54,16 @@ public static class OrreryShatterboltPresentationCodec
         for (int i = 0; i < impactCount; i++)
             WritePosition(payloadScratch, ref offset, state.GetShatterboltImpact(i));
 
+        int partCount = RequiredPartCount(offset);
+        if (partCount <= 0)
+            return;
+
         uint generation = ResolveGeneration(owner, state.ShatterboltCastSequence);
         OrreryPresentationNetwork.WriteGroup(
             FirstRecordIndex,
             OrreryPresentationNetwork.CodecShatterbolt,
             GroupId,
-            PartCount,
+            partCount,
             generation,
             payloadScratch,
             offset);
@@ -69,19 +73,25 @@ public static class OrreryShatterboltPresentationCodec
         GameShip remoteOwner,
         ref OrreryNetwork.PresentationState state)
     {
-        OrreryPresentationNetwork.GroupReader reader;
-        if (!OrreryPresentationNetwork.TryReadGroup(
-                remoteOwner,
-                FirstRecordIndex,
-                OrreryPresentationNetwork.CodecShatterbolt,
-                GroupId,
-                PartCount,
-                out reader))
+        OrreryPresentationNetwork.GroupReader reader =
+            default(OrreryPresentationNetwork.GroupReader);
+        bool found = false;
+        for (int partCount = 1; partCount <= MaximumPartCount; partCount++)
         {
-            return false;
+            if (OrreryPresentationNetwork.TryReadGroup(
+                    remoteOwner,
+                    FirstRecordIndex,
+                    OrreryPresentationNetwork.CodecShatterbolt,
+                    GroupId,
+                    partCount,
+                    out reader))
+            {
+                found = true;
+                break;
+            }
         }
 
-        if (reader.Length < 6)
+        if (!found || reader.Length < 6)
             return false;
 
         byte flags = reader.Byte();
@@ -94,8 +104,12 @@ public static class OrreryShatterboltPresentationCodec
             return false;
 
         int expectedLength = 6 + (orbActive ? 8 : 0) + impactCount * 8;
-        if (reader.Length != expectedLength || expectedLength > MaxPayloadBytes)
+        if (reader.Length != expectedLength ||
+            expectedLength > MaxPayloadBytes ||
+            RequiredPartCount(expectedLength) != reader.PartCount)
+        {
             return false;
+        }
 
         float radiusMeters = ReadFloat(ref reader);
         if (!OrreryNetwork.IsFinite(radiusMeters) || radiusMeters <= 0f)
@@ -129,6 +143,16 @@ public static class OrreryShatterboltPresentationCodec
         decoded.ShatterboltPresent = true;
         state = decoded;
         return true;
+    }
+
+    private static int RequiredPartCount(int payloadLength)
+    {
+        for (int parts = 1; parts <= MaximumPartCount; parts++)
+        {
+            if (payloadLength <= OrreryPresentationNetwork.GetPayloadCapacity(parts))
+                return parts;
+        }
+        return 0;
     }
 
     private static uint ResolveGeneration(GameShip owner, byte castSequence)
