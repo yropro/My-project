@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// Lightweight local presentation driver. Logical sectors stay in OrreryRuntime;
-/// this only keeps their native-Halo slices centered on the active Orrery ship.
+/// this only keeps their presentation centered on the active Orrery ship.
 /// </summary>
 public sealed class OrrerySectorPresentationDriver : MonoBehaviour
 {
@@ -29,6 +29,18 @@ public sealed class OrrerySectorPresentationDriver : MonoBehaviour
             context.ClassId == CoreClassId.Orrery
                 ? context.Ship
                 : null;
+
+        if (OrreryVoidGalleryPresentation.Enabled)
+        {
+            // Temporary visual audition mode. Keep the production pie-sector
+            // presentation fully intact, but make sure none of it remains visible
+            // while the 4x4 void gallery is active.
+            OrrerySectorPresentation.Hide();
+            OrreryVoidGalleryPresentation.Tick(owner);
+            return;
+        }
+
+        OrreryVoidGalleryPresentation.Hide();
         OrrerySectorPresentation.Tick(owner);
     }
 
@@ -36,6 +48,7 @@ public sealed class OrrerySectorPresentationDriver : MonoBehaviour
     {
         if (instance == this)
             instance = null;
+        OrreryVoidGalleryPresentation.Hide();
         OrrerySectorPresentation.Hide();
     }
 
