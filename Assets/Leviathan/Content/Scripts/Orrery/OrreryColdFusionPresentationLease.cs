@@ -184,6 +184,16 @@ public static class OrreryColdFusionPresentationLease
             next.SourcePlayerId == sourcePlayerId &&
             next.Sequence == sequence;
 
+        // Same-source sequences are monotonically increasing. An older relay can
+        // arrive after this target already advanced to a newer local observation;
+        // never let that stale duplicate restart the presentation lease.
+        if (matchingTarget >= 0 &&
+            next.SourcePlayerId == sourcePlayerId &&
+            sequence < next.Sequence)
+        {
+            return;
+        }
+
         next.Active = true;
         next.PlayerId = playerId;
         if (!duplicateGrant)
