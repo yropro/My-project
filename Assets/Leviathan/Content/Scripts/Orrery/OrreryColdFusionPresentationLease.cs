@@ -248,15 +248,18 @@ public static class OrreryColdFusionPresentationLease
                 continue;
             }
 
+            // A live binding needs no replica lookup. OnDestroy clears BoundShip,
+            // so reflection is paid only while waiting for initial/replacement
+            // replica availability rather than every frame of every active aura.
+            if (lease.BoundShip != null)
+                continue;
+
             if (session == null)
                 continue;
 
             GameShip current = ResolvePlayerShip(session, lease.PlayerId);
-            if (current == null || object.ReferenceEquals(current, lease.BoundShip))
+            if (current == null)
                 continue;
-
-            if (lease.BoundShip != null)
-                OrreryColdFusionPresentation.Hide(lease.BoundShip);
 
             lease.BoundShip = current;
             leases[i] = lease;
