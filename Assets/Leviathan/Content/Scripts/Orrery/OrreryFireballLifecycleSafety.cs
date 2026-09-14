@@ -1,20 +1,22 @@
 using HarmonyLib;
 using StarVortex;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 /// <summary>
-/// Non-gameplay cleanup boundary for live Orrery FF projectiles.
+/// Lifecycle and contact semantics for live Orrery FF/Magma Cannon projectiles.
 ///
-/// ExplosiveProjectile.TimedDestroy intentionally explodes. That is correct for
-/// RMB release / authored expiry, but wrong for execution cancellation, class
-/// replacement and world teardown. Managed FF projectiles are therefore captured
-/// with Projectile.CaptureDestroy(), which preserves native launcher removal and
-/// network-despawn/pool lifecycle without authoring an explosion.
+/// A managed Magma Cannon orb deals its normal native direct-hit packet on
+/// contact, survives the contact, and may hit the same target again after that
+/// target has been out of its collision path for the configured re-arm interval.
+/// Its explosive-area packet is reserved for the authored RMB release edge.
+/// Ordinary lifetime expiry, execution cancellation, class replacement and world
+/// teardown therefore remove the orb without detonating it.
 ///
 /// Reflected FF projectiles remain registered until they return to the pool so we
 /// can restore projectile scale and preserve original-owner provenance, but are
-/// marked detached so original-owner/class cleanup can no longer capture them.
+/// marked detached and immediately return to ordinary native projectile behavior.
 /// </summary>
 public static class OrreryFireballLifecycleSafety
 {
@@ -23,7 +25,13 @@ public static class OrreryFireballLifecycleSafety
         public GameShip OriginalOwner;
         public Launcher Launcher;
         public Vector3 OriginalScale;
+        public bool OriginalExplodeOnExpiry;
         public bool Detached;
+        public int ContactCount;
+        public readonly GameObject[] ContactTargets =
+            new GameObject[OrrerySpellCompendium.MagmaCannon.MaxTrackedContactTargets];
+        public readonly float[] LastContactAttemptTimes =
+            new float[OrrerySpellCompendium.MagmaCannon.MaxTrackedContactTargets];
     }
 
     private static readonly Dictionary<Projectile, Entry> managed =
@@ -31,15 +39,18 @@ public static class OrreryFireballLifecycleSafety
     private static readonly List<Projectile> cleanupScratch =
         new List<Projectile>(4);
 
+    private static readonly FieldInfo projectilePiercingField =
+        AccessTools.Field(typeof(Projectile), "piercing");
+    private static readonly FieldInfo projectileIgnoreField =
+        AccessTools.Field(typeof(Projectile), "ignore");
+
     public static void RegisterIfManagedFireball(
         Launcher launcher,
         Projectile projectile)
     {
-        if (launcher == null || projectile == null ||
-            !(projectile is ExplosiveProjectile))
-        {
+        ExplosiveProjectile explosive = projectile as ExplosiveProjectile;
+        if (launcher == null || projectile == null || explosive == null)
             return;
-        }
 
         GameShip owner = launcher.parentShip;
         if (owner == null || !OrreryRuntime.IsActive(owner) ||
@@ -58,9 +69,15 @@ public static class OrreryFireballLifecycleSafety
             OriginalOwner = owner,
             Launcher = launcher,
             OriginalScale = projectile.transform.localScale,
+            OriginalExplodeOnExpiry = explosive.explodeOnExpiry,
             Detached = false
         };
         managed[projectile] = entry;
+
+        // Contact is no longer a detonation trigger and natural expiry is cleanup,
+        // not an authored explosion. DetonateFireball flips this back to true just
+        // before its release-owned TimedDestroy call.
+        explosive.explodeOnExpiry = false;
 
         float projectileScale = Mathf.Max(
             0.01f,
@@ -93,6 +110,170 @@ public static class OrreryFireballLifecycleSafety
     }
 
     /// <summary>
+    /// Returns true only while the projectile still belongs to the authored local
+    /// Magma Cannon cast. Detached/reflected projectiles deliberately stop using
+    /// Orrery contact/detonation overrides.
+    /// </summary>
+    private static bool TryGetInteractiveEntry(
+        Projectile projectile,
+        out Entry entry)
+    {
+        entry = null;
+        return projectile != null &&
+            managed.TryGetValue(projectile, out entry) &&
+            entry != null && !entry.Detached;
+    }
+
+    /// <summary>
+    /// Temporarily makes the managed projectile piercing for one native HitObject
+    /// call. That preserves the exact native direct-damage/status/crit packet while
+    /// preventing Projectile.HitObject from scheduling destruction on contact.
+    /// Native piercing also records the target in Projectile.ignore, which is what
+    /// prevents damage every fixed tick while the orb is still crossing a target.
+    /// </summary>
+    public static bool BeginContactHit(
+        ExplosiveProjectile projectile,
+        GameObject hitObject,
+        out bool originalPiercing)
+    {
+        originalPiercing = false;
+
+        Entry entry;
+        if (!TryGetInteractiveEntry(projectile, out entry) ||
+            projectilePiercingField == null || projectileIgnoreField == null)
+        {
+            return false;
+        }
+
+        int contactIndex = FindContact(entry, hitObject);
+        if (contactIndex >= 0)
+        {
+            float now = Time.time;
+            float separationSeconds = now - entry.LastContactAttemptTimes[contactIndex];
+            if (separationSeconds >= Mathf.Max(
+                    0f,
+                    OrrerySpellCompendium.MagmaCannon.ContactRearmSeconds))
+            {
+                RemoveFromNativeIgnore(projectile, hitObject);
+            }
+            entry.LastContactAttemptTimes[contactIndex] = now;
+        }
+
+        object rawPiercing = projectilePiercingField.GetValue(projectile);
+        if (!(rawPiercing is bool))
+            return false;
+
+        originalPiercing = (bool)rawPiercing;
+        projectilePiercingField.SetValue(projectile, true);
+        return true;
+    }
+
+    public static void EndContactHit(
+        ExplosiveProjectile projectile,
+        GameObject hitObject,
+        bool originalPiercing,
+        bool hitSucceeded)
+    {
+        Entry entry;
+        if (!TryGetInteractiveEntry(projectile, out entry))
+            return;
+
+        if (projectilePiercingField != null)
+            projectilePiercingField.SetValue(projectile, originalPiercing);
+
+        if (!hitSucceeded)
+            return;
+
+        // ExplosiveProjectile marks itself exploded before delegating to the base
+        // direct-hit routine. Contact AoE is suppressed below, so restore the live
+        // projectile state after the successful direct packet.
+        projectile.hasExploded = false;
+        RecordContact(entry, hitObject, Time.time);
+    }
+
+    /// <summary>
+    /// Contact calls ExplosiveProjectile.Explode directly. A managed orb suppresses
+    /// that call while explodeOnExpiry is false. RMB release is the one path that
+    /// deliberately sets explodeOnExpiry true before TimedDestroy, so its native
+    /// explosion remains intact.
+    /// </summary>
+    public static bool ShouldSuppressExplosion(ExplosiveProjectile projectile)
+    {
+        Entry entry;
+        return TryGetInteractiveEntry(projectile, out entry) &&
+            projectile != null && !projectile.explodeOnExpiry;
+    }
+
+    private static int FindContact(Entry entry, GameObject target)
+    {
+        if (entry == null || target == null)
+            return -1;
+
+        for (int i = 0; i < entry.ContactCount; i++)
+        {
+            if (object.ReferenceEquals(entry.ContactTargets[i], target))
+                return i;
+        }
+        return -1;
+    }
+
+    private static void RecordContact(Entry entry, GameObject target, float now)
+    {
+        if (entry == null || target == null)
+            return;
+
+        int existing = FindContact(entry, target);
+        if (existing >= 0)
+        {
+            entry.LastContactAttemptTimes[existing] = now;
+            return;
+        }
+
+        int capacity = entry.ContactTargets.Length;
+        if (capacity <= 0)
+            return;
+
+        if (entry.ContactCount < capacity)
+        {
+            int index = entry.ContactCount++;
+            entry.ContactTargets[index] = target;
+            entry.LastContactAttemptTimes[index] = now;
+            return;
+        }
+
+        // Storage is deliberately bounded. Prefer keeping the most recently used
+        // contact set useful rather than growing an unbounded collection over a
+        // long/high-density encounter. A displaced target remains safely ignored
+        // by the native projectile for this cast; it simply loses repeat-hit rearm.
+        int oldestIndex = 0;
+        float oldestTime = entry.LastContactAttemptTimes[0];
+        for (int i = 1; i < capacity; i++)
+        {
+            if (entry.LastContactAttemptTimes[i] < oldestTime)
+            {
+                oldestIndex = i;
+                oldestTime = entry.LastContactAttemptTimes[i];
+            }
+        }
+
+        entry.ContactTargets[oldestIndex] = target;
+        entry.LastContactAttemptTimes[oldestIndex] = now;
+    }
+
+    private static void RemoveFromNativeIgnore(
+        Projectile projectile,
+        GameObject target)
+    {
+        if (projectile == null || target == null || projectileIgnoreField == null)
+            return;
+
+        List<GameObject> ignore =
+            projectileIgnoreField.GetValue(projectile) as List<GameObject>;
+        if (ignore != null)
+            ignore.Remove(target);
+    }
+
+    /// <summary>
     /// Severs the original Orrery runtime/launcher relationship after native
     /// Shield Ward reflection without destroying the projectile. Native reflection
     /// has already transferred parentShip and reset its trajectory/lifetime.
@@ -114,6 +295,10 @@ public static class OrreryFireballLifecycleSafety
         entry.Detached = true;
         entry.Launcher = null;
 
+        ExplosiveProjectile explosive = projectile as ExplosiveProjectile;
+        if (explosive != null)
+            explosive.explodeOnExpiry = entry.OriginalExplodeOnExpiry;
+
         // Remove from the hidden adapter's active-projectile list so a later
         // adapter Unequip cannot destroy the reflected projectile. The projectile
         // intentionally keeps its parentLauncher reference; its eventual native
@@ -134,6 +319,10 @@ public static class OrreryFireballLifecycleSafety
         }
 
         projectile.transform.localScale = entry.OriginalScale;
+
+        ExplosiveProjectile explosive = projectile as ExplosiveProjectile;
+        if (explosive != null)
+            explosive.explodeOnExpiry = entry.OriginalExplodeOnExpiry;
     }
 
     public static void Unregister(Projectile projectile)
@@ -229,6 +418,96 @@ public static class OrreryFireballLifecycleInitPatch
         OrreryFireballLifecycleSafety.RegisterIfManagedFireball(
             parentLauncher,
             __instance);
+    }
+}
+
+/// <summary>
+/// Preserve native direct contact damage without consuming the Magma Cannon orb.
+/// The base hit runs as temporarily piercing so native damage/status/crit/relay
+/// semantics remain authoritative, then the original piercing state is restored.
+/// </summary>
+[HarmonyPatch(typeof(ExplosiveProjectile), "HitObject")]
+[HarmonyPriority(Priority.First)]
+public static class OrreryFireballContactPersistencePatch
+{
+    public struct State
+    {
+        public bool Managed;
+        public bool OriginalPiercing;
+    }
+
+    public static void Prefix(
+        ExplosiveProjectile __instance,
+        GameObject hitObject,
+        ref State __state)
+    {
+        bool originalPiercing;
+        __state.Managed = OrreryFireballLifecycleSafety.BeginContactHit(
+            __instance,
+            hitObject,
+            out originalPiercing);
+        __state.OriginalPiercing = originalPiercing;
+    }
+
+    public static void Postfix(
+        ExplosiveProjectile __instance,
+        GameObject hitObject,
+        bool __result,
+        State __state)
+    {
+        if (!__state.Managed)
+            return;
+
+        OrreryFireballLifecycleSafety.EndContactHit(
+            __instance,
+            hitObject,
+            __state.OriginalPiercing,
+            __result);
+    }
+}
+
+/// <summary>
+/// ExplosiveProjectile.HitObject normally detonates immediately after its direct
+/// packet. Managed Magma Cannon contacts suppress only that AoE call. Release sets
+/// explodeOnExpiry true first, so the existing native TimedDestroy detonation path
+/// remains the single authored explosion trigger.
+/// </summary>
+[HarmonyPatch(typeof(ExplosiveProjectile), "Explode")]
+public static class OrreryFireballContactExplosionSuppressionPatch
+{
+    public static bool Prefix(ExplosiveProjectile __instance)
+    {
+        return !OrreryFireballLifecycleSafety.ShouldSuppressExplosion(__instance);
+    }
+}
+
+/// <summary>
+/// Defensive network-path guard: a live managed orb is not allowed to acquire an
+/// unsolicited native NetExplode while held. Detached/reflected projectiles and
+/// the release-owned destroy path keep native behavior.
+/// </summary>
+[HarmonyPatch(typeof(ExplosiveProjectile), "NetExplode")]
+public static class OrreryFireballNetExplosionSuppressionPatch
+{
+    public static bool Prefix(ExplosiveProjectile __instance)
+    {
+        return !OrreryFireballLifecycleSafety.ShouldSuppressExplosion(__instance);
+    }
+}
+
+/// <summary>
+/// The old FF behavior added a second explosion-equivalent packet to the directly
+/// struck target on every contact. Contact is now direct damage only; the actual
+/// release detonation supplies the explosion packet once, at the release position.
+/// Reflected projectiles remain covered by their dedicated provenance guard.
+/// </summary>
+[HarmonyPatch(typeof(OrrerySpellRuntime), "OnExplosiveProjectileHit")]
+[HarmonyPriority(Priority.First)]
+public static class OrreryFireballDirectExplosionBonusSuppressionPatch
+{
+    public static bool Prefix(ExplosiveProjectile projectile)
+    {
+        return !OrreryFireballLifecycleSafety.ShouldSuppressExplosion(projectile);
     }
 }
 
