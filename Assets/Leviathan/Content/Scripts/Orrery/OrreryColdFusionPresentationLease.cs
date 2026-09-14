@@ -184,9 +184,10 @@ public static class OrreryColdFusionPresentationLease
             next.SourcePlayerId == sourcePlayerId &&
             next.Sequence == sequence;
 
-        // Same-source sequences are monotonically increasing. An older relay can
-        // arrive after this target already advanced to a newer local observation;
-        // never let that stale duplicate restart the presentation lease.
+        // CoreCrossOwnerEffects sequences are monotonic for one source during the
+        // session. An older relay can arrive after this target already advanced to
+        // a newer local observation; never let that stale same-source grant restart
+        // the presentation lease. Different sources are independent refreshes.
         if (matchingTarget >= 0 &&
             next.SourcePlayerId == sourcePlayerId &&
             sequence < next.Sequence)
