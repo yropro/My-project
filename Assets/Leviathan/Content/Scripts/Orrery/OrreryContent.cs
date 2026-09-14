@@ -6,10 +6,12 @@ using UnityEngine;
 /// Canonical Orrery access to borrowed Star Vortex content.
 ///
 /// This resolver owns only stable source-asset references. Assets are resolved
-/// lazily from legitimate gameplay/presentation paths after mod loading, successful
-/// lookups are cached for the process lifetime, and failed lookups are retried on
-/// later calls. Runtime items, faction-selected projectile prefabs, pooled objects,
-/// ships, casts, networking and presentation lifetime remain owned by consumers.
+/// lazily from legitimate gameplay/presentation paths after mod loading. Successful
+/// lookups are cached for the process lifetime. A miss before Core exists remains
+/// retryable so DLL initialization cannot permanently hide later-loaded bundles;
+/// a miss after Core exists is cached because content cannot hot-swap in-process.
+/// Runtime items, faction-selected projectile prefabs, pooled objects, ships,
+/// casts, networking and presentation lifetime remain owned by consumers.
 /// </summary>
 public static class OrreryContent
 {
@@ -31,6 +33,8 @@ public static class OrreryContent
         "Base/Items/AutoSpecial/Electric Halo";
 
     private static readonly HashSet<string> warnedMissing =
+        new HashSet<string>();
+    private static readonly HashSet<string> failedAfterContentLoad =
         new HashSet<string>();
 
     private static LauncherItemBase infernoCannon;
@@ -149,6 +153,8 @@ public static class OrreryContent
     {
         if (cached != null)
             return cached;
+        if (failedAfterContentLoad.Contains(path))
+            return null;
 
         T resolved = ModContent.Load<T>(path);
         if (resolved != null)
@@ -165,8 +171,12 @@ public static class OrreryContent
                 typeof(T).Name + ").");
         }
 
-        // Failure is deliberately not cached. An accidental pre-bundle call must
-        // not make the asset permanently unavailable once mod loading completes.
+        // DLL initialization precedes bundle loading. Core.instance is not valid
+        // until the game-loaded phase, after ModContent has loaded bundles and
+        // applied in-place overrides. Only then is absence stable for this process.
+        if (Core.instance != null)
+            failedAfterContentLoad.Add(path);
+
         return null;
     }
 }
