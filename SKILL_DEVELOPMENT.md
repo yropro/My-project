@@ -106,12 +106,14 @@ objects through the existing safety boundary: zeroing base damage alone can stil
 leave global modifiers or status active. Remote presentation cannot apply gameplay.
 
 Repeated borrowed Orrery assets resolve lazily through `OrreryContent`; one-off
-lookups may use `ModContent` directly. Cache only successful stable source-asset
-references, treat them as read-only templates, and create/configure runtime items or
-visual instances separately. Keep faction-dependent projectile selection at the use
-site rather than caching one faction's prefab globally. Do not add a `Resources`
-fallback after `ModContent`. Dedicated Tesla-only legacy lookup paths are explicitly
-deferred until Conductor replaces that implementation.
+lookups may use `ModContent` directly. Cache stable source-asset references after a
+successful lookup; cache absence only after the game-loaded phase confirms content
+loading is complete, so an early DLL-time miss remains retryable. Treat loaded
+source assets as read-only templates and create/configure runtime items or visual
+instances separately. Keep faction-dependent projectile selection at the use site
+rather than caching one faction's prefab globally. Do not add a `Resources` fallback
+after `ModContent`. Dedicated Tesla-only legacy lookup paths are explicitly deferred
+until Conductor replaces that implementation.
 
 For every object, identify its creator, owner, pool and release path. Return native
 pooled objects through their native lifecycle. In particular, native ships can own
