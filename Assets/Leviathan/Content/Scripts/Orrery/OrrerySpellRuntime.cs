@@ -70,8 +70,8 @@ public static class OrrerySpellRuntime
             OrrerySpellCompendium.TeslaCoil.ChainCountAdjustment;
     }
 
-    private const string InfernoCannonPath = "Base/Items/PrimaryWeapon/Inferno Cannon";
-    private const string CryoGunPath = "Base/Items/PrimaryWeapon/Cryo Gun";
+    // Dedicated Tesla loading is intentionally deferred until Conductor replaces
+    // the legacy implementation. Inferno and Cryo resolve through OrreryContent.
     private const string TeslaCoilPath = "Base/Items/PrimaryWeapon/Tesla Coil";
 
     private enum ActiveSpellKind : byte
@@ -134,7 +134,6 @@ public static class OrrerySpellRuntime
                 invocation,
                 OrreryElement.Fire,
                 spell,
-                InfernoCannonPath,
                 out state,
                 out virtualWeapon))
         {
@@ -168,7 +167,6 @@ public static class OrrerySpellRuntime
                 invocation,
                 OrreryElement.Ice,
                 spell,
-                CryoGunPath,
                 out state,
                 out virtualWeapon))
         {
@@ -205,7 +203,6 @@ public static class OrrerySpellRuntime
                 invocation,
                 OrreryElement.Lightning,
                 spell,
-                TeslaCoilPath,
                 out state,
                 out virtualWeapon))
         {
@@ -461,7 +458,6 @@ public static class OrrerySpellRuntime
         OrreryCastInvocation invocation,
         OrreryElement element,
         OrrerySpellRegistry.SpellDefinition spell,
-        string resourcePath,
         out OwnerState state,
         out VirtualWeapon virtualWeapon)
     {
@@ -499,7 +495,6 @@ public static class OrrerySpellRuntime
             spell.Id,
             element,
             focus,
-            resourcePath,
             out virtualWeapon);
     }
 
@@ -509,7 +504,6 @@ public static class OrrerySpellRuntime
         ushort spellId,
         OrreryElement element,
         OrreryFocusResolver.Focus focus,
-        string resourcePath,
         out VirtualWeapon result)
     {
         result = GetVirtualWeapon(state, spellId);
@@ -519,10 +513,11 @@ public static class OrrerySpellRuntime
         Dispose(result);
         result = null;
 
-        ItemBase itemBase = Resources.Load<ItemBase>(resourcePath);
+        ItemBase itemBase = ResolveNativeSpellReference(spellId);
+        string referenceName = GetNativeSpellReferenceName(spellId);
         if (itemBase == null)
         {
-            Debug.LogError("[Orrery] Native spell reference not found: " + resourcePath);
+            Debug.LogError("[Orrery] Native spell reference not found: " + referenceName);
             SetVirtualWeapon(state, spellId, null);
             return false;
         }
@@ -530,7 +525,7 @@ public static class OrrerySpellRuntime
         Activatable weapon = itemBase.GetItem(Item.Rarity.Common, 1, 0) as Activatable;
         if (weapon == null)
         {
-            Debug.LogError("[Orrery] Native spell reference is not Activatable: " + resourcePath);
+            Debug.LogError("[Orrery] Native spell reference is not Activatable: " + referenceName);
             SetVirtualWeapon(state, spellId, null);
             return false;
         }
@@ -565,6 +560,30 @@ public static class OrrerySpellRuntime
         NormalizeSpellCadenceAndPresentation(spellId, weapon);
         SetVirtualWeapon(state, spellId, result);
         return true;
+    }
+
+    private static ItemBase ResolveNativeSpellReference(ushort spellId)
+    {
+        if (spellId == 1)
+            return OrreryContent.InfernoCannon;
+        if (spellId == 3)
+            return OrreryContent.CryoGun;
+
+        // Tesla-specific cleanup is deferred. Preserve its legacy loader until
+        // Conductor replaces this implementation rather than inventing a special
+        // compatibility layer solely for code scheduled for removal.
+        if (spellId == 2)
+            return Resources.Load<ItemBase>(TeslaCoilPath);
+
+        return null;
+    }
+
+    private static string GetNativeSpellReferenceName(ushort spellId)
+    {
+        if (spellId == 1) return "Inferno Cannon";
+        if (spellId == 2) return TeslaCoilPath;
+        if (spellId == 3) return "Cryo Gun";
+        return "spell " + spellId;
     }
 
     private static void CaptureLogicalCombatStats(VirtualWeapon virtualWeapon)
@@ -648,6 +667,9 @@ public static class OrrerySpellRuntime
         ushort spellId,
         Activatable weapon)
     {
+        if (weapon == null)
+            return;
+
         if (spellId == 1)
         {
             Launcher launcher = weapon as Launcher;
