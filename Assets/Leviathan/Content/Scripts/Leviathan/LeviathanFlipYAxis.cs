@@ -64,6 +64,12 @@ public class LeviathanShipBuilderFlipYAxisIntegration : MonoBehaviour
             }
         );
 
+    private static readonly FieldInfo FocusPartsField =
+        AccessTools.Field(
+            typeof(ShipBuilder),
+            "focusParts"
+        );
+
     private ShipBuilderTemplates templates;
     private ShipBuilder shipBuilder;
     private Button flipYAxisButton;
@@ -165,41 +171,32 @@ public class LeviathanShipBuilderFlipYAxisIntegration : MonoBehaviour
     private void FlipYAxis()
     {
         if (shipBuilder == null ||
-            shipBuilder.targetRectTransform == null)
+            shipBuilder.targetRectTransform == null ||
+            FocusPartsField == null)
         {
             return;
         }
 
+        List<ShipBuilderPart> focusedParts =
+            FocusPartsField.GetValue(shipBuilder) as List<ShipBuilderPart>;
+
+        if (focusedParts == null || focusedParts.Count == 0)
+            return;
+
         bool changed = false;
 
-        foreach (Transform child in shipBuilder.targetRectTransform)
+        foreach (ShipBuilderPart part in focusedParts)
         {
-            ShipBuilderPart part;
-
-            if (!child.TryGetComponent<ShipBuilderPart>(out part) ||
-                part == null)
-            {
+            if (part == null)
                 continue;
-            }
 
-            Vector3 position = child.localPosition;
-            position.x = -position.x;
-            child.localPosition = position;
-
-            float rotation =
-                Mathf.Repeat(
-                    360f - child.localRotation.eulerAngles.z,
-                    360f
-                );
-
-            child.localRotation =
-                Quaternion.Euler(0f, 0f, rotation);
-
-            Vector3 scale = child.localScale;
-            scale.x = -scale.x;
-            child.localScale = scale;
-
+            FlipPartAcrossYAxis(part);
             changed = true;
+
+            ShipBuilderPart mirrorPart = part.GetMirrorPart();
+
+            if (mirrorPart != null && mirrorPart != part)
+                FlipPartAcrossYAxis(mirrorPart);
         }
 
         if (!changed)
@@ -214,11 +211,33 @@ public class LeviathanShipBuilderFlipYAxisIntegration : MonoBehaviour
                 new object[]
                 {
                     ShipBuilder.History.Type.Unique,
-                    new List<ShipBuilderPart>()
+                    focusedParts
                 }
             );
         }
 
-        shipBuilder.ShowSuccess("Flipped ship over Y axis.");
+        shipBuilder.ShowSuccess("Flipped selection over Y axis.");
+    }
+
+    private static void FlipPartAcrossYAxis(ShipBuilderPart part)
+    {
+        Transform partTransform = part.transform;
+
+        Vector3 position = partTransform.localPosition;
+        position.x = -position.x;
+        partTransform.localPosition = position;
+
+        float rotation =
+            Mathf.Repeat(
+                360f - partTransform.localRotation.eulerAngles.z,
+                360f
+            );
+
+        partTransform.localRotation =
+            Quaternion.Euler(0f, 0f, rotation);
+
+        Vector3 scale = partTransform.localScale;
+        scale.x = -scale.x;
+        partTransform.localScale = scale;
     }
 }
