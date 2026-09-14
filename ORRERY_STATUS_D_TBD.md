@@ -1,10 +1,16 @@
 # Orrery Status — D / TBD
 
+> **Historical snapshot (2026-09-13); not current instructions or status.**
+> Labeled on 2026-09-14. Preserve the findings below as evidence of that snapshot;
+> do not copy its tuning, native signatures, missing-feature list or next-step plan
+> into current work without checking the source. Start with
+> [DOCUMENTATION.md](DOCUMENTATION.md) and [current networking](Assets/Leviathan/Content/Scripts/NETWORKING.md).
+
 **Branch:** `skill-trees`  
 **Date:** 2026-09-13  
 **Meaning of D:** implemented/source-reviewed. D does **not** mean Unity compiler-, in-game-, or co-op-verified unless explicitly stated.
 
-Current canonical guidance:
+References used by this historical snapshot:
 
 - `ORRERY_SPELL_DESIGN_IMPLEMENTATION_STANDARDS_V3.md` — broad spell design/implementation policy.
 - `ORRERY_SPELL_LIFETIME_STANDARD.md` — canonical persistent-spell lifetime boundary.

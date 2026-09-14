@@ -39,6 +39,7 @@ public static class NetworkIntegrationTests
         Framing();
         CombatTrailers();
         PublishFailure();
+        Registration();
     }
 
     private static void Assert(bool condition, string message)
@@ -151,6 +152,22 @@ public static class NetworkIntegrationTests
                 }
             }
         }
+        // Exercise production slot grouping and packet selection together.
+        int[] sizes = { 16, 32, 32, 12 };
+        for (int i = 0; i < sizes.Length; i++)
+        {
+            var slot = CoreNetwork.BeginSlot((byte)(200 + i));
+            for (int j = 0; j < sizes[i]; j++) slot.Byte(1);
+            CoreNetwork.EndSlot(slot);
+        }
+        CoreNetwork.GroupLocalSlots(201, 2);
+        CoreNetwork.GroupLocalSlots(203, 1);
+        object[] build = { false, 34, (byte)0 };
+        Assert((int)Call("BuildPayload", build) == 34, "Production budget size");
+        byte[] selected = (byte[])Get("scratch");
+        Assert(selected[1] == 2 && selected[2] == 200 && selected[20] == 203,
+            "Production group selection dropped essential or split group");
+        CoreNetwork.ClearLocalSlots();
         // Seed a legal 512-node schema without accessing a Unity world. This
         // makes the actual production writer emit a 265-byte spec payload.
         object schema = Call("GetSchema", CoreClassId.None);
@@ -221,6 +238,19 @@ public static class NetworkIntegrationTests
             Assert(stream.Length == 1 && stream.ToArray()[0] == 0xab, "Publisher corrupted native packet");
             Assert((int)Get("localSlotCount") == 0, "Publisher left stale slots");
         }
+    }
+
+    private static void Registration()
+    {
+        CoreNetwork.RegisterDefaultSlots();
+        OrreryNetwork.Initialize();
+        var entries = (IList)typeof(CoreNetworkPresentation).GetField("entries", Private).GetValue(null);
+        int entryCount = entries.Count;
+        CoreNetwork.RegisterDefaultSlots();
+        OrreryNetwork.Initialize();
+        Assert(entries.Count == entryCount && entryCount == 8, "Repeated initialization duplicated callbacks");
+        var slots = (IDictionary)Get("slots");
+        for (byte i = 1; i <= 14; i++) Assert(slots.Contains(i), "Missing registered mod slot " + i);
     }
 }
 #endif

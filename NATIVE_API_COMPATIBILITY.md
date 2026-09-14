@@ -1,18 +1,56 @@
-# Native API compatibility note
+# Native API compatibility
 
-On 2026-09-13 Star Vortex changed `NetCombat.RouteDamage` parameter 5 (critical hit) from `bool` to `int`, while this Unity project still had an older game reference. Predator's exact delegate lookup therefore returned null during static initialization and prevented the mod/classes from finishing startup. Other reflected damage callers would have failed when used.
+**Scope:** installed-game integration. Reviewed 2026-09-14.
+Start with [DOCUMENTATION.md](DOCUMENTATION.md) for the other development guides.
 
-Current rule: after a Star Vortex update, verify native reflection/delegate bindings against the **installed game's current Assembly-CSharp**, not only the Unity/editor reference. RouteDamage callers should validate the full overload signature. Existing binary crit decisions cross the current native boundary as `0` / `1`.
+## Evidence before bindings
 
-The 2026-09-13 migration updated Predator, OrreryDamageRouter, Starfire, Constrictor, Stellar Converter, and CoreCombat's RouteDamage selector.
+The failures investigated on 2026-09-13 exposed a mismatch between the installed
+Star Vortex assembly and the Unity project's older reference. This investigation
+date is not a verified game-release date. An exact delegate lookup returned null
+and prevented class initialization; other callers still used old parameter types.
 
-## Core timed/cross-owner effect hooks
+Check reflected targets and full overload signatures against the installed game's
+`Star Vortex_Data/Managed/Assembly-CSharp.dll`. Compilation against the editor
+reference alone does not establish runtime compatibility. Do not copy old method
+signatures from the historical precompile audit.
 
-Cold Fusion introduced two reusable Core boundaries whose native assumptions should be rechecked after a game update:
+## Critical-hit boundary
 
-- `CoreTimedShipEffects` composes temporary effects through `GameShip.ApplyModifier(Modifier.Type, Item.Category, float, bool)`, `Launcher.ReloadTime`, `Thruster.AccelerationFactor`, `Thruster.DodgeFactor`, `Thruster.BoostFactor`, `Thruster.ControlMultiplier`, `GameShip.UpdateHeat`, `Ship.GetClassBoostHeat`, and `Ship.GetClassDisplaceHeat`.
-- `CoreCrossOwnerEffects` intercepts the private `NetSession.DispatchAsHost(ConnKey, NetMessageType, string)` and `DispatchAsClient(ConnKey, NetMessageType, string)` methods and reads the private `connToPlayer` map to validate the real sender before forwarding owner-to-owner gameplay intents.
-- Cross-owner Core gameplay currently reserves `NetMessageType` byte value **126**. The runtime fails closed if the installed game later defines that enum value. `NetProtocol` currently reserves only bit 7 (`128`) as its gzip flag and masks message ids with `127`, so 126 is the highest usable uncompressed/custom message id under the present protocol.
-- `NetSession.SendStarEntityMessage` currently uses `ReliableOrdered` transport for these intents. Do not move cross-owner gameplay onto `CoreNetwork`'s dynamic slots; those slots remain presentation-only by contract.
+The installed API uses integer critical tiers at damage/heal boundaries, including
+`NetCombat.RouteDamage`, `Damageable.Damage`, `GameShip.Damage`, `Damageable.Heal`
+and `DamageBeam.GetDamageData(GameShip, ref int critTier)`.
 
-The installed 2026-09-13 Assembly-CSharp was used to verify these signatures and protocol assumptions when Cold Fusion was added.
+Use `CoreNativeCriticalHits` and the shared damage router where applicable instead
+of adding another per-skill reflective binding. Preserve integer tiers when
+forwarding native results. An existing skill that deliberately makes a binary
+crit decision maps that decision to 0/1; that is not a rule to flatten every native
+tier into a boolean. Healing without a crit uses tier 0.
+
+Harmony normally binds original arguments by name. A patch requesting `crit`
+cannot bind an original parameter named `critTier`. Match the actual signature or
+use a verified positional argument with the correct type. Check the complete
+parameter list after updates, not only whether the method name still exists.
+
+## Shared effects and transport
+
+`CoreTimedShipEffects` owns the native stat/query hooks needed to compose temporary
+contributions. Skills use its public API and register presentation callbacks.
+
+`CoreCrossOwnerEffects` owns native dispatch interception and sender validation.
+Its current reserved message byte is 126; initialization rejects a native enum
+collision. Grants use native reliable delivery. A dispatched request is not proof
+that a remote recipient applied it. Presentation observers consume typed validated
+notices rather than patching private receive methods or parsing JSON again.
+
+See [Networking for skill authors](Assets/Leviathan/Content/Scripts/NETWORKING.md) for current integration APIs and
+packet formats. A mod-version match alone does not prove identical development
+binaries; rebuild and distribute the same package to all peers for co-op testing.
+
+## Verification boundaries
+
+The networking runner compiles the source and checks target selectors and the
+native damage-router binding against the installed game. It also tests framing
+and routing, with test doubles explicitly identified. It does not execute every
+Harmony patch or provide a live Unity/co-op result. Recheck the native boundary
+when the game or reference assemblies change; do not invent fallback signatures.

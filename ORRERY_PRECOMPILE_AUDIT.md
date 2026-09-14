@@ -1,5 +1,11 @@
 # Orrery V0 Pre-Compile Audit
 
+> **Historical snapshot (2026-09-12); not current instructions or status.**
+> Labeled on 2026-09-14. Preserve the findings below as evidence of that snapshot;
+> do not copy its tuning, native signatures, missing-feature list or next-step plan
+> into current work without checking the source. Start with
+> [DOCUMENTATION.md](DOCUMENTATION.md) and [current networking](Assets/Leviathan/Content/Scripts/NETWORKING.md).
+
 **Branch:** `skill-trees`  
 **Date:** 2026-09-12  
 **Scope:** static/source + supplied Star Vortex decompile/item-data review before the first full Unity/mod compile of the current Orrery vertical slice.

@@ -58,4 +58,8 @@ Compile-NetworkCheck 'TimedEffectNetworkTests.exe' @('/target:exe','/define:CORE
     ('"' + (Join-Path $PSScriptRoot 'TimedEffectNetworkTests.cs') + '"'))
 & $mono (Join-Path $OutputDirectory 'TimedEffectNetworkTests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Timed-effect network tests failed.' }
+Compile-NetworkCheck 'HarmonySelectorTests.exe' @('/target:exe','/define:CORE_SELECTOR_TESTS') $framework @(
+    ('"' + (Join-Path $PSScriptRoot 'HarmonySelectorTests.cs') + '"'))
+& $mono (Join-Path $OutputDirectory 'HarmonySelectorTests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Installed-game target selectors failed.' }
 Write-Output "Validated build and tests are in $OutputDirectory. Nothing was deployed."

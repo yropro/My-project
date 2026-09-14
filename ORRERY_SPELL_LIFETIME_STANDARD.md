@@ -1,11 +1,16 @@
 # Orrery Spell Lifetime Standard
 
 **Project:** Star Vortex — Orrery / Celestial Mage / Sphereweaver  
-**Status:** CANONICAL IMPLEMENTATION STANDARD  
+**Status:** CURRENT — authoritative gameplay lifetime only; scope reviewed 2026-09-14  
 **Applies to:** all new Orrery spells and all maintenance/refactors touching Orrery persistent runtime behavior  
 **Established from live implementation:** `skill-trees` through `6d6e56e52d0d2389e459c359fb1502cc485e5758`
 
 ---
+
+See [DOCUMENTATION.md](DOCUMENTATION.md) for reference scopes.
+Remote presentation lifecycle and network exception containment are governed by
+[Networking for skill authors](Assets/Leviathan/Content/Scripts/NETWORKING.md). Shared presentation callbacks do not
+replace or duplicate this authoritative gameplay fixed-step dispatcher.
 
 # 1. Purpose
 
@@ -149,7 +154,7 @@ Do not move these into `OrrerySpellLifetime` merely because multiple spells use 
 - `OrreryCasting.CompleteInvocation`,
 - `OrreryCasting.Cancel`,
 - `OrreryController.StartShuffle`,
-- spell-specific network payloads,
+- the semantic state a skill exposes to its networking adapter (byte layouts remain in that adapter),
 - spell-specific presentation state.
 
 The lifetime layer may tell a spell **when** a target or owner is disappearing. The spell decides **what that means** for its mechanic.
@@ -324,7 +329,12 @@ Do not wrap every spell dispatch in a broad `try/catch` merely to keep the lifet
 
 A swallowed exception can leave half-mutated gameplay state, native adapters, pooled presentation objects, or semantic state alive while hiding the programming error that caused it.
 
-Defensive exception handling is appropriate only around a specific native/API boundary that is known to require it, and should remain near that boundary.
+This restriction applies to authoritative gameplay ticks. Core's presentation,
+serialization and network-dispatch boundaries intentionally contain exceptions
+so a visual error cannot interrupt native networking or become a peer strike.
+Use the shared boundaries; do not copy their catches around gameplay mutation.
+Defensive handling around a specific native/API boundary should remain near that
+boundary and leave failures observable.
 
 The normal lifetime dispatcher should stay transparent: if a spell runtime has a programming error during development, it should be visible rather than silently converted into corrupted persistent state.
 
@@ -346,7 +356,7 @@ A future migration of legacy FF/II/LL into the same boundary should be treated a
 
 If a future mechanic genuinely needs a lifecycle phase not currently supplied—for example a shared `LateTick` or non-fixed presentation update—do **not** give that spell an isolated Harmony patch by default.
 
-Review whether the class boundary should gain one narrow shared phase:
+For remote/non-gameplay presentation, first use the existing `CoreNetworkPresentation` render/update callbacks registered by `OrreryNetwork.Initialize`. If a new authoritative gameplay phase is needed, review whether the class boundary should gain one narrow shared phase:
 
 ```text
 OrrerySpellLifetime.LateTickLocal()
@@ -500,7 +510,7 @@ That is the standard.
 
 # 20. Documentation Ownership
 
-This file is the canonical lifetime architecture reference.
+This file is the maintained authoritative gameplay-lifetime reference. It does not govern presentation transport or override the shared presentation callback registry.
 
 Historical migration plans are intentionally not retained as competing implementation guidance after their durable rules and regression checks have been incorporated here.
 

@@ -7,22 +7,17 @@
 
 ---
 
-# 1. Authority and Design Order
+# 1. Scope and source evidence
 
-When guidance conflicts, use this order:
+**Reviewed 2026-09-14.** This document governs skill mechanics, inheritance,
+geometry and tuning. [DOCUMENTATION.md](DOCUMENTATION.md) identifies the maintained
+reference for each subject. [Networking for skill authors](Assets/Leviathan/Content/Scripts/NETWORKING.md) governs
+transport, presentation callbacks, serialization and cross-owner grants.
 
-```text
-1. The user's newest explicit spell requirement
-2. The newest exact live source currently compiling
-3. This Orrery spell standard
-4. Shared Core / architecture / networking standards
-5. Older handoff notes and prototype comments
-```
-
-The live source is authoritative for current tuned values and API reality.
-
-This document is authoritative for how new Orrery spell work should be shaped going forward.
-
+Follow explicit user requirements. Check source for implemented behavior and the
+installed game assembly for native signatures. A source/document disagreement
+must be investigated; do not silently treat a bug as the intended design.
+Historical handoffs and proposed layouts do not override current requirements.
 A refactor is not automatically a rebalance.
 
 ---
@@ -411,10 +406,18 @@ Orrery damage should be based on a class reference-DPS model rather than copying
 Current reference model:
 
 ```text
-Mean DPS at level 1   = 726
-Median DPS at level 1 = 546
-Growth per effective item level = +2%
+Per-weapon base: mean 726 or median 546
+LevelScale = 1 + 0.02 * (max(1, abs(effectiveLevel)) - 1)
+WeaponEquivalentBudget = SmoothStep(2, 4, clamp01((level - 1) / 19))
+FocusMultiplier = 0.80 for an unfocused cast, otherwise 1
+ReferenceDPS = PerWeaponBase * LevelScale * WeaponEquivalentBudget * FocusMultiplier
 ```
+
+This is the current `OrrerySpellPower.GetReferenceDps` policy, checked on
+2026-09-14. The weapon-equivalent budget rises from two at level 1 to four at
+level 20 and stays capped while ordinary level scaling continues. Use that shared
+function; do not multiply by the weapon budget again in individual skills.
+The constants in `OrrerySpellPower.cs` are the tuning source.
 
 A spell then defines how much reference damage it integrates.
 
@@ -1005,133 +1008,26 @@ Do not leave class-owned native objects attached to the old ship.
 
 ---
 
-# 20. Multiplayer Authority
+# 20. Multiplayer authority and presentation
 
-Orrery follows the project multiplayer model:
+The gameplay owner decides mechanics through the shared native combat path.
+Remote replicas reconstruct visuals and never run a second damage simulation.
+For buffs on another player, the recipient's authoritative local ship applies the
+registered grant handler; the sender must not mutate a remote replica.
 
-```text
-OWNER:
-    decides gameplay
-    resolves targets
-    rolls crit/status
-    applies damage
-    applies forces
-    owns cooldown/resource state
+Implement networking through [Networking for skill authors](Assets/Leviathan/Content/Scripts/NETWORKING.md).
+`OrreryNetwork` / `LeviathanNetwork` own mod-specific contracts; Core owns transport,
+validation and engine lifecycle hooks. Skills expose semantic state and visual
+behavior. They do not add send/receive hooks or duplicate JSON/byte parsing.
 
-REMOTE CLIENT:
-    reconstructs presentation
-    does not independently apply gameplay
-```
+The presentation adapter chooses snapshots, bounded event history or timed
+refresh as appropriate. This is an integration decision, not a demand that the
+skill designer implement netcode. Packet omission is not a gameplay cancellation.
+A reliable send result is not a recipient-application acknowledgement.
 
-The project assumes every co-op peer runs the exact same mod build.
-
-Do not design mixed-version compatibility unless explicitly required.
-
-## 20.1 Replicate the minimum irreducible state
-
-Before adding new network data, ask:
-
-```text
-Can remote clients derive this from:
-    native replicated ship state
-    replicated class/tree state
-    deterministic spell definition
-    cast start time / seed / target id
-```
-
-If yes, derive it.
-
-Only send dynamic state that cannot be reconstructed reliably.
-
-## 20.2 Events vs state
-
-Use event-like replication for things such as:
-
-```text
-cast started
-projectile detonated
-chain jumped
-one-shot presentation trigger
-```
-
-Use state-like replication for things such as:
-
-```text
-held channel active
-charge progress
-guided projectile active
-persistent debuff presentation
-```
-
-Do not make remote clients guess whether a missing update means "still active."
-
-## 20.3 Bounded cumulative event history
-
-A latest-state/coalescing transport can erase a short one-frame event even when the gameplay event happened correctly on the owner.
-
-For a short bounded event sequence, it is valid to replicate a cumulative count plus a bounded history so a remote can catch up.
-
-Example:
-
-```text
-owner Shatterbolt cast sequence = 41
-owner impacts so far = [A, B, C, D]
-impact count = 4
-
-remote previously saw impact count = 1
-remote next receives count = 4
-    ↓
-remote reconstructs B, C, and D presentation in order
-```
-
-This prevents packet coalescing from visually deleting intermediate chain jumps.
-
-Use this only when the event sequence is naturally bounded. Do not turn the network payload into an unbounded combat log. Reset/discard the bounded history when the cast/effect instance is complete.
-
-Useful fields are typically:
-
-```text
-cast/effect sequence id
-cumulative event count
-bounded event history
-optional current persistent state
-```
-
-## 20.4 Spell-specific payload boundaries and byte budgets
-
-Do not append every future spell's dynamic fields forever to one monolithic Orrery presentation struct.
-
-Prefer:
-
-```text
-small common Orrery presentation header
-    +
-active spell/effect-specific payload or codec
-```
-
-Under the current CoreNetwork implementation, the Orrery shared slot has a hard 32-byte maximum. Treat that as an engineering budget unless CoreNetwork itself changes.
-
-Each spell payload should explicitly document:
-
-- worst-case byte count
-- version/format identifier when needed
-- bounds for event counts and arrays
-- whether data is state, bounded event history, or both
-- coordinate encoding and quantization error
-- stale/clear semantics
-- validation rules on read
-
-Relative coordinate compression is only safe when the chosen anchor can represent **every legal state transition**. Retargeting, target death, reacquisition, owner movement, or long-lived guided motion can invalidate a range assumption that was true for the ordinary path.
-
-If a legal state can leave the encoding range:
-
-```text
-re-anchor explicitly
-or use a wider encoding
-or use a different coordinate representation
-```
-
-Do not silently clamp a gameplay-valid remote position into the representable range.
+Do not grow the common Orrery state indefinitely or allocate a permanent Core
+slot per spell. Use the shared typed channel and bank. Protocol bounds, multipart
+placement and current validation status are documented once in the linked guide.
 
 ---
 
@@ -1309,7 +1205,10 @@ OrrerySpellName.cs
     mechanic + bounded runtime state for a substantial spell
 
 OrrerySpellNameRemotePresentation.cs
-    only when remote/presentation lifecycle is substantial enough to justify it
+    skill-specific visuals when substantial; register with shared lifecycle hooks
+
+OrreryNetwork.cs / LeviathanNetwork.cs
+    mod-specific networking contracts, outside the gameplay skill
 ```
 
 The Compendium is **not** a universal effect schema. It is the tune sheet. Spell-specific mechanics remain explicit C# in the spell implementation.
@@ -1331,7 +1230,7 @@ One canonical implementation is preferable.
 
 Class-specific folders are encouraged for organization. Ordinary C# scripts do not gain a namespace or change runtime behavior merely because their filesystem path changes.
 
-A reasonable project shape is:
+An optional organizational example (not the current directory layout or a required refactor):
 
 ```text
 Assets/Leviathan/Content/Scripts/
@@ -1374,13 +1273,13 @@ When reorganizing Unity assets:
 5. Respect other Unity special-folder semantics such as `Resources`, plugins, platform folders, and asset-bundle/addressable conventions.
 6. Prefer a dedicated organization-only commit for a large move. Avoid mixing path moves with behavioral refactors so GUID/path mistakes are easy to review or revert.
 
-As of the current project layout, there are no `.asmdef` files in this repository, so ordinary subfolders beneath the existing runtime Scripts hierarchy do not currently create new assembly boundaries. That fact should be rechecked before any future large move.
+The runtime Scripts directory contains `LeviathanMod.asmdef`; the SDK also has an editor assembly definition. Inspect the actual assembly boundary and references before a move. Ordinary subfolders inside the same asmdef do not themselves add a namespace or assembly boundary.
 
 ---
 
 # 25. Spell Design Sheet — Required Before Implementation
 
-Before coding a new spell, fill out this sheet.
+Use this as an implementation checklist scaled to the spell. Capture the user-facing mechanic and important unresolved decisions first. The implementer fills in native/API and networking details; the user does not need to specify packet layouts before skill work can proceed.
 
 ```text
 SPELL NAME:
@@ -1483,10 +1382,9 @@ MULTIPLAYER:
     remote presentation state/event:
     can remote derive anything from start time/seed/target?
     event catch-up/history needed if updates coalesce?
-    payload worst-case bytes:
-    coordinate anchor / quantization:
-    can every legal retarget/reacquire state be represented?
-    stale/clear semantics:
+    what other players need to see:
+    what should happen visually on completion, refresh or target loss:
+    adapter/transport details are the implementer's responsibility via the networking guide:
 
 POOLING / CLEANUP:
     created objects:
