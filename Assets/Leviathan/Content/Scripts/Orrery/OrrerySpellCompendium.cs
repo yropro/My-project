@@ -17,6 +17,12 @@ public static class OrrerySpellCompendium
         public const float ExplosionRadiusMeters = 40f;
         public const float LifetimeSeconds = 5f;
         public const float SpawnGraceSeconds = 0.15f;
+
+        // Contact damage may re-arm against the same target after the projectile
+        // has stopped intersecting it for this long. Native piercing ignore state
+        // prevents per-fixed-tick damage while the orb remains inside a target.
+        public const float ContactRearmSeconds = 0.10f;
+        public const int MaxTrackedContactTargets = 64;
     }
 
     public static class TeslaCoil
@@ -195,7 +201,6 @@ public static class OrrerySpellCompendium
         public const int MaximumImpacts =
             BaseMaximumImpacts + MaxInheritedAdditionalChains;
         public const int MaximumInheritedImpacts = MaximumImpacts;
-
         public const int MaxCandidateShipsPerQuery = 64;
         public const int MaxTargetsPerExplosion = 64;
 
