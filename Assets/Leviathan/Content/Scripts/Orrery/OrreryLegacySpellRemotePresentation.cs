@@ -67,6 +67,8 @@ public static class OrreryLegacySpellRemotePresentation
 
     private static readonly Dictionary<GameShip, RemoteState> states =
         new Dictionary<GameShip, RemoteState>(4);
+    private static readonly HashSet<string> warnedInvalidPresentation =
+        new HashSet<string>();
 
     private static BeamWeaponItemBase teslaBase;
     private static float baseCryoVisualSpeedWorld;
@@ -156,6 +158,7 @@ public static class OrreryLegacySpellRemotePresentation
                 TrySpawnInert(
                     ref state.Magma,
                     GetInfernoBase(),
+                    "Inferno Cannon",
                     owner,
                     wire.ProjectilePosition,
                     wire.ProjectileAngleDegrees,
@@ -282,9 +285,25 @@ public static class OrreryLegacySpellRemotePresentation
         GameObject projectilePrefab = itemBase == null
             ? null
             : itemBase.GetProjectileObject(owner.faction);
+        if (itemBase != null && projectilePrefab == null)
+        {
+            WarnInvalidPresentation(
+                "Inferno Cannon explosion",
+                "selected faction has no projectile prefab");
+            return;
+        }
+
         ExplosiveProjectile template = projectilePrefab == null
             ? null
             : projectilePrefab.GetComponent<ExplosiveProjectile>();
+        if (projectilePrefab != null &&
+            (template == null || template.explosiveAreaPrefab == null))
+        {
+            WarnInvalidPresentation(
+                "Inferno Cannon explosion",
+                "projectile is missing ExplosiveProjectile or explosiveAreaPrefab");
+            return;
+        }
         if (template == null || template.explosiveAreaPrefab == null)
             return;
 
@@ -300,6 +319,9 @@ public static class OrreryLegacySpellRemotePresentation
         if (!explosionObject.TryGetComponent<ExplosiveArea>(out area) ||
             area == null)
         {
+            WarnInvalidPresentation(
+                "Inferno Cannon explosion",
+                "explosive-area prefab has no ExplosiveArea component");
             ReturnUnexpectedVisual(explosionObject);
             return;
         }
@@ -320,7 +342,12 @@ public static class OrreryLegacySpellRemotePresentation
 
         GameObject prefab = itemBase.GetProjectileObject(owner.faction);
         if (prefab == null)
+        {
+            WarnInvalidPresentation(
+                "Cryo Gun projectile",
+                "selected faction has no projectile prefab");
             return;
+        }
 
         int shotCount = Mathf.Max(
             1,
@@ -349,6 +376,7 @@ public static class OrreryLegacySpellRemotePresentation
             if (!TrySpawnInert(
                     ref state.CryoVisuals[slot],
                     itemBase,
+                    "Cryo Gun",
                     owner,
                     state.CryoOrigin,
                     degrees,
@@ -556,6 +584,7 @@ public static class OrreryLegacySpellRemotePresentation
     private static bool TrySpawnInert(
         ref InertProjectileState state,
         LauncherItemBase itemBase,
+        string logicalName,
         GameShip owner,
         Vector2 position,
         float angleDegrees,
@@ -568,7 +597,12 @@ public static class OrreryLegacySpellRemotePresentation
 
         GameObject prefab = itemBase.GetProjectileObject(owner.faction);
         if (prefab == null)
+        {
+            WarnInvalidPresentation(
+                logicalName + " projectile",
+                "selected faction has no projectile prefab");
             return false;
+        }
 
         GameObject visualObject = PoolController.instance.GetObject(
             prefab,
@@ -582,6 +616,9 @@ public static class OrreryLegacySpellRemotePresentation
         if (!visualObject.TryGetComponent<Projectile>(out projectile) ||
             projectile == null)
         {
+            WarnInvalidPresentation(
+                logicalName + " projectile",
+                "prefab has no root Projectile component");
             ReturnUnexpectedVisual(visualObject);
             return false;
         }
@@ -647,6 +684,17 @@ public static class OrreryLegacySpellRemotePresentation
             projectile.PoolDestroy();
         }
         state = default(InertProjectileState);
+    }
+
+    private static void WarnInvalidPresentation(string logicalName, string reason)
+    {
+        string key = logicalName + "|" + reason;
+        if (!warnedInvalidPresentation.Add(key))
+            return;
+
+        Debug.LogWarning(
+            "[Orrery] " + logicalName + " presentation is incompatible: " +
+            reason + "; optional remote presentation was omitted.");
     }
 
     private static void ReturnUnexpectedVisual(GameObject visualObject)
