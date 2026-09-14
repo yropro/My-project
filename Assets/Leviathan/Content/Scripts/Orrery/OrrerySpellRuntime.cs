@@ -667,9 +667,6 @@ public static class OrrerySpellRuntime
         ushort spellId,
         Activatable weapon)
     {
-        if (weapon == null)
-            return;
-
         if (spellId == 1)
         {
             Launcher launcher = weapon as Launcher;
