@@ -23,7 +23,6 @@ public static class OrreryVoidGalleryPresentation
 
     private const float CellSizeWorld = CellSizeMeters / 20f;
     private const string MaterialAssetName = "OrreryVoidGalleryBase";
-    private const string ThermalHaloPath = "Base/Items/AutoSpecial/Thermal Halo";
 
     private sealed class GalleryState
     {
@@ -362,7 +361,7 @@ public static class OrreryVoidGalleryPresentation
 
     private static SpriteRenderer GetSortingSource()
     {
-        HaloItemBase itemBase = Resources.Load<HaloItemBase>(ThermalHaloPath);
+        HaloItemBase itemBase = OrreryContent.ThermalHalo;
         if (itemBase == null || itemBase.field == null)
             return null;
         return itemBase.field.GetComponent<SpriteRenderer>();

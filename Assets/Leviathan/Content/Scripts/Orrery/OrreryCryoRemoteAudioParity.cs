@@ -12,8 +12,7 @@ using UnityEngine;
 [HarmonyPatch(typeof(OrreryLegacySpellRemotePresentation), "SpawnCryoWave")]
 public static class OrreryCryoRemoteAudioParityPatch
 {
-    private const string CryoGunPath = "Base/Items/PrimaryWeapon/Cryo Gun";
-    private static LauncherItemBase cryoBase;
+    private static bool warnedMissingCryoAudio;
 
     public static void Postfix(GameShip owner, int waveIndex)
     {
@@ -22,12 +21,20 @@ public static class OrreryCryoRemoteAudioParityPatch
         if (owner == null || waveIndex <= 0)
             return;
 
+        LauncherItemBase cryoBase = OrreryContent.CryoGun;
         if (cryoBase == null)
-            cryoBase = Resources.Load<LauncherItemBase>(CryoGunPath);
+            return;
 
-        if (cryoBase == null || cryoBase.soundEffect == null ||
+        if (cryoBase.soundEffect == null ||
             cryoBase.soundEffect.audioClip == null)
         {
+            if (!warnedMissingCryoAudio)
+            {
+                warnedMissingCryoAudio = true;
+                Debug.LogWarning(
+                    "[Orrery] Cryo Gun has no usable sound effect; " +
+                    "remote Cone of Cold follow-up audio was omitted.");
+            }
             return;
         }
 
@@ -35,19 +42,5 @@ public static class OrreryCryoRemoteAudioParityPatch
             cryoBase.soundEffect,
             owner.transform.position,
             "Orrery Remote Cone of Cold Wave");
-    }
-
-    public static void Reset()
-    {
-        cryoBase = null;
-    }
-}
-
-[HarmonyPatch(typeof(WorldController), "OnDestroy")]
-public static class OrreryCryoRemoteAudioParityWorldPatch
-{
-    public static void Postfix()
-    {
-        OrreryCryoRemoteAudioParityPatch.Reset();
     }
 }

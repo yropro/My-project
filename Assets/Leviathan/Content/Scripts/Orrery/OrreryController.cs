@@ -35,6 +35,9 @@ public sealed class OrreryController : MonoBehaviour
     }
 
     private static OrreryController instance;
+    private static SquadronBase spawnCarrierSource;
+    private static bool warnedInvalidDirectCarrier;
+    private static bool warnedAmbiguousCarrier;
 
     private readonly List<OrrerySatellites.IntentEntry> intentEntries =
         new List<OrrerySatellites.IntentEntry>(OrreryOrbit.MaxSatellites);
@@ -632,23 +635,63 @@ public sealed class OrreryController : MonoBehaviour
 
     private static SquadronBase FindSpawnCarrier()
     {
-        string fullPath = SpawnCarrierResourcePath + "/" + SpawnCarrierName;
-        SquadronBase direct = Resources.Load<SquadronBase>(fullPath);
-        if (direct != null)
-            return direct;
+        if (IsExpectedSpawnCarrier(spawnCarrierSource))
+            return spawnCarrierSource;
+        spawnCarrierSource = null;
 
-        SquadronBase[] bases = Resources.FindObjectsOfTypeAll<SquadronBase>();
+        string fullPath = SpawnCarrierResourcePath + "/" + SpawnCarrierName;
+        SquadronBase direct = ModContent.Load<SquadronBase>(fullPath);
+        if (IsExpectedSpawnCarrier(direct))
+        {
+            spawnCarrierSource = direct;
+            return spawnCarrierSource;
+        }
+
+        if (direct != null && !warnedInvalidDirectCarrier)
+        {
+            warnedInvalidDirectCarrier = true;
+            Debug.LogWarning(
+                "[Orrery] Spawn carrier resolved at '" + fullPath +
+                "' but did not retain the expected filename/resourcePath identity.");
+        }
+
+        SquadronBase[] bases =
+            ModContent.LoadAll<SquadronBase>(SpawnCarrierResourcePath);
+        SquadronBase match = null;
+        int matches = 0;
         for (int i = 0; i < bases.Length; i++)
         {
             SquadronBase candidate = bases[i];
-            if (candidate != null &&
-                candidate.filename == SpawnCarrierName &&
-                candidate.resourcePath == SpawnCarrierResourcePath)
-            {
-                return candidate;
-            }
+            if (!IsExpectedSpawnCarrier(candidate))
+                continue;
+
+            match = candidate;
+            matches++;
         }
+
+        if (matches == 1)
+        {
+            spawnCarrierSource = match;
+            return spawnCarrierSource;
+        }
+
+        if (matches > 1 && !warnedAmbiguousCarrier)
+        {
+            warnedAmbiguousCarrier = true;
+            Debug.LogError(
+                "[Orrery] Spawn carrier discovery was ambiguous: found " +
+                matches + " matching '" + SpawnCarrierResourcePath + "/" +
+                SpawnCarrierName + "' assets.");
+        }
+
         return null;
+    }
+
+    private static bool IsExpectedSpawnCarrier(SquadronBase candidate)
+    {
+        return candidate != null &&
+            candidate.filename == SpawnCarrierName &&
+            candidate.resourcePath == SpawnCarrierResourcePath;
     }
 }
 

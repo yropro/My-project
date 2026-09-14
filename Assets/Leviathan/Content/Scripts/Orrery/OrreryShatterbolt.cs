@@ -14,12 +14,6 @@ using UnityEngine;
 /// </summary>
 public static class OrreryShatterbolt
 {
-    private const string LightningOrbPath =
-        "Base/Items/SecondaryWeapon/Lightning Orb Launcher";
-    private const string FrozenOrbPath =
-        "Base/Items/SecondaryWeapon/Frozen Orb Launcher";
-    private const string FrostNovaPath =
-        "Base/Items/Special/Frost Nova Pulse";
     // Keep completed impact history briefly available through packet loss.
     // This presentation tail never delays shuffle or permits more damage.
     private const float PresentationTailSeconds =
@@ -167,7 +161,8 @@ public static class OrreryShatterbolt
 
     private static readonly Dictionary<GameShip, OwnerState> owners =
         new Dictionary<GameShip, OwnerState>(4);
-    private static PulseItemBase frostNovaBase;
+    private static bool warnedInvalidOrbVisual;
+    private static bool warnedInvalidExplosionVisual;
 
     public static bool Execute(
         GameShip owner,
@@ -204,13 +199,11 @@ public static class OrreryShatterbolt
         if (!TryCreateSource(
                 owner,
                 OrreryElement.Lightning,
-                LightningOrbPath,
                 out lightningProfile,
                 out lightningSource) ||
             !TryCreateSource(
                 owner,
                 OrreryElement.Ice,
-                FrozenOrbPath,
                 out iceProfile,
                 out iceSource))
         {
@@ -361,7 +354,6 @@ public static class OrreryShatterbolt
         for (int i = 0; i < keys.Length; i++)
             Forget(keys[i]);
         owners.Clear();
-        frostNovaBase = null;
     }
 
     public static bool TryGetPresentation(
@@ -872,7 +864,6 @@ public static class OrreryShatterbolt
     private static bool TryCreateSource(
         GameShip owner,
         OrreryElement element,
-        string resourcePath,
         out OrreryFocusProfile.Resolved focus,
         out Launcher launcher)
     {
@@ -885,12 +876,24 @@ public static class OrreryShatterbolt
             return false;
         }
 
-        ItemBase itemBase = Resources.Load<ItemBase>(resourcePath);
+        LauncherItemBase itemBase = null;
+        string logicalName = null;
+        if (element == OrreryElement.Lightning)
+        {
+            itemBase = OrreryContent.LightningOrbLauncher;
+            logicalName = "Lightning Orb Launcher";
+        }
+        else if (element == OrreryElement.Ice)
+        {
+            itemBase = OrreryContent.FrozenOrbLauncher;
+            logicalName = "Frozen Orb Launcher";
+        }
+
         if (itemBase == null)
         {
             Debug.LogError(
                 "[Orrery] Shatterbolt native implementation item not found: " +
-                resourcePath);
+                (logicalName ?? element.ToString()));
             return false;
         }
 
@@ -899,7 +902,7 @@ public static class OrreryShatterbolt
         {
             Debug.LogError(
                 "[Orrery] Shatterbolt implementation item is not a Launcher: " +
-                resourcePath);
+                (logicalName ?? element.ToString()));
             return false;
         }
 
@@ -936,6 +939,13 @@ public static class OrreryShatterbolt
         if (!visualObject.TryGetComponent<Projectile>(out projectile) ||
             projectile == null)
         {
+            if (!warnedInvalidOrbVisual)
+            {
+                warnedInvalidOrbVisual = true;
+                Debug.LogWarning(
+                    "[Orrery] Shatterbolt Lightning Orb presentation prefab has no " +
+                    "Projectile component; the cast was not started.");
+            }
             ReturnUnexpectedVisual(visualObject);
             return false;
         }
@@ -1036,14 +1046,18 @@ public static class OrreryShatterbolt
         if (PoolController.instance == null)
             return;
 
-        if (frostNovaBase == null)
-            frostNovaBase = Resources.Load<PulseItemBase>(FrostNovaPath);
+        PulseItemBase frostNovaBase = OrreryContent.FrostNovaPulse;
         GameObject visualPrefab =
             frostNovaBase == null ? null : frostNovaBase.wave;
         if (visualPrefab == null)
         {
-            Debug.LogError(
-                "[Orrery] Shatterbolt Frost Nova presentation prefab was not found.");
+            if (!warnedInvalidExplosionVisual)
+            {
+                warnedInvalidExplosionVisual = true;
+                Debug.LogWarning(
+                    "[Orrery] Shatterbolt Frost Nova presentation has no wave prefab; " +
+                    "the optional burst presentation was omitted.");
+            }
             return;
         }
 
@@ -1056,16 +1070,19 @@ public static class OrreryShatterbolt
             return;
 
         Wave wave;
-        if (!visualObject.TryGetComponent<Wave>(out wave) || wave == null)
-        {
-            ReturnUnexpectedVisual(visualObject);
-            return;
-        }
-
         CircleCollider2D circle;
-        if (!visualObject.TryGetComponent<CircleCollider2D>(out circle) ||
+        if (!visualObject.TryGetComponent<Wave>(out wave) || wave == null ||
+            !visualObject.TryGetComponent<CircleCollider2D>(out circle) ||
             circle == null || circle.radius <= 0f)
         {
+            if (!warnedInvalidExplosionVisual)
+            {
+                warnedInvalidExplosionVisual = true;
+                Debug.LogWarning(
+                    "[Orrery] Shatterbolt Frost Nova presentation prefab is missing " +
+                    "a Wave or valid CircleCollider2D; the optional burst presentation " +
+                    "was omitted.");
+            }
             ReturnUnexpectedVisual(visualObject);
             return;
         }

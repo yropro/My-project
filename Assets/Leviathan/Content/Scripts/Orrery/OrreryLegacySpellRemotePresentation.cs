@@ -18,10 +18,9 @@ public static class OrreryLegacySpellRemotePresentation
         public const int MaxCryoShards = 45;
     }
 
-    private const string InfernoCannonPath =
-        "Base/Items/PrimaryWeapon/Inferno Cannon";
-    private const string CryoGunPath =
-        "Base/Items/PrimaryWeapon/Cryo Gun";
+    // Tesla is intentionally left on its legacy dedicated lookup path until the
+    // planned Conductor replacement. Inferno and Cryo use OrreryContent so their
+    // local/remote presentations resolve the same override-aware source assets.
     private const string TeslaCoilPath =
         "Base/Items/PrimaryWeapon/Tesla Coil";
 
@@ -68,9 +67,9 @@ public static class OrreryLegacySpellRemotePresentation
 
     private static readonly Dictionary<GameShip, RemoteState> states =
         new Dictionary<GameShip, RemoteState>(4);
+    private static readonly HashSet<string> warnedInvalidPresentation =
+        new HashSet<string>();
 
-    private static LauncherItemBase infernoBase;
-    private static LauncherItemBase cryoBase;
     private static BeamWeaponItemBase teslaBase;
     private static float baseCryoVisualSpeedWorld;
     private static bool baseCryoSpeedResolved;
@@ -159,6 +158,7 @@ public static class OrreryLegacySpellRemotePresentation
                 TrySpawnInert(
                     ref state.Magma,
                     GetInfernoBase(),
+                    "Inferno Cannon",
                     owner,
                     wire.ProjectilePosition,
                     wire.ProjectileAngleDegrees,
@@ -285,9 +285,25 @@ public static class OrreryLegacySpellRemotePresentation
         GameObject projectilePrefab = itemBase == null
             ? null
             : itemBase.GetProjectileObject(owner.faction);
+        if (itemBase != null && projectilePrefab == null)
+        {
+            WarnInvalidPresentation(
+                "Inferno Cannon explosion",
+                "selected faction has no projectile prefab");
+            return;
+        }
+
         ExplosiveProjectile template = projectilePrefab == null
             ? null
             : projectilePrefab.GetComponent<ExplosiveProjectile>();
+        if (projectilePrefab != null &&
+            (template == null || template.explosiveAreaPrefab == null))
+        {
+            WarnInvalidPresentation(
+                "Inferno Cannon explosion",
+                "projectile is missing ExplosiveProjectile or explosiveAreaPrefab");
+            return;
+        }
         if (template == null || template.explosiveAreaPrefab == null)
             return;
 
@@ -303,6 +319,9 @@ public static class OrreryLegacySpellRemotePresentation
         if (!explosionObject.TryGetComponent<ExplosiveArea>(out area) ||
             area == null)
         {
+            WarnInvalidPresentation(
+                "Inferno Cannon explosion",
+                "explosive-area prefab has no ExplosiveArea component");
             ReturnUnexpectedVisual(explosionObject);
             return;
         }
@@ -323,7 +342,12 @@ public static class OrreryLegacySpellRemotePresentation
 
         GameObject prefab = itemBase.GetProjectileObject(owner.faction);
         if (prefab == null)
+        {
+            WarnInvalidPresentation(
+                "Cryo Gun projectile",
+                "selected faction has no projectile prefab");
             return;
+        }
 
         int shotCount = Mathf.Max(
             1,
@@ -352,6 +376,7 @@ public static class OrreryLegacySpellRemotePresentation
             if (!TrySpawnInert(
                     ref state.CryoVisuals[slot],
                     itemBase,
+                    "Cryo Gun",
                     owner,
                     state.CryoOrigin,
                     degrees,
@@ -559,6 +584,7 @@ public static class OrreryLegacySpellRemotePresentation
     private static bool TrySpawnInert(
         ref InertProjectileState state,
         LauncherItemBase itemBase,
+        string logicalName,
         GameShip owner,
         Vector2 position,
         float angleDegrees,
@@ -571,7 +597,12 @@ public static class OrreryLegacySpellRemotePresentation
 
         GameObject prefab = itemBase.GetProjectileObject(owner.faction);
         if (prefab == null)
+        {
+            WarnInvalidPresentation(
+                logicalName + " projectile",
+                "selected faction has no projectile prefab");
             return false;
+        }
 
         GameObject visualObject = PoolController.instance.GetObject(
             prefab,
@@ -585,6 +616,9 @@ public static class OrreryLegacySpellRemotePresentation
         if (!visualObject.TryGetComponent<Projectile>(out projectile) ||
             projectile == null)
         {
+            WarnInvalidPresentation(
+                logicalName + " projectile",
+                "prefab has no root Projectile component");
             ReturnUnexpectedVisual(visualObject);
             return false;
         }
@@ -652,6 +686,17 @@ public static class OrreryLegacySpellRemotePresentation
         state = default(InertProjectileState);
     }
 
+    private static void WarnInvalidPresentation(string logicalName, string reason)
+    {
+        string key = logicalName + "|" + reason;
+        if (!warnedInvalidPresentation.Add(key))
+            return;
+
+        Debug.LogWarning(
+            "[Orrery] " + logicalName + " presentation is incompatible: " +
+            reason + "; optional remote presentation was omitted.");
+    }
+
     private static void ReturnUnexpectedVisual(GameObject visualObject)
     {
         if (visualObject == null)
@@ -671,16 +716,12 @@ public static class OrreryLegacySpellRemotePresentation
 
     private static LauncherItemBase GetInfernoBase()
     {
-        if (infernoBase == null)
-            infernoBase = Resources.Load<LauncherItemBase>(InfernoCannonPath);
-        return infernoBase;
+        return OrreryContent.InfernoCannon;
     }
 
     private static LauncherItemBase GetCryoBase()
     {
-        if (cryoBase == null)
-            cryoBase = Resources.Load<LauncherItemBase>(CryoGunPath);
-        return cryoBase;
+        return OrreryContent.CryoGun;
     }
 
     private static BeamWeaponItemBase GetTeslaBase()
@@ -794,8 +835,6 @@ public static class OrreryLegacySpellRemotePresentation
             DestroyTesla(state);
         }
         states.Clear();
-        infernoBase = null;
-        cryoBase = null;
         teslaBase = null;
         baseCryoVisualSpeedWorld = 0f;
         baseCryoSpeedResolved = false;

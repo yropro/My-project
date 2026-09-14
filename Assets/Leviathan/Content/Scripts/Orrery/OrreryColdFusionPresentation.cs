@@ -17,7 +17,6 @@ using UnityEngine;
 /// </summary>
 public static class OrreryColdFusionPresentation
 {
-    private const string FrostNovaPath = "Base/Items/Special/Frost Nova Pulse";
     private const int MaxHaloLayers = 6;
 
     private sealed class HaloLayer
@@ -46,11 +45,8 @@ public static class OrreryColdFusionPresentation
         new Dictionary<GameShip, AuraState>(8);
     private static readonly List<GameShip> cleanupScratch =
         new List<GameShip>(8);
-
-
-
-
-    private static PulseItemBase frostNovaBase;
+    private static bool warnedMissingWavePrefab;
+    private static bool warnedInvalidVisualShape;
 
     public static void Show(GameShip target, float durationSeconds)
     {
@@ -68,11 +64,19 @@ public static class OrreryColdFusionPresentation
         if (PoolController.instance == null)
             return;
 
-        if (frostNovaBase == null)
-            frostNovaBase = Resources.Load<PulseItemBase>(FrostNovaPath);
+        PulseItemBase frostNovaBase = OrreryContent.FrostNovaPulse;
         GameObject prefab = frostNovaBase == null ? null : frostNovaBase.wave;
         if (prefab == null)
+        {
+            if (frostNovaBase != null && !warnedMissingWavePrefab)
+            {
+                warnedMissingWavePrefab = true;
+                Debug.LogWarning(
+                    "[Orrery] Frost Nova Pulse has no wave prefab; " +
+                    "Cold Fusion aura presentation was omitted.");
+            }
             return;
+        }
 
         AuraState state = new AuraState();
         state.Target = target;
@@ -102,6 +106,14 @@ public static class OrreryColdFusionPresentation
                 circle.radius <= 0f ||
                 !visual.TryGetComponent<SpriteRenderer>(out sprite) || sprite == null)
             {
+                if (!warnedInvalidVisualShape)
+                {
+                    warnedInvalidVisualShape = true;
+                    Debug.LogWarning(
+                        "[Orrery] Frost Nova Pulse wave prefab is missing the Wave, " +
+                        "root SpriteRenderer, or valid CircleCollider2D required by " +
+                        "Cold Fusion; aura presentation was omitted.");
+                }
                 ReturnUnexpectedVisual(visual);
                 continue;
             }
@@ -196,7 +208,6 @@ public static class OrreryColdFusionPresentation
         for (int i = 0; i < cleanupScratch.Count; i++)
             Hide(cleanupScratch[i]);
         cleanupScratch.Clear();
-        frostNovaBase = null;
     }
 
     private static void UpdateState(AuraState state, float deltaTime)

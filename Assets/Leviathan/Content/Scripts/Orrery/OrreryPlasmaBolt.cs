@@ -19,11 +19,6 @@ using UnityEngine;
 /// </summary>
 public static class OrreryPlasmaBolt
 {
-    // Hidden source supplies native slot context only. Actual focus stats come
-    // from OrreryFocusProfile; no native projectile is fired.
-    private const string LightningDonorPath =
-        "Base/Items/SecondaryWeapon/Lightning Orb Launcher";
-
     private struct DamageProfile
     {
         public float DamageDps;
@@ -1474,12 +1469,11 @@ public static class OrreryPlasmaBolt
         out Launcher launcher)
     {
         launcher = null;
-        ItemBase itemBase = ModContent.Load<ItemBase>(LightningDonorPath);
+        LauncherItemBase itemBase = OrreryContent.LightningOrbLauncher;
         if (itemBase == null)
         {
             Debug.LogError(
-                "[Orrery] Plasma Bolt native donor not found: " +
-                LightningDonorPath);
+                "[Orrery] Plasma Bolt native donor not found: Lightning Orb Launcher");
             return false;
         }
 
@@ -1487,8 +1481,7 @@ public static class OrreryPlasmaBolt
         if (launcher == null)
         {
             Debug.LogError(
-                "[Orrery] Plasma Bolt donor is not a Launcher: " +
-                LightningDonorPath);
+                "[Orrery] Plasma Bolt donor is not a Launcher: Lightning Orb Launcher");
             return false;
         }
 
