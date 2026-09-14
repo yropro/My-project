@@ -20,6 +20,15 @@ public static class OrreryRemoteSectorPresentation
         if (remoteOwner == null || !remoteOwner.IsRemotePlayer())
             return;
 
+        // The gallery is intentionally a local visual workbench, not a networked
+        // Orrery presentation. Suppress production remote wheels while testing so
+        // the old pie art cannot contaminate the comparison.
+        if (OrreryVoidGalleryPresentation.Enabled)
+        {
+            OrrerySectorPresentation.Hide(remoteOwner);
+            return;
+        }
+
         if (!CoreNetwork.HasSynchronizedSpecialization(
                 remoteOwner,
                 CoreClassId.Orrery))
