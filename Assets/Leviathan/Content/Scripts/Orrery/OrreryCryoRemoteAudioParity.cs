@@ -36,6 +36,11 @@ public static class OrreryCryoRemoteAudioParityPatch
             owner.transform.position,
             "Orrery Remote Cone of Cold Wave");
     }
+
+    public static void Reset()
+    {
+        cryoBase = null;
+    }
 }
 
 [HarmonyPatch(typeof(WorldController), "OnDestroy")]
@@ -43,11 +48,6 @@ public static class OrreryCryoRemoteAudioParityWorldPatch
 {
     public static void Postfix()
     {
-        // Resource assets survive world teardown, but dropping the reference keeps
-        // this presentation cache aligned with the rest of Orrery's world caches.
-        typeof(OrreryCryoRemoteAudioParityPatch)
-            .GetField("cryoBase", System.Reflection.BindingFlags.NonPublic |
-                System.Reflection.BindingFlags.Static)
-            .SetValue(null, null);
+        OrreryCryoRemoteAudioParityPatch.Reset();
     }
 }
