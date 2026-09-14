@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Local gameplay-space presentation for Orrery elemental sectors.
+/// Gameplay-space presentation for Orrery elemental sectors.
 ///
-/// Each sector is a procedural wedge that samples the real native Halo field art
-/// for its element. Geometry performs the angular cut; native Halo textures and
-/// materials provide the actual visual language. This is presentation only and
-/// never participates in element resolution or collision.
+/// Each owner receives an independent procedural wheel that samples the real
+/// native Halo field art for its elements. Local gameplay and remote replicas
+/// share the same presentation builder; only the source of resolved state differs.
+/// This layer is presentation-only and never participates in element resolution
+/// or collision.
 /// </summary>
 public static class OrrerySectorPresentation
 {
@@ -30,40 +31,175 @@ public static class OrrerySectorPresentation
     private const string ColdHaloPath = "Base/Items/AutoSpecial/Cold Halo";
     private const string ElectricHaloPath = "Base/Items/AutoSpecial/Electric Halo";
 
-    private static readonly List<Mesh> meshes = new List<Mesh>(8);
-    private static readonly List<Material> materials = new List<Material>(8);
+    private sealed class PresentationState
+    {
+        public GameShip Owner;
+        public OrreryRuntime.ResolvedState Resolved;
+        public GameObject Root;
+        public readonly List<Mesh> Meshes = new List<Mesh>(8);
+        public readonly List<Material> Materials = new List<Material>(8);
+    }
 
-    private static GameShip owner;
-    private static GameObject root;
+    private static readonly Dictionary<GameShip, PresentationState> states =
+        new Dictionary<GameShip, PresentationState>(8);
 
+    private static GameShip localOwner;
+
+    /// <summary>
+    /// Local-owner entry point retained for the existing presentation driver.
+    /// </summary>
     public static void Show(GameShip newOwner)
     {
         if (newOwner == null || !OrreryRuntime.IsActive(newOwner))
         {
-            Hide();
+            HideLocal();
             return;
         }
-
-        if (object.ReferenceEquals(owner, newOwner) && root != null)
-            return;
-
-        Hide();
-        owner = newOwner;
 
         OrreryRuntime.ResolvedState resolved =
             OrreryRuntime.GetResolvedState(newOwner);
         if (resolved == null || !resolved.Active || resolved.Sectors == null)
         {
-            owner = null;
+            Hide(newOwner);
             return;
         }
 
-        root = new GameObject("Orrery Element Sectors");
-        root.transform.position = newOwner.transform.position;
-        root.transform.rotation = Quaternion.identity;
+        if (localOwner != null && !object.ReferenceEquals(localOwner, newOwner))
+            Hide(localOwner);
+
+        localOwner = newOwner;
+        EnsureShown(newOwner, resolved);
+    }
+
+    /// <summary>
+    /// Local-owner tick. It intentionally cleans only the local wheel so a player
+    /// without Orrery selected can still see synchronized remote Orrery wheels.
+    /// </summary>
+    public static void Tick(GameShip currentOwner)
+    {
+        if (currentOwner == null || !OrreryRuntime.IsActive(currentOwner))
+        {
+            HideLocal();
+            return;
+        }
+
+        OrreryRuntime.ResolvedState resolved =
+            OrreryRuntime.GetResolvedState(currentOwner);
+        if (resolved == null || !resolved.Active || resolved.Sectors == null)
+        {
+            Hide(currentOwner);
+            return;
+        }
+
+        if (localOwner != null && !object.ReferenceEquals(localOwner, currentOwner))
+            Hide(localOwner);
+
+        localOwner = currentOwner;
+        TickResolved(currentOwner, resolved);
+    }
+
+    /// <summary>
+    /// Remote-owner tick. The caller must already have passed CoreNetwork's exact
+    /// replica specialization gate and provide the derived presentation state.
+    /// No remote gameplay state is created here.
+    /// </summary>
+    public static void TickRemote(
+        GameShip remoteOwner,
+        OrreryRuntime.ResolvedState resolved)
+    {
+        if (remoteOwner == null || resolved == null ||
+            !resolved.Active || resolved.Sectors == null)
+        {
+            Hide(remoteOwner);
+            return;
+        }
+
+        TickResolved(remoteOwner, resolved);
+    }
+
+    public static void Hide(GameShip expectedOwner)
+    {
+        if (expectedOwner == null)
+            return;
+
+        PresentationState state;
+        if (!states.TryGetValue(expectedOwner, out state) || state == null)
+        {
+            if (object.ReferenceEquals(localOwner, expectedOwner))
+                localOwner = null;
+            return;
+        }
+
+        CleanupState(state);
+        states.Remove(expectedOwner);
+
+        if (object.ReferenceEquals(localOwner, expectedOwner))
+            localOwner = null;
+    }
+
+    public static void Hide()
+    {
+        foreach (KeyValuePair<GameShip, PresentationState> pair in states)
+            CleanupState(pair.Value);
+
+        states.Clear();
+        localOwner = null;
+    }
+
+    private static void HideLocal()
+    {
+        GameShip owner = localOwner;
+        localOwner = null;
+        if (owner != null)
+            Hide(owner);
+    }
+
+    private static void TickResolved(
+        GameShip owner,
+        OrreryRuntime.ResolvedState resolved)
+    {
+        PresentationState state = EnsureShown(owner, resolved);
+        if (state == null || state.Root == null)
+            return;
+
+        state.Root.transform.position = owner.transform.position;
+        // Baseline wheel is world-fixed. Do not inherit ship rotation.
+        state.Root.transform.rotation = Quaternion.identity;
+    }
+
+    private static PresentationState EnsureShown(
+        GameShip owner,
+        OrreryRuntime.ResolvedState resolved)
+    {
+        if (owner == null || resolved == null ||
+            !resolved.Active || resolved.Sectors == null)
+        {
+            return null;
+        }
+
+        PresentationState state;
+        if (states.TryGetValue(owner, out state) && state != null)
+        {
+            if (state.Root != null &&
+                object.ReferenceEquals(state.Resolved, resolved))
+            {
+                return state;
+            }
+
+            CleanupState(state);
+            states.Remove(owner);
+        }
+
+        state = new PresentationState();
+        state.Owner = owner;
+        state.Resolved = resolved;
+        state.Root = new GameObject("Orrery Element Sectors");
+        state.Root.transform.position = owner.transform.position;
+        state.Root.transform.rotation = Quaternion.identity;
 
         float outerRadiusMeters = resolved.BaseOrbitRadiusMeters +
-            resolved.OrbitLaneSpacingMeters * Mathf.Max(0, resolved.SatelliteCount - 1) +
+            resolved.OrbitLaneSpacingMeters *
+                Mathf.Max(0, resolved.SatelliteCount - 1) +
             Tuning.OuterPaddingMeters;
         float outerRadiusWorld = OrreryUnits.MetersToWorld(outerRadiusMeters);
 
@@ -78,81 +214,65 @@ public static class OrrerySectorPresentation
                 continue;
 
             CreateLayer(
+                state,
                 sector,
                 haloSource,
                 outerRadiusWorld * Tuning.OuterLayerRadiusMultiplier,
                 Tuning.OuterLayerOpacity,
                 0);
             CreateLayer(
+                state,
                 sector,
                 haloSource,
                 outerRadiusWorld * Tuning.InnerLayerRadiusMultiplier,
                 Tuning.InnerLayerOpacity,
                 1);
         }
+
+        states[owner] = state;
+        return state;
     }
 
-    public static void Tick(GameShip currentOwner)
+    private static void CleanupState(PresentationState state)
     {
-        if (currentOwner == null || !OrreryRuntime.IsActive(currentOwner))
-        {
-            Hide();
-            return;
-        }
-
-        if (!object.ReferenceEquals(owner, currentOwner) || root == null)
-            Show(currentOwner);
-
-        if (root == null)
+        if (state == null)
             return;
 
-        Vector3 position = currentOwner.transform.position;
-        root.transform.position = position;
-        // Baseline wheel is world-fixed. Do not inherit ship rotation.
-        root.transform.rotation = Quaternion.identity;
-    }
+        if (state.Root != null)
+            UnityEngine.Object.Destroy(state.Root);
+        state.Root = null;
 
-    public static void Hide(GameShip expectedOwner)
-    {
-        if (expectedOwner != null && owner != null &&
-            !object.ReferenceEquals(expectedOwner, owner))
+        for (int i = 0; i < state.Meshes.Count; i++)
         {
-            return;
+            if (state.Meshes[i] != null)
+                UnityEngine.Object.Destroy(state.Meshes[i]);
         }
-        Hide();
-    }
+        state.Meshes.Clear();
 
-    public static void Hide()
-    {
-        if (root != null)
-            UnityEngine.Object.Destroy(root);
-        root = null;
-        owner = null;
-
-        for (int i = 0; i < meshes.Count; i++)
+        for (int i = 0; i < state.Materials.Count; i++)
         {
-            if (meshes[i] != null)
-                UnityEngine.Object.Destroy(meshes[i]);
+            if (state.Materials[i] != null)
+                UnityEngine.Object.Destroy(state.Materials[i]);
         }
-        meshes.Clear();
+        state.Materials.Clear();
 
-        for (int i = 0; i < materials.Count; i++)
-        {
-            if (materials[i] != null)
-                UnityEngine.Object.Destroy(materials[i]);
-        }
-        materials.Clear();
+        state.Owner = null;
+        state.Resolved = null;
     }
 
     private static void CreateLayer(
+        PresentationState state,
         OrreryRuntime.Sector sector,
         SpriteRenderer source,
         float radiusWorld,
         float opacityMultiplier,
         int layerIndex)
     {
-        if (root == null || source == null || source.sprite == null || radiusWorld <= 0f)
+        if (state == null || state.Root == null ||
+            source == null || source.sprite == null || radiusWorld <= 0f)
+        {
             return;
+        }
 
         float gap = sector.ArcDegrees >= 359.9f
             ? 0f
@@ -167,20 +287,20 @@ public static class OrrerySectorPresentation
         Mesh mesh = BuildWedgeMesh(source.sprite, start, arc, segments);
         if (mesh == null)
             return;
-        meshes.Add(mesh);
+        state.Meshes.Add(mesh);
 
         Material material = CreateHaloMaterial(source, opacityMultiplier);
         if (material == null)
         {
             UnityEngine.Object.Destroy(mesh);
-            meshes.Remove(mesh);
+            state.Meshes.Remove(mesh);
             return;
         }
-        materials.Add(material);
+        state.Materials.Add(material);
 
         GameObject wedge = new GameObject(
             "Orrery " + sector.Element + " Sector " + layerIndex);
-        wedge.transform.SetParent(root.transform, false);
+        wedge.transform.SetParent(state.Root.transform, false);
         wedge.transform.localPosition = Vector3.zero;
         wedge.transform.localRotation = Quaternion.identity;
         wedge.transform.localScale = new Vector3(radiusWorld, radiusWorld, 1f);

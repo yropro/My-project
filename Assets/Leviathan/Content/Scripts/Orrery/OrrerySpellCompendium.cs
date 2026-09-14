@@ -201,7 +201,6 @@ public static class OrrerySpellCompendium
         public const int MaximumImpacts =
             BaseMaximumImpacts + MaxInheritedAdditionalChains;
         public const int MaximumInheritedImpacts = MaximumImpacts;
-
         public const int MaxCandidateShipsPerQuery = 64;
         public const int MaxTargetsPerExplosion = 64;
 

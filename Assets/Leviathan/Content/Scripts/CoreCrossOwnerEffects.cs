@@ -96,6 +96,17 @@ public static class CoreCrossOwnerEffects
     private static int nextSequence;
     private static int recentCursor;
 
+    /// <summary>
+    /// Sequence assigned to the most recent successfully-authored local grant.
+    /// Presentation observers use this synchronously after RequestGrant returns
+    /// so the immediate local observation and later reliable relay share one
+    /// event identity without reflecting Core's private storage.
+    /// </summary>
+    internal static int CurrentLocalSequence
+    {
+        get { return nextSequence; }
+    }
+
     public static void EnsureInitialized()
     {
         if (initialized)
