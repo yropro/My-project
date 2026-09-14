@@ -39,6 +39,64 @@ public static class OrrerySpellCompendium
         public const float ChainDamageMultiplier = 0.50f;
     }
 
+    public static class VoidWave
+    {
+        // Identity. Code still uses the legacy Ice enum slot for the Void focus;
+        // the stable recipe/spell id remain unchanged while the presentation and
+        // mechanics move to the Stellar / Void / Plasma vocabulary.
+        public const ushort Id = 3;
+        public const string Name = "Void Wave";
+        public static readonly OrreryRecipeKey Recipe =
+            OrreryRecipeKey.Pure(OrreryElement.Ice, 2);
+
+        // Shared/Core identities.
+        public const ushort MotionEffectId = 0x0202;
+        public const ushort HostWorldIntentEffectId = MotionEffectId;
+        public const byte PresentationSlotId = 15;
+
+        // Advancing annular-sector geometry. The front begins narrow near the
+        // caster and widens while travelling. Depth is radial thickness, not
+        // visual line thickness. Every value is independently tuneable.
+        public const float InitialFrontDistanceMeters = 20f;
+        public const float MaximumFrontDistanceMeters = 150f;
+        public const float WaveDepthMeters = 40f;
+        public const float InitialArcWidthMeters = 20f;
+        public const float FinalArcWidthMeters = 150f;
+        public const float TravelSpeedMetersPerSecond = 45f;
+        public const float BroadphasePaddingMultiplier = 1.20f;
+
+        // Contact slow. CoreMotionEffects composes multiple future slow sources
+        // by strongest-slow-wins and these short leases are refreshed only while
+        // the target remains inside the moving front.
+        public const float ShipSpeedMultiplier = 0.25f;
+        public const float ProjectileSpeedMultiplier = 0.15f;
+        public const float ContactLeaseSeconds = 0.15f;
+
+        // Projectile consumption pool. Budget is resolved from the Void focus's
+        // mean reference DPS at cast time. Projectiles cost their non-crit direct
+        // hit damage. If one costs more than the remaining pool, the remaining
+        // budget is exhausted and that projectile survives but remains slowed.
+        public const float ProjectileAbsorptionBudgetReferenceSeconds = 4f;
+        public const float ProjectileBudgetCostMultiplier = 1f;
+        public const float MinimumProjectileBudgetCost = 1f;
+        public const int MaxTrackedProjectiles = 128;
+
+        // Fixed bounds for broad-phase work and simultaneous remote-host waves.
+        public const int MaxColliderCandidatesPerTick = 192;
+        public const int MaxHostGameplayWaves = 8;
+
+        // Placeholder void-front presentation. The mesh is an annular sector
+        // matching gameplay geometry and uses the current void-gallery material
+        // when available. These are presentation-only knobs.
+        public const int VisualArcSegments = 28;
+        public const float VisualOpacity = 0.72f;
+        public const int VisualSortingOrder = 12;
+        public const string VisualMaterialAssetName = "OrreryVoidGalleryBase";
+        public const float RemotePresentationGraceSeconds = 0.35f;
+    }
+
+    // Legacy compatibility constants retained while the old Cryo executor and
+    // presenter remain in source. Spell id 3 no longer routes to that executor.
     public static class ConeOfCold
     {
         // Mechanical cone and native presentation volley.
