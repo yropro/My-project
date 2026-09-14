@@ -23,6 +23,8 @@ public static class OrreryColdFusionPresentationLease
     {
         public bool Active;
         public int PlayerId;
+        public int SourcePlayerId;
+        public int Sequence;
         public float ExpiresAt;
         public GameShip BoundShip;
     }
@@ -30,7 +32,9 @@ public static class OrreryColdFusionPresentationLease
     [Serializable]
     private sealed class GrantEnvelopeView
     {
+        public int sourcePlayerId;
         public int targetPlayerId;
+        public int sequence;
         public int effectId;
         public int payloadA;
     }
@@ -48,6 +52,8 @@ public static class OrreryColdFusionPresentationLease
         AccessTools.Field(typeof(NetSession), "activeBridge");
     private static readonly FieldInfo RepsField =
         AccessTools.Field(typeof(NetWorldBridge), "reps");
+    private static readonly FieldInfo NextGrantSequenceField =
+        AccessTools.Field(typeof(CoreCrossOwnerEffects), "nextSequence");
 
     public static void ObserveGrant(NetSession session, string json)
     {
@@ -66,7 +72,9 @@ public static class OrreryColdFusionPresentationLease
 
         if (envelope == null ||
             envelope.effectId != OrreryColdFusion.CrossOwnerEffectId ||
-            envelope.targetPlayerId < 0)
+            envelope.sourcePlayerId < 0 ||
+            envelope.targetPlayerId < 0 ||
+            envelope.sequence <= 0)
         {
             return;
         }
@@ -75,7 +83,12 @@ public static class OrreryColdFusionPresentationLease
         {
             UInt = unchecked((uint)envelope.payloadA)
         }.Float;
-        Remember(session, envelope.targetPlayerId, duration);
+        Remember(
+            session,
+            envelope.sourcePlayerId,
+            envelope.targetPlayerId,
+            envelope.sequence,
+            duration);
     }
 
     public static void ObserveLocalRequest(
@@ -84,32 +97,55 @@ public static class OrreryColdFusionPresentationLease
         CoreCrossOwnerEffects.GrantPayload payload,
         bool accepted)
     {
+        NetSession session = NetSession.instance;
         if (!accepted || effectId != OrreryColdFusion.CrossOwnerEffectId ||
-            targetPlayerId < 0 || NetSession.instance == null)
+            targetPlayerId < 0 || session == null || session.localPlayerId < 0)
         {
             return;
         }
 
+        // ObserveLocalRequest is called synchronously from the RequestGrant
+        // postfix, after CoreCrossOwnerEffects has incremented nextSequence.
+        // Correlating that identity with the later reliable relay prevents the
+        // same grant from restarting its full visual duration after network RTT.
+        int sequence = ReadCurrentLocalGrantSequence();
+        if (sequence <= 0)
+            return;
+
         float duration = new FloatBits { UInt = payload.A }.Float;
-        Remember(NetSession.instance, targetPlayerId, duration);
+        Remember(
+            session,
+            session.localPlayerId,
+            targetPlayerId,
+            sequence,
+            duration);
+    }
+
+    private static int ReadCurrentLocalGrantSequence()
+    {
+        if (NextGrantSequenceField == null)
+            return 0;
+
+        object raw = NextGrantSequenceField.GetValue(null);
+        return raw is int ? (int)raw : 0;
     }
 
     private static void Remember(
         NetSession session,
+        int sourcePlayerId,
         int playerId,
+        int sequence,
         float durationSeconds)
     {
-        if (session == null || playerId < 0 ||
-            float.IsNaN(durationSeconds) ||
-            float.IsInfinity(durationSeconds) ||
-            durationSeconds <= 0f)
+        if (session == null || sourcePlayerId < 0 || playerId < 0 ||
+            sequence <= 0 || float.IsNaN(durationSeconds) ||
+            float.IsInfinity(durationSeconds) || durationSeconds <= 0f)
         {
             return;
         }
 
         float now = Time.time;
-        float expiresAt = now + durationSeconds;
-        int matching = -1;
+        int matchingTarget = -1;
         int free = -1;
         int oldest = -1;
         float oldestExpiry = float.PositiveInfinity;
@@ -119,7 +155,7 @@ public static class OrreryColdFusionPresentationLease
             Lease lease = leases[i];
             if (lease.Active && lease.PlayerId == playerId)
             {
-                matching = i;
+                matchingTarget = i;
                 break;
             }
 
@@ -137,16 +173,34 @@ public static class OrreryColdFusionPresentationLease
             }
         }
 
-        int index = matching >= 0 ? matching : (free >= 0 ? free : oldest);
+        int index = matchingTarget >= 0
+            ? matchingTarget
+            : (free >= 0 ? free : oldest);
         if (index < 0)
             return;
 
-        Lease next = matching >= 0 ? leases[index] : default(Lease);
+        Lease next = matchingTarget >= 0 ? leases[index] : default(Lease);
+        bool duplicateGrant = matchingTarget >= 0 &&
+            next.SourcePlayerId == sourcePlayerId &&
+            next.Sequence == sequence;
+
         next.Active = true;
         next.PlayerId = playerId;
-        next.ExpiresAt = matching >= 0
-            ? Mathf.Max(next.ExpiresAt, expiresAt)
-            : expiresAt;
+        if (!duplicateGrant)
+        {
+            next.SourcePlayerId = sourcePlayerId;
+            next.Sequence = sequence;
+            next.ExpiresAt = now + durationSeconds;
+        }
+
+        float remaining = next.ExpiresAt - now;
+        if (remaining <= 0f)
+        {
+            if (next.BoundShip != null)
+                OrreryColdFusionPresentation.Hide(next.BoundShip);
+            leases[index] = default(Lease);
+            return;
+        }
 
         GameShip target = ResolvePlayerShip(session, playerId);
         if (target != null)
@@ -158,9 +212,7 @@ public static class OrreryColdFusionPresentationLease
             }
 
             next.BoundShip = target;
-            OrreryColdFusionPresentation.Show(
-                target,
-                Mathf.Max(0.001f, next.ExpiresAt - now));
+            OrreryColdFusionPresentation.Show(target, remaining);
         }
 
         leases[index] = next;
