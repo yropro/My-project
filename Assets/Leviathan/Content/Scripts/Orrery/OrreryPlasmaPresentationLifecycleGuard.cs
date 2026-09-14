@@ -19,9 +19,18 @@ public static class OrreryPlasmaPresentationLifecycleGuardPatch
         if (owner == null || !owner.IsRemotePlayer())
             return true;
 
-        OrreryNetwork.PresentationState common;
-        if (OrreryNetwork.TryReadRemote(owner, out common))
+        // This is only a liveness gate. Reading the full Orrery presentation
+        // state would also rescan/decode Shatterbolt's multipart history every
+        // render even though Plasma does not consume any of those fields.
+        CoreNetwork.SlotReader common;
+        if (CoreNetwork.TryReadSlot(
+                owner,
+                OrreryNetwork.SharedSlotId,
+                out common) &&
+            common.Byte() == OrreryNetwork.PayloadVersion)
+        {
             return true;
+        }
 
         OrreryPlasmaBoltPresentation.Forget(owner);
         return false;
