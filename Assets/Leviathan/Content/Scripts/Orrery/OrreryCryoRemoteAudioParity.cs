@@ -12,6 +12,8 @@ using UnityEngine;
 [HarmonyPatch(typeof(OrreryLegacySpellRemotePresentation), "SpawnCryoWave")]
 public static class OrreryCryoRemoteAudioParityPatch
 {
+    private static bool warnedMissingCryoAudio;
+
     public static void Postfix(GameShip owner, int waveIndex)
     {
         // Wave zero's sound is emitted by the new-generation path. Native local
@@ -20,9 +22,19 @@ public static class OrreryCryoRemoteAudioParityPatch
             return;
 
         LauncherItemBase cryoBase = OrreryContent.CryoGun;
-        if (cryoBase == null || cryoBase.soundEffect == null ||
+        if (cryoBase == null)
+            return;
+
+        if (cryoBase.soundEffect == null ||
             cryoBase.soundEffect.audioClip == null)
         {
+            if (!warnedMissingCryoAudio)
+            {
+                warnedMissingCryoAudio = true;
+                Debug.LogWarning(
+                    "[Orrery] Cryo Gun has no usable sound effect; " +
+                    "remote Cone of Cold follow-up audio was omitted.");
+            }
             return;
         }
 
