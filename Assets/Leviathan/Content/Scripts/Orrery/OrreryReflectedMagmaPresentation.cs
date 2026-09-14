@@ -464,8 +464,10 @@ public static class OrreryReflectedMagmaPresentation
             readIds[i] = id;
             readFlags[i] = flags;
             readPositions[i] = ownerPosition + new Vector2(
-                OrreryUnits.MetersToWorld(relativeX * RelativePositionStepMeters),
-                OrreryUnits.MetersToWorld(relativeY * RelativePositionStepMeters));
+                relativeX * RelativePositionStepMeters *
+                    OrreryUnits.WorldUnitsPerMeter,
+                relativeY * RelativePositionStepMeters *
+                    OrreryUnits.WorldUnitsPerMeter);
             readAngles[i] = angle * (360f / 255f);
         }
 
