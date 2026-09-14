@@ -8,38 +8,90 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 
 /// <summary>
-/// Owner-published / remote-only presentation for the original Orrery spell trio.
+/// Owner capture and compact network codecs for the original Orrery spell trio.
 ///
-/// The hidden native adapters used by Magma Cannon, Tesla Coil and Cone of Cold
-/// do not occupy real replicated player slots, so their local Unity objects are
-/// intentionally invisible to peers. This layer samples only the irreducible
-/// presentation result of those adapters and reconstructs mechanically inert VFX
-/// and SFX on remote clients. Damage, status, target selection, cooldowns and
-/// authoritative projectile/beam behavior remain owner-only.
+/// Magma Cannon, Tesla Coil and Cone of Cold are executed through hidden native
+/// adapters that deliberately do not occupy replicated player weapon slots. This
+/// layer publishes only irreducible presentation results. Remote reconstruction
+/// lives in OrreryLegacySpellRemotePresentation and never authors gameplay.
 /// </summary>
 public static class OrreryLegacySpellPresentation
 {
     public static class Tuning
     {
+        // A discrete cast stays present long enough to survive several dropped
+        // 20 Hz ship-state packets. This is event redundancy, not gameplay state.
         public const float DiscreteEventPublishSeconds = 0.75f;
-        public const float RemoteGenerationRetentionSeconds = 2.0f;
-        public const float MagmaPositionFollowPerSecond = 24f;
         public const int MaxTeslaSegments = 3;
-        public const int MaxCryoShards = 45;
-        public const float TeslaStopCleanupSeconds = 1.0f;
     }
 
-    private const string InfernoCannonPath = "Base/Items/PrimaryWeapon/Inferno Cannon";
-    private const string CryoGunPath = "Base/Items/PrimaryWeapon/Cryo Gun";
-    private const string TeslaCoilPath = "Base/Items/PrimaryWeapon/Tesla Coil";
-
+    private const int MagmaSpellId = 1;
+    private const int TeslaSpellId = 2;
     private const byte GroupId = 0;
-    private const int MagmaPreferredRecord = 0;
-    private const int TeslaPreferredRecord = 0;
-    private const int CryoPreferredRecord = 0;
+    private const int PreferredRecord = 0;
 
     private const byte MagmaFlagProjectile = 1 << 0;
     private const byte MagmaFlagExplosion = 1 << 1;
+
+    internal struct MagmaWireState
+    {
+        public uint Generation;
+        public bool ProjectilePresent;
+        public Vector2 ProjectilePosition;
+        public float ProjectileAngleDegrees;
+        public bool ExplosionPresent;
+        public Vector2 ExplosionPosition;
+        public float ExplosionRadiusWorld;
+    }
+
+    internal struct CryoWireState
+    {
+        public uint Generation;
+        public Vector2 Origin;
+        public float AimDegrees;
+    }
+
+    internal struct TeslaWireState
+    {
+        public uint Generation;
+        public int SegmentCount;
+        public float Width;
+        public Vector2 Start0, End0;
+        public Vector2 Start1, End1;
+        public Vector2 Start2, End2;
+
+        public Vector2 GetStart(int index)
+        {
+            switch (index)
+            {
+                case 0: return Start0;
+                case 1: return Start1;
+                case 2: return Start2;
+                default: return Vector2.zero;
+            }
+        }
+
+        public Vector2 GetEnd(int index)
+        {
+            switch (index)
+            {
+                case 0: return End0;
+                case 1: return End1;
+                case 2: return End2;
+                default: return Vector2.zero;
+            }
+        }
+
+        public void SetSegment(int index, Vector2 start, Vector2 end)
+        {
+            switch (index)
+            {
+                case 0: Start0 = start; End0 = end; break;
+                case 1: Start1 = start; End1 = end; break;
+                case 2: Start2 = start; End2 = end; break;
+            }
+        }
+    }
 
     private sealed class OwnerCapture
     {
@@ -47,6 +99,7 @@ public static class OrreryLegacySpellPresentation
         public bool MagmaPendingProjectile;
         public Projectile MagmaProjectile;
         public Vector2 MagmaExplosionPosition;
+        public float MagmaExplosionRadiusWorld;
         public float MagmaExplosionPublishUntil;
 
         public uint TeslaGeneration;
@@ -56,49 +109,6 @@ public static class OrreryLegacySpellPresentation
         public Vector2 CryoOrigin;
         public float CryoAimDegrees;
         public float CryoPublishUntil;
-    }
-
-    private sealed class RemoteProjectileVisual
-    {
-        public Projectile Projectile;
-        public Rigidbody2D Body;
-        public bool ProjectileEnabled;
-        public bool BodySimulated;
-        public Vector3 BaseScale;
-    }
-
-    private struct RemoteCryoShard
-    {
-        public RemoteProjectileVisual Visual;
-        public Vector2 Velocity;
-        public float ExpiresAt;
-        public bool Active;
-    }
-
-    private sealed class RemoteState
-    {
-        public uint MagmaGeneration;
-        public uint MagmaExplosionGeneration;
-        public RemoteProjectileVisual Magma;
-
-        public uint TeslaGeneration;
-        public readonly GameObject[] TeslaObjects =
-            new GameObject[Tuning.MaxTeslaSegments];
-        public readonly LineRenderer[] TeslaLines =
-            new LineRenderer[Tuning.MaxTeslaSegments];
-        public int TeslaSegmentCount;
-        public GameObject TeslaAudioObject;
-        public SoundEffectPlayer TeslaAudioPlayer;
-
-        public uint CryoGeneration;
-        public Vector2 CryoOrigin;
-        public float CryoBaseAimDegrees;
-        public float CryoNextWaveAt;
-        public int CryoNextWaveIndex;
-        public readonly RemoteCryoShard[] CryoShards =
-            new RemoteCryoShard[Tuning.MaxCryoShards];
-
-        public float LastObservedAt;
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -112,14 +122,13 @@ public static class OrreryLegacySpellPresentation
         new Dictionary<GameShip, OwnerCapture>(4);
     private static readonly Dictionary<Projectile, GameShip> magmaOwners =
         new Dictionary<Projectile, GameShip>(4);
-    private static readonly Dictionary<GameShip, RemoteState> remotes =
-        new Dictionary<GameShip, RemoteState>(4);
 
-    private static readonly byte[] payload = new byte[128];
+    private static readonly byte[] payload = new byte[96];
     private static readonly Vector2[] teslaStarts =
         new Vector2[Tuning.MaxTeslaSegments];
     private static readonly Vector2[] teslaEnds =
         new Vector2[Tuning.MaxTeslaSegments];
+    private static float teslaWidth;
 
     private static readonly FieldInfo RuntimeOwnersField =
         AccessTools.Field(typeof(OrrerySpellRuntime), "owners");
@@ -146,13 +155,7 @@ public static class OrreryLegacySpellPresentation
     private static readonly FieldInfo BeamSubBeamField =
         AccessTools.Field(typeof(Beam), "subBeam");
 
-    private static LauncherItemBase infernoBase;
-    private static LauncherItemBase cryoBase;
-    private static BeamWeaponItemBase teslaBase;
-    private static float cryoVisualSpeedWorld;
-    private static bool cryoSpeedResolved;
     private static bool warnedRuntimeReflection;
-
     private static uint magmaGenerationCounter;
     private static uint teslaGenerationCounter;
     private static uint cryoGenerationCounter;
@@ -169,22 +172,27 @@ public static class OrreryLegacySpellPresentation
         capture.MagmaGeneration = NextGeneration(ref magmaGenerationCounter);
         capture.MagmaPendingProjectile = true;
         capture.MagmaProjectile = null;
+        capture.MagmaExplosionPosition = Vector2.zero;
+        capture.MagmaExplosionRadiusWorld = 0f;
         capture.MagmaExplosionPublishUntil = 0f;
     }
 
     public static void CompleteMagmaAttempt(GameShip owner, bool succeeded)
     {
         OwnerCapture capture;
-        if (owner == null || !owners.TryGetValue(owner, out capture) || capture == null)
+        if (owner == null || !owners.TryGetValue(owner, out capture) ||
+            capture == null)
+        {
+            return;
+        }
+
+        if (succeeded)
             return;
 
-        if (!succeeded)
-        {
-            capture.MagmaPendingProjectile = false;
-            if (capture.MagmaProjectile != null)
-                magmaOwners.Remove(capture.MagmaProjectile);
-            capture.MagmaProjectile = null;
-        }
+        capture.MagmaPendingProjectile = false;
+        if (capture.MagmaProjectile != null)
+            magmaOwners.Remove(capture.MagmaProjectile);
+        capture.MagmaProjectile = null;
     }
 
     public static void ObserveProjectile(Launcher launcher, Projectile projectile)
@@ -199,10 +207,8 @@ public static class OrreryLegacySpellPresentation
 
         GameShip owner = launcher.parentShip;
         OwnerCapture capture;
-        if (owner == null ||
-            !owners.TryGetValue(owner, out capture) ||
-            capture == null ||
-            !capture.MagmaPendingProjectile)
+        if (owner == null || !owners.TryGetValue(owner, out capture) ||
+            capture == null || !capture.MagmaPendingProjectile)
         {
             return;
         }
@@ -215,6 +221,9 @@ public static class OrreryLegacySpellPresentation
 
         capture.MagmaPendingProjectile = false;
         capture.MagmaProjectile = projectile;
+        capture.MagmaExplosionRadiusWorld = Mathf.Max(
+            0f,
+            launcher.ExplosiveRadius);
         magmaOwners[projectile] = owner;
     }
 
@@ -299,6 +308,16 @@ public static class OrreryLegacySpellPresentation
         owners.Remove(owner);
     }
 
+    public static void Reset()
+    {
+        owners.Clear();
+        magmaOwners.Clear();
+        warnedRuntimeReflection = false;
+        magmaGenerationCounter = 0u;
+        teslaGenerationCounter = 0u;
+        cryoGenerationCounter = 0u;
+    }
+
     public static void Publish(GameShip owner)
     {
         if (!IsLocalOrreryOwner(owner))
@@ -310,13 +329,14 @@ public static class OrreryLegacySpellPresentation
 
         OrreryNetwork.PresentationState baseState;
         bool hasBase = OrreryNetwork.TryBuildLocalState(owner, out baseState);
-        ushort activeSpellId = hasBase && baseState.Phase == OrreryCastPhase.Invoking
-            ? baseState.SpellId
-            : (ushort)0;
+        ushort activeSpellId = hasBase &&
+            baseState.Phase == OrreryCastPhase.Invoking
+                ? baseState.SpellId
+                : (ushort)0;
 
-        if (activeSpellId == 1)
+        if (activeSpellId == MagmaSpellId)
             PublishMagma(capture);
-        else if (activeSpellId == 2)
+        else if (activeSpellId == TeslaSpellId)
             PublishTesla(owner, capture);
 
         if (capture.CryoGeneration != 0u &&
@@ -325,7 +345,8 @@ public static class OrreryLegacySpellPresentation
             PublishCryo(capture);
         }
 
-        if (activeSpellId != 1 && capture.MagmaGeneration != 0u &&
+        if (activeSpellId != MagmaSpellId &&
+            capture.MagmaGeneration != 0u &&
             Time.unscaledTime < capture.MagmaExplosionPublishUntil)
         {
             PublishMagma(capture);
@@ -359,21 +380,31 @@ public static class OrreryLegacySpellPresentation
         {
             Vector2 position = capture.MagmaProjectile.transform.position;
             float angle = capture.MagmaProjectile.transform.eulerAngles.z;
-            if (!OrreryNetwork.IsFinite(position) || !OrreryNetwork.IsFinite(angle))
+            if (!OrreryNetwork.IsFinite(position) ||
+                !OrreryNetwork.IsFinite(angle))
+            {
                 return;
+            }
+
             WritePosition(payload, ref offset, position);
             WriteFloat(payload, ref offset, angle);
         }
 
         if (explosionPresent)
         {
-            if (!OrreryNetwork.IsFinite(capture.MagmaExplosionPosition))
+            if (!OrreryNetwork.IsFinite(capture.MagmaExplosionPosition) ||
+                !OrreryNetwork.IsFinite(capture.MagmaExplosionRadiusWorld) ||
+                capture.MagmaExplosionRadiusWorld <= 0f)
+            {
                 return;
+            }
+
             WritePosition(payload, ref offset, capture.MagmaExplosionPosition);
+            WriteFloat(payload, ref offset, capture.MagmaExplosionRadiusWorld);
         }
 
         OrreryPresentationNetwork.WriteGroup(
-            MagmaPreferredRecord,
+            PreferredRecord,
             OrreryPresentationNetwork.CodecMagmaCannon,
             GroupId,
             1,
@@ -384,12 +415,19 @@ public static class OrreryLegacySpellPresentation
 
     private static void PublishCryo(OwnerCapture capture)
     {
+        if (capture == null || capture.CryoGeneration == 0u ||
+            !OrreryNetwork.IsFinite(capture.CryoOrigin) ||
+            !OrreryNetwork.IsFinite(capture.CryoAimDegrees))
+        {
+            return;
+        }
+
         int offset = 0;
         WritePosition(payload, ref offset, capture.CryoOrigin);
         WriteFloat(payload, ref offset, capture.CryoAimDegrees);
 
         OrreryPresentationNetwork.WriteGroup(
-            CryoPreferredRecord,
+            PreferredRecord,
             OrreryPresentationNetwork.CodecConeOfCold,
             GroupId,
             1,
@@ -400,7 +438,7 @@ public static class OrreryLegacySpellPresentation
 
     private static void PublishTesla(GameShip owner, OwnerCapture capture)
     {
-        if (capture.TeslaGeneration == 0u)
+        if (capture == null || capture.TeslaGeneration == 0u)
             return;
 
         if (capture.TeslaWeapon == null ||
@@ -410,11 +448,15 @@ public static class OrreryLegacySpellPresentation
         }
 
         int segmentCount = CaptureTeslaSegments(capture.TeslaWeapon);
-        if (segmentCount <= 0)
+        if (segmentCount <= 0 || !OrreryNetwork.IsFinite(teslaWidth) ||
+            teslaWidth <= 0f)
+        {
             return;
+        }
 
         int offset = 0;
         payload[offset++] = (byte)segmentCount;
+        WriteFloat(payload, ref offset, teslaWidth);
         for (int i = 0; i < segmentCount; i++)
         {
             WritePosition(payload, ref offset, teslaStarts[i]);
@@ -426,7 +468,7 @@ public static class OrreryLegacySpellPresentation
             return;
 
         OrreryPresentationNetwork.WriteGroup(
-            TeslaPreferredRecord,
+            PreferredRecord,
             OrreryPresentationNetwork.CodecTeslaCoil,
             GroupId,
             partCount,
@@ -445,6 +487,8 @@ public static class OrreryLegacySpellPresentation
 
         Beam beam = BeamScriptField.GetValue(weapon) as Beam;
         int count = 0;
+        teslaWidth = 0f;
+
         while (beam != null && count < Tuning.MaxTeslaSegments)
         {
             LineRenderer line = BeamLineField.GetValue(beam) as LineRenderer;
@@ -464,6 +508,8 @@ public static class OrreryLegacySpellPresentation
                 if (OrreryNetwork.IsFinite(start) &&
                     OrreryNetwork.IsFinite(end))
                 {
+                    if (count == 0)
+                        teslaWidth = Mathf.Max(0.001f, line.widthMultiplier);
                     teslaStarts[count] = start;
                     teslaEnds[count] = end;
                     count++;
@@ -476,253 +522,16 @@ public static class OrreryLegacySpellPresentation
         return count;
     }
 
-    public static void TickRemote(GameShip remoteOwner, float deltaTime)
-    {
-        if (remoteOwner == null || !remoteOwner.IsRemotePlayer())
-            return;
-
-        if (!CoreNetwork.HasSynchronizedSpecialization(
-                remoteOwner,
-                CoreClassId.Orrery))
-        {
-            ForgetRemote(remoteOwner);
-            return;
-        }
-
-        uint magmaGeneration;
-        byte magmaFlags;
-        Vector2 magmaPosition;
-        float magmaAngle;
-        Vector2 magmaExplosion;
-        bool hasMagma = TryReadMagma(
-            remoteOwner,
-            out magmaGeneration,
-            out magmaFlags,
-            out magmaPosition,
-            out magmaAngle,
-            out magmaExplosion);
-
-        uint cryoGeneration;
-        Vector2 cryoOrigin;
-        float cryoAim;
-        bool hasCryo = TryReadCryo(
-            remoteOwner,
-            out cryoGeneration,
-            out cryoOrigin,
-            out cryoAim);
-
-        uint teslaGeneration;
-        int teslaCount;
-        bool hasTesla = TryReadTesla(
-            remoteOwner,
-            out teslaGeneration,
-            out teslaCount);
-
-        RemoteState state;
-        bool hasState = remotes.TryGetValue(remoteOwner, out state) && state != null;
-        if (!hasState && !hasMagma && !hasCryo && !hasTesla)
-            return;
-
-        if (!hasState)
-        {
-            state = new RemoteState();
-            remotes[remoteOwner] = state;
-        }
-
-        if (hasMagma || hasCryo || hasTesla)
-            state.LastObservedAt = Time.unscaledTime;
-
-        TickRemoteMagma(
-            remoteOwner,
-            state,
-            hasMagma,
-            magmaGeneration,
-            magmaFlags,
-            magmaPosition,
-            magmaAngle,
-            magmaExplosion,
-            deltaTime);
-        TickRemoteCryo(
-            remoteOwner,
-            state,
-            hasCryo,
-            cryoGeneration,
-            cryoOrigin,
-            cryoAim,
-            deltaTime);
-        TickRemoteTesla(
-            remoteOwner,
-            state,
-            hasTesla,
-            teslaGeneration,
-            teslaCount);
-
-        if (!hasMagma && !hasCryo && !hasTesla &&
-            state.Magma == null && state.TeslaSegmentCount == 0 &&
-            !HasActiveCryo(state) &&
-            Time.unscaledTime - state.LastObservedAt >=
-                Tuning.RemoteGenerationRetentionSeconds)
-        {
-            ForgetRemote(remoteOwner);
-        }
-    }
-
-    private static void TickRemoteMagma(
+    internal static bool TryReadMagma(
         GameShip owner,
-        RemoteState state,
-        bool hasMagma,
-        uint generation,
-        byte flags,
-        Vector2 position,
-        float angle,
-        Vector2 explosion,
-        float deltaTime)
+        out MagmaWireState state)
     {
-        bool projectilePresent = hasMagma &&
-            (flags & MagmaFlagProjectile) != 0;
-        bool explosionPresent = hasMagma &&
-            (flags & MagmaFlagExplosion) != 0;
-
-        if (hasMagma && state.MagmaGeneration != generation)
-        {
-            CleanupRemoteProjectile(ref state.Magma);
-            state.MagmaGeneration = generation;
-            PlayLauncherOneShot(
-                GetInfernoBase(),
-                owner,
-                projectilePresent ? position : (Vector2)owner.transform.position,
-                "Orrery Remote Magma Cannon");
-        }
-
-        if (projectilePresent)
-        {
-            if (state.Magma == null)
-                state.Magma = SpawnRemoteProjectile(
-                    GetInfernoBase(),
-                    owner,
-                    position,
-                    angle,
-                    OrrerySpellCompendium.MagmaCannon.ProjectileVisualScale);
-
-            UpdateRemoteProjectile(
-                state.Magma,
-                position,
-                angle,
-                deltaTime,
-                Tuning.MagmaPositionFollowPerSecond);
-        }
-        else
-        {
-            CleanupRemoteProjectile(ref state.Magma);
-        }
-
-        if (explosionPresent &&
-            state.MagmaExplosionGeneration != generation)
-        {
-            state.MagmaExplosionGeneration = generation;
-            SpawnMagmaExplosion(owner, explosion);
-        }
-    }
-
-    private static void TickRemoteCryo(
-        GameShip owner,
-        RemoteState state,
-        bool hasCryo,
-        uint generation,
-        Vector2 origin,
-        float aimDegrees,
-        float deltaTime)
-    {
-        if (hasCryo && state.CryoGeneration != generation)
-        {
-            state.CryoGeneration = generation;
-            state.CryoOrigin = origin;
-            state.CryoBaseAimDegrees = aimDegrees;
-            state.CryoNextWaveIndex = 0;
-            state.CryoNextWaveAt = Time.unscaledTime;
-            ClearCryoShards(state);
-            PlayLauncherOneShot(
-                GetCryoBase(),
-                owner,
-                origin,
-                "Orrery Remote Cone of Cold");
-        }
-
-        while (state.CryoNextWaveIndex <
-                OrrerySpellCompendium.ConeOfCold.VisualWaveCount &&
-            Time.unscaledTime + 0.0001f >= state.CryoNextWaveAt)
-        {
-            SpawnCryoWave(owner, state, state.CryoNextWaveIndex);
-            state.CryoNextWaveIndex++;
-            state.CryoNextWaveAt += Mathf.Max(
-                0.01f,
-                OrrerySpellCompendium.ConeOfCold.VisualWaveIntervalSeconds);
-        }
-
-        TickCryoShards(state, deltaTime);
-    }
-
-    private static void TickRemoteTesla(
-        GameShip owner,
-        RemoteState state,
-        bool hasTesla,
-        uint generation,
-        int segmentCount)
-    {
-        if (!hasTesla)
-        {
-            StopTesla(state);
-            return;
-        }
-
-        if (state.TeslaGeneration != generation)
-        {
-            StopTesla(state);
-            state.TeslaGeneration = generation;
-            StartTeslaAudio(owner, state);
-        }
-
-        if (state.TeslaAudioObject != null)
-            state.TeslaAudioObject.transform.position = owner.transform.position;
-
-        EnsureTeslaLines(state, segmentCount);
-        for (int i = 0; i < segmentCount; i++)
-        {
-            LineRenderer line = state.TeslaLines[i];
-            if (line == null)
-                continue;
-            line.gameObject.SetActive(true);
-            line.positionCount = 2;
-            line.SetPosition(0, teslaStarts[i]);
-            line.SetPosition(1, teslaEnds[i]);
-        }
-
-        for (int i = segmentCount; i < state.TeslaSegmentCount; i++)
-        {
-            if (state.TeslaObjects[i] != null)
-                state.TeslaObjects[i].SetActive(false);
-        }
-        state.TeslaSegmentCount = segmentCount;
-    }
-
-    private static bool TryReadMagma(
-        GameShip owner,
-        out uint generation,
-        out byte flags,
-        out Vector2 position,
-        out float angle,
-        out Vector2 explosion)
-    {
-        generation = 0u;
-        flags = 0;
-        position = Vector2.zero;
-        angle = 0f;
-        explosion = Vector2.zero;
+        state = default(MagmaWireState);
 
         OrreryPresentationNetwork.GroupReader reader;
         if (!OrreryPresentationNetwork.TryReadGroup(
                 owner,
-                MagmaPreferredRecord,
+                PreferredRecord,
                 OrreryPresentationNetwork.CodecMagmaCannon,
                 GroupId,
                 1,
@@ -731,54 +540,59 @@ public static class OrreryLegacySpellPresentation
             return false;
         }
 
-        flags = reader.Byte();
-        if (flags == 0 ||
-            (flags & ~(MagmaFlagProjectile | MagmaFlagExplosion)) != 0)
-        {
-            return false;
-        }
-
-        int expected = 1;
-        if ((flags & MagmaFlagProjectile) != 0) expected += 12;
-        if ((flags & MagmaFlagExplosion) != 0) expected += 8;
-        if (reader.Length != expected)
+        byte flags = reader.Byte();
+        const byte knownFlags = MagmaFlagProjectile | MagmaFlagExplosion;
+        if (flags == 0 || (flags & ~knownFlags) != 0)
             return false;
 
-        if ((flags & MagmaFlagProjectile) != 0)
+        bool projectile = (flags & MagmaFlagProjectile) != 0;
+        bool explosion = (flags & MagmaFlagExplosion) != 0;
+        int expectedLength = 1 + (projectile ? 12 : 0) +
+            (explosion ? 12 : 0);
+        if (reader.Length != expectedLength)
+            return false;
+
+        state.ProjectilePresent = projectile;
+        state.ExplosionPresent = explosion;
+        if (projectile)
         {
-            position = ReadPosition(ref reader);
-            angle = ReadFloat(ref reader);
-            if (!OrreryNetwork.IsFinite(position) || !OrreryNetwork.IsFinite(angle))
+            state.ProjectilePosition = ReadPosition(ref reader);
+            state.ProjectileAngleDegrees = ReadFloat(ref reader);
+            if (!OrreryNetwork.IsFinite(state.ProjectilePosition) ||
+                !OrreryNetwork.IsFinite(state.ProjectileAngleDegrees))
+            {
                 return false;
+            }
         }
 
-        if ((flags & MagmaFlagExplosion) != 0)
+        if (explosion)
         {
-            explosion = ReadPosition(ref reader);
-            if (!OrreryNetwork.IsFinite(explosion))
+            state.ExplosionPosition = ReadPosition(ref reader);
+            state.ExplosionRadiusWorld = ReadFloat(ref reader);
+            if (!OrreryNetwork.IsFinite(state.ExplosionPosition) ||
+                !OrreryNetwork.IsFinite(state.ExplosionRadiusWorld) ||
+                state.ExplosionRadiusWorld <= 0f)
+            {
                 return false;
+            }
         }
 
         if (reader.Remaining != 0)
             return false;
-        generation = reader.Generation;
-        return generation != 0u;
+        state.Generation = reader.Generation;
+        return state.Generation != 0u;
     }
 
-    private static bool TryReadCryo(
+    internal static bool TryReadCryo(
         GameShip owner,
-        out uint generation,
-        out Vector2 origin,
-        out float aimDegrees)
+        out CryoWireState state)
     {
-        generation = 0u;
-        origin = Vector2.zero;
-        aimDegrees = 0f;
+        state = default(CryoWireState);
 
         OrreryPresentationNetwork.GroupReader reader;
         if (!OrreryPresentationNetwork.TryReadGroup(
                 owner,
-                CryoPreferredRecord,
+                PreferredRecord,
                 OrreryPresentationNetwork.CodecConeOfCold,
                 GroupId,
                 1,
@@ -787,25 +601,25 @@ public static class OrreryLegacySpellPresentation
             return false;
         }
 
-        origin = ReadPosition(ref reader);
-        aimDegrees = ReadFloat(ref reader);
+        state.Origin = ReadPosition(ref reader);
+        state.AimDegrees = ReadFloat(ref reader);
         if (reader.Remaining != 0 ||
-            !OrreryNetwork.IsFinite(origin) ||
-            !OrreryNetwork.IsFinite(aimDegrees))
+            !OrreryNetwork.IsFinite(state.Origin) ||
+            !OrreryNetwork.IsFinite(state.AimDegrees))
         {
+            state = default(CryoWireState);
             return false;
         }
-        generation = reader.Generation;
-        return generation != 0u;
+
+        state.Generation = reader.Generation;
+        return state.Generation != 0u;
     }
 
-    private static bool TryReadTesla(
+    internal static bool TryReadTesla(
         GameShip owner,
-        out uint generation,
-        out int segmentCount)
+        out TeslaWireState state)
     {
-        generation = 0u;
-        segmentCount = 0;
+        state = default(TeslaWireState);
 
         OrreryPresentationNetwork.GroupReader reader =
             default(OrreryPresentationNetwork.GroupReader);
@@ -814,7 +628,7 @@ public static class OrreryLegacySpellPresentation
         {
             if (OrreryPresentationNetwork.TryReadGroup(
                     owner,
-                    TeslaPreferredRecord,
+                    PreferredRecord,
                     OrreryPresentationNetwork.CodecTeslaCoil,
                     GroupId,
                     parts,
@@ -824,476 +638,37 @@ public static class OrreryLegacySpellPresentation
                 break;
             }
         }
-        if (!found || reader.Length < 1)
+        if (!found || reader.Length < 5)
             return false;
 
-        segmentCount = reader.Byte();
+        int segmentCount = reader.Byte();
+        float width = ReadFloat(ref reader);
         if (segmentCount < 1 || segmentCount > Tuning.MaxTeslaSegments ||
-            reader.Length != 1 + segmentCount * 16 ||
+            !OrreryNetwork.IsFinite(width) || width <= 0f ||
+            reader.Length != 5 + segmentCount * 16 ||
             RequiredPartCount(reader.Length) != reader.PartCount)
         {
             return false;
         }
 
+        state.SegmentCount = segmentCount;
+        state.Width = width;
         for (int i = 0; i < segmentCount; i++)
         {
             Vector2 start = ReadPosition(ref reader);
             Vector2 end = ReadPosition(ref reader);
             if (!OrreryNetwork.IsFinite(start) || !OrreryNetwork.IsFinite(end))
+            {
+                state = default(TeslaWireState);
                 return false;
-            teslaStarts[i] = start;
-            teslaEnds[i] = end;
+            }
+            state.SetSegment(i, start, end);
         }
 
         if (reader.Remaining != 0)
             return false;
-        generation = reader.Generation;
-        return generation != 0u;
-    }
-
-    private static void SpawnCryoWave(
-        GameShip owner,
-        RemoteState state,
-        int waveIndex)
-    {
-        LauncherItemBase itemBase = GetCryoBase();
-        if (itemBase == null || PoolController.instance == null)
-            return;
-
-        GameObject prefab = itemBase.GetProjectileObject(owner.faction);
-        if (prefab == null)
-            return;
-
-        float offsetDegrees = GetCryoWaveOffset(waveIndex);
-        int shotCount = Mathf.Max(
-            1,
-            OrrerySpellCompendium.ConeOfCold.VisualProjectileCount);
-        float spread = Mathf.Max(
-            0f,
-            (float)OrrerySpellCompendium.ConeOfCold.VisualSpreadDegrees);
-        float step = shotCount > 1 ? spread / (shotCount - 1) : 0f;
-        float first = state.CryoBaseAimDegrees + offsetDegrees - spread * 0.5f;
-        float speed = ResolveCryoVisualSpeedWorld();
-        float visualRange = OrreryUnits.MetersToWorld(
-            Mathf.Max(0f, OrrerySpellCompendium.ConeOfCold.VisualRangeMeters));
-        float lifetime = speed > 0.001f
-            ? visualRange / speed
-            : 1f;
-
-        for (int shot = 0; shot < shotCount; shot++)
-        {
-            int slot = FindFreeCryoShard(state);
-            if (slot < 0)
-                break;
-
-            float degrees = first + step * shot;
-            Quaternion rotation = Quaternion.Euler(0f, 0f, degrees);
-            GameObject visualObject = PoolController.instance.GetObject(
-                prefab,
-                state.CryoOrigin,
-                rotation,
-                false);
-            if (visualObject == null)
-                continue;
-
-            Projectile projectile;
-            if (!visualObject.TryGetComponent<Projectile>(out projectile) ||
-                projectile == null)
-            {
-                ReturnUnexpectedVisual(visualObject);
-                continue;
-            }
-
-            RemoteProjectileVisual visual = MakeInertProjectile(
-                projectile,
-                OrrerySpellCompendium.ConeOfCold.VisualProjectileScale *
-                    OrrerySpellCompendium.ConeOfCold.WaveProjectileScaleMultiplier);
-            if (visual == null)
-                continue;
-
-            Vector2 direction = rotation * Vector2.right;
-            state.CryoShards[slot] = new RemoteCryoShard
-            {
-                Visual = visual,
-                Velocity = direction * speed,
-                ExpiresAt = Time.unscaledTime + Mathf.Max(0.05f, lifetime),
-                Active = true
-            };
-        }
-    }
-
-    private static void TickCryoShards(RemoteState state, float deltaTime)
-    {
-        float dt = Mathf.Max(0f, deltaTime);
-        for (int i = 0; i < state.CryoShards.Length; i++)
-        {
-            RemoteCryoShard shard = state.CryoShards[i];
-            if (!shard.Active)
-                continue;
-
-            if (shard.Visual == null || shard.Visual.Projectile == null ||
-                Time.unscaledTime >= shard.ExpiresAt)
-            {
-                CleanupCryoShard(state, i);
-                continue;
-            }
-
-            Transform transform = shard.Visual.Projectile.transform;
-            Vector3 current = transform.position;
-            Vector2 next = (Vector2)current + shard.Velocity * dt;
-            transform.position = new Vector3(next.x, next.y, current.z);
-        }
-    }
-
-    private static void EnsureTeslaLines(RemoteState state, int count)
-    {
-        if (count <= 0)
-            return;
-
-        LineRenderer template = GetTeslaLineTemplate();
-        for (int i = 0; i < count; i++)
-        {
-            if (state.TeslaLines[i] != null)
-                continue;
-
-            GameObject lineObject = new GameObject("Orrery Remote Tesla Segment");
-            LineRenderer line = lineObject.AddComponent<LineRenderer>();
-            line.useWorldSpace = true;
-            line.positionCount = 2;
-
-            if (template != null)
-            {
-                line.sharedMaterial = template.sharedMaterial;
-                line.widthCurve = template.widthCurve;
-                line.widthMultiplier = template.widthMultiplier * Mathf.Max(
-                    0.01f,
-                    OrrerySpellCompendium.TeslaCoil.BeamWidthMultiplier);
-                line.colorGradient = template.colorGradient;
-                line.textureMode = template.textureMode;
-                line.alignment = template.alignment;
-                line.numCapVertices = template.numCapVertices;
-                line.numCornerVertices = template.numCornerVertices;
-            }
-
-            state.TeslaObjects[i] = lineObject;
-            state.TeslaLines[i] = line;
-        }
-    }
-
-    private static void StartTeslaAudio(GameShip owner, RemoteState state)
-    {
-        BeamWeaponItemBase itemBase = GetTeslaBase();
-        if (itemBase == null || itemBase.soundEffect == null ||
-            itemBase.soundEffect.audioClip == null)
-        {
-            return;
-        }
-
-        GameObject audioObject = new GameObject("Orrery Remote Tesla Audio");
-        audioObject.transform.position = owner.transform.position;
-        SoundEffectPlayer player = audioObject.AddComponent<SoundEffectPlayer>();
-        player.Attach(audioObject, SoundEffectPlayer.Category.Effects);
-        player.Play(itemBase.soundEffect, true, true);
-        state.TeslaAudioObject = audioObject;
-        state.TeslaAudioPlayer = player;
-    }
-
-    private static void StopTesla(RemoteState state)
-    {
-        if (state == null)
-            return;
-
-        for (int i = 0; i < state.TeslaObjects.Length; i++)
-        {
-            if (state.TeslaObjects[i] != null)
-                UnityEngine.Object.Destroy(state.TeslaObjects[i]);
-            state.TeslaObjects[i] = null;
-            state.TeslaLines[i] = null;
-        }
-        state.TeslaSegmentCount = 0;
-
-        if (state.TeslaAudioPlayer != null)
-            state.TeslaAudioPlayer.Stop();
-        if (state.TeslaAudioObject != null)
-        {
-            UnityEngine.Object.Destroy(
-                state.TeslaAudioObject,
-                Mathf.Max(0f, Tuning.TeslaStopCleanupSeconds));
-        }
-        state.TeslaAudioObject = null;
-        state.TeslaAudioPlayer = null;
-    }
-
-    private static RemoteProjectileVisual SpawnRemoteProjectile(
-        LauncherItemBase itemBase,
-        GameShip owner,
-        Vector2 position,
-        float angle,
-        float scaleMultiplier)
-    {
-        if (itemBase == null || owner == null || PoolController.instance == null)
-            return null;
-
-        GameObject prefab = itemBase.GetProjectileObject(owner.faction);
-        if (prefab == null)
-            return null;
-
-        GameObject visualObject = PoolController.instance.GetObject(
-            prefab,
-            position,
-            Quaternion.Euler(0f, 0f, angle),
-            false);
-        if (visualObject == null)
-            return null;
-
-        Projectile projectile;
-        if (!visualObject.TryGetComponent<Projectile>(out projectile) ||
-            projectile == null)
-        {
-            ReturnUnexpectedVisual(visualObject);
-            return null;
-        }
-
-        return MakeInertProjectile(projectile, scaleMultiplier);
-    }
-
-    private static RemoteProjectileVisual MakeInertProjectile(
-        Projectile projectile,
-        float scaleMultiplier)
-    {
-        if (projectile == null)
-            return null;
-
-        RemoteProjectileVisual visual = new RemoteProjectileVisual();
-        visual.Projectile = projectile;
-        visual.Body = projectile.rigidBody;
-        visual.ProjectileEnabled = projectile.enabled;
-        visual.BodySimulated = visual.Body != null && visual.Body.simulated;
-        visual.BaseScale = projectile.transform.localScale;
-
-        projectile.enabled = false;
-        if (visual.Body != null)
-        {
-            visual.Body.velocity = Vector2.zero;
-            visual.Body.angularVelocity = 0f;
-            visual.Body.simulated = false;
-        }
-        projectile.transform.localScale = visual.BaseScale * Mathf.Max(
-            0.01f,
-            scaleMultiplier);
-        return visual;
-    }
-
-    private static void UpdateRemoteProjectile(
-        RemoteProjectileVisual visual,
-        Vector2 position,
-        float angle,
-        float deltaTime,
-        float followPerSecond)
-    {
-        if (visual == null || visual.Projectile == null)
-            return;
-
-        Transform transform = visual.Projectile.transform;
-        Vector3 current3 = transform.position;
-        Vector2 current = current3;
-        float t = Mathf.Clamp01(Mathf.Max(0f, deltaTime) *
-            Mathf.Max(0f, followPerSecond));
-        Vector2 smoothed = Vector2.Lerp(current, position, t);
-        transform.position = new Vector3(smoothed.x, smoothed.y, current3.z);
-        transform.rotation = Quaternion.Euler(0f, 0f, angle);
-    }
-
-    private static void CleanupRemoteProjectile(
-        ref RemoteProjectileVisual visual)
-    {
-        if (visual == null)
-            return;
-
-        Projectile projectile = visual.Projectile;
-        if (projectile != null)
-        {
-            projectile.transform.localScale = visual.BaseScale;
-            if (visual.Body != null)
-            {
-                visual.Body.velocity = Vector2.zero;
-                visual.Body.angularVelocity = 0f;
-                visual.Body.simulated = visual.BodySimulated;
-            }
-            projectile.enabled = visual.ProjectileEnabled;
-            projectile.PoolDestroy();
-        }
-        visual = null;
-    }
-
-    private static void SpawnMagmaExplosion(GameShip owner, Vector2 position)
-    {
-        if (owner == null || PoolController.instance == null)
-            return;
-
-        LauncherItemBase itemBase = GetInfernoBase();
-        GameObject projectilePrefab = itemBase == null
-            ? null
-            : itemBase.GetProjectileObject(owner.faction);
-        ExplosiveProjectile template = projectilePrefab == null
-            ? null
-            : projectilePrefab.GetComponent<ExplosiveProjectile>();
-        if (template == null || template.explosiveAreaPrefab == null)
-            return;
-
-        GameObject explosionObject = PoolController.instance.GetObject(
-            template.explosiveAreaPrefab,
-            position,
-            Utils.RandomRotation(),
-            false);
-        if (explosionObject == null)
-            return;
-
-        ExplosiveArea area;
-        if (!explosionObject.TryGetComponent<ExplosiveArea>(out area) || area == null)
-        {
-            ReturnUnexpectedVisual(explosionObject);
-            return;
-        }
-
-        float radiusWorld = OrreryUnits.MetersToWorld(
-            OrrerySpellCompendium.MagmaCannon.ExplosionRadiusMeters);
-        area.SetScale(new Vector3(
-            radiusWorld * 2f,
-            radiusWorld * 2f,
-            radiusWorld * 2f));
-        area.SetColor(template.explosionColor);
-    }
-
-    private static void PlayLauncherOneShot(
-        LauncherItemBase itemBase,
-        GameShip owner,
-        Vector2 position,
-        string objectName)
-    {
-        if (itemBase == null || itemBase.soundEffect == null ||
-            itemBase.soundEffect.audioClip == null)
-        {
-            return;
-        }
-        PlayNativeOneShot(itemBase.soundEffect, position, objectName);
-    }
-
-    internal static void PlayNativeOneShot(
-        SoundEffectPlayer.SoundEffect effect,
-        Vector2 position,
-        string objectName)
-    {
-        if (effect == null || effect.audioClip == null)
-            return;
-
-        GameObject audioObject = new GameObject(
-            string.IsNullOrEmpty(objectName)
-                ? "Orrery Remote Audio"
-                : objectName);
-        audioObject.transform.position = position;
-        SoundEffectPlayer player = audioObject.AddComponent<SoundEffectPlayer>();
-        player.Attach(audioObject, SoundEffectPlayer.Category.Effects);
-        player.Play(effect, true, true);
-
-        float lifetime = Mathf.Max(
-            1f,
-            effect.audioClip.length +
-                Mathf.Max(0f, effect.fadeSeconds) + 0.5f);
-        UnityEngine.Object.Destroy(audioObject, lifetime);
-    }
-
-    private static LauncherItemBase GetInfernoBase()
-    {
-        if (infernoBase == null)
-            infernoBase = Resources.Load<LauncherItemBase>(InfernoCannonPath);
-        return infernoBase;
-    }
-
-    private static LauncherItemBase GetCryoBase()
-    {
-        if (cryoBase == null)
-            cryoBase = Resources.Load<LauncherItemBase>(CryoGunPath);
-        return cryoBase;
-    }
-
-    private static BeamWeaponItemBase GetTeslaBase()
-    {
-        if (teslaBase == null)
-            teslaBase = Resources.Load<BeamWeaponItemBase>(TeslaCoilPath);
-        return teslaBase;
-    }
-
-    private static LineRenderer GetTeslaLineTemplate()
-    {
-        BeamWeaponItemBase itemBase = GetTeslaBase();
-        if (itemBase == null || itemBase.beamPrefab == null)
-            return null;
-        return itemBase.beamPrefab.GetComponent<LineRenderer>();
-    }
-
-    private static float ResolveCryoVisualSpeedWorld()
-    {
-        if (cryoSpeedResolved)
-            return cryoVisualSpeedWorld;
-
-        cryoSpeedResolved = true;
-        LauncherItemBase itemBase = GetCryoBase();
-        Launcher launcher = itemBase == null
-            ? null
-            : itemBase.GetItem(Item.Rarity.Common, 1, 0) as Launcher;
-        if (launcher != null)
-        {
-            cryoVisualSpeedWorld = Mathf.Max(
-                0.01f,
-                launcher.BaseVelocity *
-                    OrrerySpellCompendium.ConeOfCold.VisualVelocityMultiplier);
-        }
-        else
-        {
-            cryoVisualSpeedWorld = OrreryUnits.MetersToWorld(100f);
-        }
-        return cryoVisualSpeedWorld;
-    }
-
-    private static BeamWeapon ResolveRuntimeTesla(GameShip owner)
-    {
-        if (owner == null || RuntimeOwnersField == null ||
-            RuntimeTeslaField == null || RuntimeVirtualWeaponField == null)
-        {
-            WarnRuntimeReflection();
-            return null;
-        }
-
-        try
-        {
-            IDictionary runtimeOwners = RuntimeOwnersField.GetValue(null) as IDictionary;
-            if (runtimeOwners == null || !runtimeOwners.Contains(owner))
-                return null;
-
-            object ownerState = runtimeOwners[owner];
-            object virtualWeapon = ownerState == null
-                ? null
-                : RuntimeTeslaField.GetValue(ownerState);
-            return virtualWeapon == null
-                ? null
-                : RuntimeVirtualWeaponField.GetValue(virtualWeapon) as BeamWeapon;
-        }
-        catch (Exception)
-        {
-            WarnRuntimeReflection();
-            return null;
-        }
-    }
-
-    private static void WarnRuntimeReflection()
-    {
-        if (warnedRuntimeReflection)
-            return;
-        warnedRuntimeReflection = true;
-        Debug.LogWarning(
-            "[Orrery] Remote Tesla presentation could not resolve the hidden " +
-            "runtime adapter. Gameplay remains authoritative; Tesla VFX may be absent.");
+        state.Generation = reader.Generation;
+        return state.Generation != 0u;
     }
 
     private static OwnerCapture GetOrCreateOwner(GameShip owner)
@@ -1333,115 +708,44 @@ public static class OrreryLegacySpellPresentation
         return Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
     }
 
-    private static float GetCryoWaveOffset(int waveIndex)
+    private static BeamWeapon ResolveRuntimeTesla(GameShip owner)
     {
-        switch (waveIndex)
+        if (owner == null || RuntimeOwnersField == null ||
+            RuntimeTeslaField == null || RuntimeVirtualWeaponField == null)
         {
-            case 0: return 0f;
-            case 1: return -OrrerySpellCompendium.ConeOfCold.OuterAimOffsetDegrees;
-            case 2: return OrrerySpellCompendium.ConeOfCold.OuterAimOffsetDegrees;
-            case 3: return -OrrerySpellCompendium.ConeOfCold.InnerAimOffsetDegrees;
-            case 4: return OrrerySpellCompendium.ConeOfCold.InnerAimOffsetDegrees;
-            default: return 0f;
+            WarnRuntimeReflection();
+            return null;
+        }
+
+        try
+        {
+            IDictionary runtimeOwners = RuntimeOwnersField.GetValue(null) as IDictionary;
+            if (runtimeOwners == null || !runtimeOwners.Contains(owner))
+                return null;
+
+            object ownerState = runtimeOwners[owner];
+            object virtualWeapon = ownerState == null
+                ? null
+                : RuntimeTeslaField.GetValue(ownerState);
+            return virtualWeapon == null
+                ? null
+                : RuntimeVirtualWeaponField.GetValue(virtualWeapon) as BeamWeapon;
+        }
+        catch (Exception)
+        {
+            WarnRuntimeReflection();
+            return null;
         }
     }
 
-    private static int FindFreeCryoShard(RemoteState state)
+    private static void WarnRuntimeReflection()
     {
-        for (int i = 0; i < state.CryoShards.Length; i++)
-        {
-            if (!state.CryoShards[i].Active)
-                return i;
-        }
-        return -1;
-    }
-
-    private static bool HasActiveCryo(RemoteState state)
-    {
-        if (state == null)
-            return false;
-        for (int i = 0; i < state.CryoShards.Length; i++)
-        {
-            if (state.CryoShards[i].Active)
-                return true;
-        }
-        return false;
-    }
-
-    private static void CleanupCryoShard(RemoteState state, int index)
-    {
-        if (state == null || index < 0 || index >= state.CryoShards.Length)
+        if (warnedRuntimeReflection)
             return;
-
-        RemoteCryoShard shard = state.CryoShards[index];
-        if (shard.Visual != null)
-        {
-            RemoteProjectileVisual visual = shard.Visual;
-            CleanupRemoteProjectile(ref visual);
-        }
-        state.CryoShards[index] = default(RemoteCryoShard);
-    }
-
-    private static void ClearCryoShards(RemoteState state)
-    {
-        if (state == null)
-            return;
-        for (int i = 0; i < state.CryoShards.Length; i++)
-            CleanupCryoShard(state, i);
-    }
-
-    private static void ReturnUnexpectedVisual(GameObject visualObject)
-    {
-        if (visualObject == null)
-            return;
-
-        PoolableObject poolable;
-        if (visualObject.TryGetComponent<PoolableObject>(out poolable) &&
-            poolable != null)
-        {
-            poolable.PoolDestroy();
-        }
-        else
-        {
-            UnityEngine.Object.Destroy(visualObject);
-        }
-    }
-
-    public static void ForgetRemote(GameShip owner)
-    {
-        if (object.ReferenceEquals(owner, null))
-            return;
-
-        RemoteState state;
-        if (!remotes.TryGetValue(owner, out state) || state == null)
-            return;
-
-        CleanupRemoteProjectile(ref state.Magma);
-        ClearCryoShards(state);
-        StopTesla(state);
-        remotes.Remove(owner);
-    }
-
-    public static void Reset()
-    {
-        foreach (KeyValuePair<GameShip, RemoteState> pair in remotes)
-        {
-            RemoteState state = pair.Value;
-            if (state == null)
-                continue;
-            CleanupRemoteProjectile(ref state.Magma);
-            ClearCryoShards(state);
-            StopTesla(state);
-        }
-        remotes.Clear();
-        owners.Clear();
-        magmaOwners.Clear();
-        infernoBase = null;
-        cryoBase = null;
-        teslaBase = null;
-        cryoSpeedResolved = false;
-        cryoVisualSpeedWorld = 0f;
-        warnedRuntimeReflection = false;
+        warnedRuntimeReflection = true;
+        Debug.LogWarning(
+            "[Orrery] Tesla presentation could not resolve the hidden runtime " +
+            "adapter. Gameplay remains authoritative; remote Tesla VFX may be absent.");
     }
 
     private static uint NextGeneration(ref uint counter)
@@ -1542,13 +846,16 @@ public static class OrreryMagmaPresentationProjectilePatch
 [HarmonyPatch(typeof(OrrerySpellRuntime), nameof(OrrerySpellRuntime.OnExplosiveProjectileHit))]
 public static class OrreryMagmaPresentationHitPatch
 {
-    public static void Postfix(
-        ExplosiveProjectile projectile,
-        Vector2 hitPoint)
+    public static void Postfix(ExplosiveProjectile projectile)
     {
+        if (projectile == null)
+            return;
+
+        // Native ExplosiveProjectile.Explode anchors its area at the projectile,
+        // not the collider contact point. Publish that exact presentation pose.
         OrreryLegacySpellPresentation.RecordMagmaExplosion(
             projectile,
-            hitPoint);
+            projectile.transform.position);
     }
 }
 
@@ -1585,34 +892,10 @@ public static class OrreryLegacyPresentationOwnerForgetPatch
     }
 }
 
-[HarmonyPatch(typeof(RemoteShipDriver), "Render")]
-public static class OrreryLegacySpellRemoteRenderPatch
+[HarmonyPatch(typeof(OrrerySpellRuntime), nameof(OrrerySpellRuntime.Reset))]
+public static class OrreryLegacyPresentationOwnerResetPatch
 {
-    public static void Postfix(RemoteShipDriver __instance)
-    {
-        GameShip owner = __instance == null ? null : __instance.gameShip;
-        if (owner != null && owner.IsRemotePlayer())
-            OrreryLegacySpellPresentation.TickRemote(owner, Time.deltaTime);
-    }
-}
-
-[HarmonyPatch(typeof(GameShip), "OnDestroy")]
-public static class OrreryLegacySpellRemoteShipDestroyPatch
-{
-    public static void Prefix(GameShip __instance)
-    {
-        if (__instance == null)
-            return;
-        OrreryLegacySpellPresentation.ForgetOwner(__instance);
-        if (__instance.IsRemotePlayer())
-            OrreryLegacySpellPresentation.ForgetRemote(__instance);
-    }
-}
-
-[HarmonyPatch(typeof(WorldController), "OnDestroy")]
-public static class OrreryLegacySpellPresentationWorldDestroyPatch
-{
-    public static void Prefix()
+    public static void Postfix()
     {
         OrreryLegacySpellPresentation.Reset();
     }
