@@ -13,20 +13,57 @@ using UnityEngine;
 /// </summary>
 public static class OrreryPlasmaBoltPresentation
 {
-    private const int StrokeRecordIndex = 3;
-    private const int BurnFirstRecordIndex = 4;
-    private const byte StrokeGroupId = 0;
-    private const byte BurnGroupId = 1;
-    private const int StrokePartCount = 1;
     private const int RefreshEntryCount = 6;
-    private const int StrokePayloadBytes = 20;
-    private const int BurnPayloadMaxBytes = 1 + RefreshEntryCount * 5;
     private const float RefreshTimeout = 1.25f;
-
     private static readonly uint[] targetScratch = new uint[RefreshEntryCount];
     private static readonly byte[] remainingScratch = new byte[RefreshEntryCount];
-    private static readonly byte[] strokePayload = new byte[StrokePayloadBytes];
-    private static readonly byte[] burnPayload = new byte[BurnPayloadMaxBytes];
+    private static readonly byte[] kindScratch = new byte[RefreshEntryCount];
+    private static readonly OrreryNetwork.Channel<StrokeState> StrokeChannel =
+        new OrreryNetwork.Channel<StrokeState>(OrreryPresentationNetwork.CodecPlasmaBolt, WireStroke, 0);
+    private static readonly OrreryNetwork.Channel<RefreshState> BurnChannel =
+        new OrreryNetwork.Channel<RefreshState>(OrreryPresentationNetwork.CodecPlasmaBolt, WireRefresh, 1);
+    private static readonly OrreryNetwork.Channel<RefreshState> ImmolationChannel =
+        new OrreryNetwork.Channel<RefreshState>(OrreryPresentationNetwork.CodecPlasmaBolt, WireRefresh, 2);
+
+    internal struct StrokeState { public Vector2 Start, End; public float Width; }
+    internal struct RefreshEntry { public uint Target; public byte Remaining; }
+    internal struct RefreshState
+    {
+        public byte Count;
+        public RefreshEntry E0, E1, E2, E3, E4, E5;
+        public RefreshEntry Get(int index)
+        {
+            switch (index) { case 0: return E0; case 1: return E1; case 2: return E2;
+                case 3: return E3; case 4: return E4; default: return E5; }
+        }
+        public void Add(uint target, byte remaining)
+        {
+            var entry = new RefreshEntry { Target = target, Remaining = remaining };
+            switch (Count++) { case 0: E0 = entry; break; case 1: E1 = entry; break;
+                case 2: E2 = entry; break; case 3: E3 = entry; break;
+                case 4: E4 = entry; break; case 5: E5 = entry; break; }
+        }
+    }
+    internal static void WireStroke(ref CoreWire wire, ref StrokeState state)
+    {
+        wire.Position(ref state.Start); wire.Position(ref state.End); wire.Positive(ref state.Width);
+    }
+    internal static void WireRefresh(ref CoreWire wire, ref RefreshState state)
+    {
+        wire.Byte(ref state.Count);
+        if (!wire.Ok || state.Count < 1 || state.Count > RefreshEntryCount) { wire.Fail(); return; }
+        WireEntry(ref wire, ref state.E0);
+        if (state.Count > 1) WireEntry(ref wire, ref state.E1);
+        if (state.Count > 2) WireEntry(ref wire, ref state.E2);
+        if (state.Count > 3) WireEntry(ref wire, ref state.E3);
+        if (state.Count > 4) WireEntry(ref wire, ref state.E4);
+        if (state.Count > 5) WireEntry(ref wire, ref state.E5);
+    }
+    private static void WireEntry(ref CoreWire wire, ref RefreshEntry entry)
+    {
+        wire.UInt32(ref entry.Target); wire.Byte(ref entry.Remaining);
+        if (entry.Target == 0 || entry.Remaining == 0) wire.Fail();
+    }
 
     private static bool strokeGenerationInitialized;
     private static int strokeOwnerInstanceId;
@@ -40,6 +77,7 @@ public static class OrreryPlasmaBoltPresentation
     private sealed class BurnVisual
     {
         public GameShip Target;
+        public byte Kind;
         public StatusEffectLayer Layer;
         public float ExpiresAt, RefreshUntil;
     }
@@ -50,6 +88,8 @@ public static class OrreryPlasmaBoltPresentation
         public uint BoltGeneration;
         public bool BurnRefreshInitialized;
         public uint BurnRefreshGeneration;
+        public bool ImmolationRefreshInitialized;
+        public uint ImmolationRefreshGeneration;
         public readonly OrreryPlasmaBolt.BoltVisualState Bolt =
             new OrreryPlasmaBolt.BoltVisualState();
         public readonly BurnVisual[] Burns =
@@ -80,6 +120,7 @@ public static class OrreryPlasmaBoltPresentation
         if (!OrreryPlasmaBolt.ReadPresentation(
                 targetScratch,
                 remainingScratch,
+                kindScratch,
                 out cast,
                 out start,
                 out end,
@@ -90,49 +131,21 @@ public static class OrreryPlasmaBoltPresentation
             return;
         }
 
-        if (bolt &&
-            OrreryNetwork.IsFinite(start) &&
-            OrreryNetwork.IsFinite(end) &&
-            OrreryNetwork.IsFinite(width) &&
-            width > 0f)
+        if (bolt)
         {
-            int offset = 0;
-            WritePosition(strokePayload, ref offset, start);
-            WritePosition(strokePayload, ref offset, end);
-            WriteFloat(strokePayload, ref offset, width);
-
-            OrreryPresentationNetwork.WriteGroup(
-                StrokeRecordIndex,
-                OrreryPresentationNetwork.CodecPlasmaBolt,
-                StrokeGroupId,
-                StrokePartCount,
-                ResolveStrokeGeneration(owner, cast),
-                strokePayload,
-                StrokePayloadBytes);
+            var stroke = new StrokeState { Start = start, End = end, Width = width };
+            StrokeChannel.Publish(ResolveStrokeGeneration(owner, cast), ref stroke);
         }
-
-        count = Mathf.Clamp(count, 0, RefreshEntryCount);
-        if (count <= 0)
-            return;
-
-        int burnOffset = 0;
-        burnPayload[burnOffset++] = (byte)count;
+        var burns = default(RefreshState);
+        var immolations = default(RefreshState);
         for (int i = 0; i < count; i++)
         {
-            WriteUInt(burnPayload, ref burnOffset, targetScratch[i]);
-            burnPayload[burnOffset++] = remainingScratch[i];
+            if (kindScratch[i] == 0) burns.Add(targetScratch[i], remainingScratch[i]);
+            else immolations.Add(targetScratch[i], remainingScratch[i]);
         }
-
-        int partCount = burnOffset <=
-            OrreryPresentationNetwork.GetPayloadCapacity(1) ? 1 : 2;
-        OrreryPresentationNetwork.WriteGroup(
-            BurnFirstRecordIndex,
-            OrreryPresentationNetwork.CodecPlasmaBolt,
-            BurnGroupId,
-            partCount,
-            NextGeneration(ref burnRefreshGenerationCounter),
-            burnPayload,
-            burnOffset);
+        uint generation = NextGeneration(ref burnRefreshGenerationCounter);
+        if (burns.Count > 0) BurnChannel.Publish(generation, ref burns);
+        if (immolations.Count > 0) ImmolationChannel.Publish(generation, ref immolations);
     }
 
     public static void Tick(GameShip owner)
@@ -140,27 +153,17 @@ public static class OrreryPlasmaBoltPresentation
         if (owner == null || !owner.IsRemotePlayer())
             return;
 
-        uint boltGeneration;
-        Vector2 start;
-        Vector2 end;
-        float width;
-        bool hasStroke = TryReadStroke(
-            owner,
-            out boltGeneration,
-            out start,
-            out end,
-            out width);
-
-        uint burnGeneration;
-        int burnCount;
-        bool hasBurnRefresh = TryReadBurnRefresh(
-            owner,
-            out burnGeneration,
-            out burnCount);
+        uint boltGeneration, burnGeneration, immolationGeneration;
+        var stroke = default(StrokeState);
+        var burns = default(RefreshState);
+        var immolations = default(RefreshState);
+        bool hasStroke = StrokeChannel.TryRead(owner, ref stroke, out boltGeneration);
+        bool hasBurnRefresh = BurnChannel.TryRead(owner, ref burns, out burnGeneration);
+        bool hasImmolationRefresh = ImmolationChannel.TryRead(owner, ref immolations, out immolationGeneration);
 
         RemoteState state;
         bool hasState = remotes.TryGetValue(owner, out state) && state != null;
-        if (!hasState && !hasStroke && !hasBurnRefresh)
+        if (!hasState && !hasStroke && !hasBurnRefresh && !hasImmolationRefresh)
             return;
 
         if (!hasState)
@@ -174,29 +177,20 @@ public static class OrreryPlasmaBoltPresentation
         {
             state.BoltInitialized = true;
             state.BoltGeneration = boltGeneration;
-            OrreryPlasmaBolt.ShowBoltVisual(state.Bolt, owner, start, end, width);
+            OrreryPlasmaBolt.ShowBoltVisual(state.Bolt, owner, stroke.Start, stroke.End, stroke.Width);
         }
 
-        if (hasBurnRefresh &&
-            (!state.BurnRefreshInitialized ||
-             state.BurnRefreshGeneration != burnGeneration))
+        if (hasBurnRefresh && (!state.BurnRefreshInitialized || state.BurnRefreshGeneration != burnGeneration))
         {
             state.BurnRefreshInitialized = true;
             state.BurnRefreshGeneration = burnGeneration;
-
-            NetWorldBridge bridge = NetSession.instance == null || bridgeField == null
-                ? null
-                : bridgeField.GetValue(NetSession.instance) as NetWorldBridge;
-            if (bridge != null)
-            {
-                for (int i = 0; i < burnCount; i++)
-                {
-                    GameShip target =
-                        bridge.ResolveNetTarget(targetScratch[i]) as GameShip;
-                    if (target != null && target.health > 0f)
-                        RefreshBurn(state, target, remainingScratch[i] * 0.05f);
-                }
-            }
+            ApplyRefresh(state, ref burns, 0);
+        }
+        if (hasImmolationRefresh && (!state.ImmolationRefreshInitialized || state.ImmolationRefreshGeneration != immolationGeneration))
+        {
+            state.ImmolationRefreshInitialized = true;
+            state.ImmolationRefreshGeneration = immolationGeneration;
+            ApplyRefresh(state, ref immolations, 1);
         }
 
         // The physical presentation bank is multiplexed. A group can be absent
@@ -216,7 +210,7 @@ public static class OrreryPlasmaBoltPresentation
             }
         }
 
-        if (!hasStroke && !hasBurnRefresh &&
+        if (!hasStroke && !hasBurnRefresh && !hasImmolationRefresh &&
             Time.time >= state.Bolt.BoltVisibleUntil &&
             !HasActiveBurns(state))
         {
@@ -242,120 +236,30 @@ public static class OrreryPlasmaBoltPresentation
         return false;
     }
 
-    private static bool TryReadStroke(
-        GameShip owner,
-        out uint generation,
-        out Vector2 start,
-        out Vector2 end,
-        out float width)
+    private static void ApplyRefresh(RemoteState state, ref RefreshState refresh, byte kind)
     {
-        generation = 0u;
-        start = Vector2.zero;
-        end = Vector2.zero;
-        width = 0f;
-
-        OrreryPresentationNetwork.GroupReader reader;
-        if (!OrreryPresentationNetwork.TryReadGroup(
-                owner,
-                StrokeRecordIndex,
-                OrreryPresentationNetwork.CodecPlasmaBolt,
-                StrokeGroupId,
-                StrokePartCount,
-                out reader) ||
-            reader.Length != StrokePayloadBytes)
+        NetWorldBridge bridge = NetSession.instance == null || bridgeField == null
+            ? null : bridgeField.GetValue(NetSession.instance) as NetWorldBridge;
+        if (bridge == null) return;
+        for (int i = 0; i < refresh.Count; i++)
         {
-            return false;
+            RefreshEntry entry = refresh.Get(i);
+            GameShip target = bridge.ResolveNetTarget(entry.Target) as GameShip;
+            if (target != null && target.health > 0f)
+                RefreshBurn(state, target, entry.Remaining * 0.05f, kind);
         }
-
-        start = ReadPosition(ref reader);
-        end = ReadPosition(ref reader);
-        width = ReadFloat(ref reader);
-        if (reader.Remaining != 0 ||
-            !OrreryNetwork.IsFinite(start) ||
-            !OrreryNetwork.IsFinite(end) ||
-            !OrreryNetwork.IsFinite(width) ||
-            width <= 0f)
-        {
-            return false;
-        }
-
-        generation = reader.Generation;
-        return generation != 0u;
-    }
-
-    private static bool TryReadBurnRefresh(
-        GameShip owner,
-        out uint generation,
-        out int count)
-    {
-        generation = 0u;
-        count = 0;
-
-        OrreryPresentationNetwork.GroupReader reader;
-        if (!OrreryPresentationNetwork.TryReadGroup(
-                owner,
-                BurnFirstRecordIndex,
-                OrreryPresentationNetwork.CodecPlasmaBolt,
-                BurnGroupId,
-                1,
-                out reader) &&
-            !OrreryPresentationNetwork.TryReadGroup(
-                owner,
-                BurnFirstRecordIndex,
-                OrreryPresentationNetwork.CodecPlasmaBolt,
-                BurnGroupId,
-                2,
-                out reader))
-        {
-            return false;
-        }
-
-        if (reader.Length < 1)
-            return false;
-
-        count = reader.Byte();
-        if (count < 1 || count > RefreshEntryCount)
-            return false;
-
-        int expectedLength = 1 + count * 5;
-        int expectedParts = expectedLength <=
-            OrreryPresentationNetwork.GetPayloadCapacity(1) ? 1 : 2;
-        if (reader.Length != expectedLength ||
-            reader.PartCount != expectedParts)
-        {
-            return false;
-        }
-
-        // Validate the complete refresh group before mutating any remote visuals.
-        for (int i = 0; i < count; i++)
-        {
-            targetScratch[i] = ReadUInt(ref reader);
-            remainingScratch[i] = reader.Byte();
-            if (targetScratch[i] == 0u ||
-                remainingScratch[i] == 0 ||
-                remainingScratch[i] > 100)
-            {
-                return false;
-            }
-        }
-
-        if (reader.Remaining != 0)
-            return false;
-
-        generation = reader.Generation;
-        return generation != 0u;
     }
 
     private static void RefreshBurn(
         RemoteState state,
         GameShip target,
-        float remaining)
+        float remaining, byte kind)
     {
         BurnVisual available = null;
         for (int i = 0; i < state.Burns.Length; i++)
         {
             BurnVisual burn = state.Burns[i];
-            if (object.ReferenceEquals(burn.Target, target))
+            if (object.ReferenceEquals(burn.Target, target) && burn.Kind == kind)
             {
                 available = burn;
                 break;
@@ -372,10 +276,11 @@ public static class OrreryPlasmaBoltPresentation
 
         if (available == null)
             return;
-        if (!object.ReferenceEquals(available.Target, target))
+        if (!object.ReferenceEquals(available.Target, target) || available.Kind != kind)
             ClearBurn(available);
 
         available.Target = target;
+        available.Kind = kind;
         available.ExpiresAt = Time.time + remaining;
         available.RefreshUntil = Time.unscaledTime + RefreshTimeout;
         if (available.Layer == null)
@@ -461,50 +366,4 @@ public static class OrreryPlasmaBoltPresentation
         return value;
     }
 
-    private static void WritePosition(byte[] buffer, ref int offset, Vector2 value)
-    {
-        WriteFloat(buffer, ref offset, value.x);
-        WriteFloat(buffer, ref offset, value.y);
-    }
-
-    private static Vector2 ReadPosition(
-        ref OrreryPresentationNetwork.GroupReader reader)
-    {
-        return new Vector2(ReadFloat(ref reader), ReadFloat(ref reader));
-    }
-
-    [System.Runtime.InteropServices.StructLayout(
-        System.Runtime.InteropServices.LayoutKind.Explicit)]
-    private struct FloatBits
-    {
-        [System.Runtime.InteropServices.FieldOffset(0)] public float Value;
-        [System.Runtime.InteropServices.FieldOffset(0)] public uint Bits;
-    }
-
-    private static void WriteFloat(byte[] buffer, ref int offset, float value)
-    {
-        FloatBits bits = new FloatBits { Value = value };
-        WriteUInt(buffer, ref offset, bits.Bits);
-    }
-
-    private static float ReadFloat(ref OrreryPresentationNetwork.GroupReader reader)
-    {
-        return new FloatBits { Bits = ReadUInt(ref reader) }.Value;
-    }
-
-    private static void WriteUInt(byte[] buffer, ref int offset, uint value)
-    {
-        buffer[offset++] = (byte)value;
-        buffer[offset++] = (byte)(value >> 8);
-        buffer[offset++] = (byte)(value >> 16);
-        buffer[offset++] = (byte)(value >> 24);
-    }
-
-    private static uint ReadUInt(ref OrreryPresentationNetwork.GroupReader reader)
-    {
-        return (uint)reader.Byte() |
-            ((uint)reader.Byte() << 8) |
-            ((uint)reader.Byte() << 16) |
-            ((uint)reader.Byte() << 24);
-    }
 }

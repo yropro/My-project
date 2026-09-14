@@ -123,17 +123,45 @@ public static class OrrerySpellCompendium
         public static readonly OrreryRecipeKey Recipe = default(OrreryRecipeKey)
             .Add(OrreryElement.Fire).Add(OrreryElement.Lightning);
         public const float IntegratedReferenceSeconds = 1f;
+
+        // ---- Strike -------------------------------------------------------
+        // LightningDamageMultiplier is the spell's reference power and is left
+        // at its original value so the baseline stays readable. StrikeDamage-
+        // Multiplier is the knob that actually tunes the direct hit; it is
+        // folded in before the focus bonus, so it behaves exactly as if the
+        // reference multiplier had been lowered.
         public const float LightningDamageMultiplier = 4f;
+        public const float StrikeDamageMultiplier = 0.6f;
         public const float BoltLengthMeters = 220f;
         public const float BoltWidthMeters = 25f;
         public const float SpreadRadiusMeters = 42f;
+        // ---- Plasma Burn: spreading damage-over-time -----------------------
+        // Budget is a multiple of the confirmed post-mitigation hit, so a
+        // weaker strike spreads a proportionally weaker burn. That is the
+        // intended consequence of the strike nerf: contagion damage scales
+        // with the hit that seeded it.
+        public const float BurnBudgetMultiplier = 1f;
         public const float BurnDurationSeconds = 5f;
         public const float ReinfectionLockoutSeconds = 10f;
         public const float BurnTickIntervalSeconds = 0.5f;
         public const int BurnTickCount = 10;
         public const float SpreadScanIntervalSeconds = 0.25f;
+
+        // ---- Immolation: single-target damage-over-time --------------------
+        // Never spreads. The budget restores the pre-nerf strike value: the
+        // confirmed hit is StrikeDamageMultiplier of the original, so dividing
+        // by it returns the original. Replace with a plain number to decouple
+        // Immolation from the strike knob.
+        public const float ImmolationBudgetMultiplier = 1f / StrikeDamageMultiplier;
+        public const float ImmolationDurationSeconds = 8f;
+        public const float ImmolationReapplyLockoutSeconds = 8f;
+        public const float ImmolationTickIntervalSeconds = 1f;
+        public const int ImmolationTickCount = 8;
         // Concurrent storage bounds only: no generation or total-spread limit.
-        public const int MaxActiveInfections = 64;
+        // Plasma Burn and Immolation share this pool. Immolation adds at most
+        // one slot per directly struck target and never spreads, so the headroom
+        // increase is small relative to contagion.
+        public const int MaxActiveInfections = 96;
         public const int MaxPendingImpacts = 16;
         public const float PendingOutcomeTimeoutSeconds = 5f;
         public const int BoltVisualPointCount = 12;

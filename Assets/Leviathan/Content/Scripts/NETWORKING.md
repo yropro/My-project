@@ -1,7 +1,7 @@
 # Networking for skill authors
 
 **Status: maintained networking and remote-presentation guide.** Reviewed
-2026-09-14. See the [documentation index](../../../../DOCUMENTATION.md) for
+2026-09-14. See the [Skill development](../../../../SKILL_DEVELOPMENT.md) for
 gameplay design, authoritative gameplay lifetime, native APIs and historical notes.
 Older network standards and proposals do not override this guide's current APIs.
 
@@ -48,7 +48,11 @@ They should not implement another engine lifecycle or transport.
    callback uses `channel.TryRead(owner, ref snapshot, out castId)` and updates
    visual-only objects. Core supplies the engine hooks and exception boundaries.
 6. Pin expected bytes and test decoding failures before changing an existing
-   codec. `OrreryLegacySpellPresentation.WireMagma` is the first integrated example.
+   codec. `OrreryLegacySpellPresentation.WireMagma`/`WireCryo`/`WireTesla` and
+   `OrreryShatterboltPresentationCodec.WireShatterbolt` and Plasma
+   `WireStroke`/`WireRefresh` are integrated examples.
+   Each pins its bytes against the pre-conversion writer's rules, not against
+   itself, so a layout change fails instead of agreeing with itself.
 
 ```csharp
 // Example adapter format, not code that belongs in the gameplay skill.
@@ -135,11 +139,12 @@ runtime, and the .NET SDK compiler. Override `UnityEditorRoot` or `GameManaged`
 when their locations differ. Output goes to a temporary directory; the runner
 does not install the mod, change the project checkout or push to GitHub.
 
-Validated on 2026-09-14:
+Validated on 2026-09-14 after the Opus patch batch and Plasma integration:
 
 - Full source compilation, including the URP dependency required by Sol's remote
   presentations. The asmdef now names that dependency explicitly.
-- 2,864 integration assertions: production Magma golden bytes and round trips,
+- 7,096 integration assertions: production Magma, Cryo, Tesla, Shatterbolt and
+  Plasma golden bytes, truncation/invalid-field rejection and round trips,
   every truncated prefix of test packets, production ship-state writer/reader
   above 255 bytes, production combat footer writers/locator, group budgets and
   injected publisher failure preserving the native packet.
@@ -157,7 +162,9 @@ Validated on 2026-09-14:
 These are not a live Unity rendering test or two-peer co-op test. Test the same
 rebuilt mod on host and client: all spells in both directions, Cold Fusion self
 and ally casts, satellite visibility, overlapping effects, world transitions,
-ship death/replacement and loaded native packets. IL2CPP remains unverified.
+ship death/replacement and loaded native packets. The developer reference identifies
+the game backend as Mono. These checks used the local Unity 2022.3.62f1 toolchain;
+the v0.8.21 developer reference requires f2 for compatible AssetBundle packaging.
 
 ## Integration provenance
 
@@ -168,6 +175,28 @@ notifications rather than keeping per-spell engine/network Harmony wrappers.
 
 The ship-state length is a ushort; combat trailer lengths remain a byte matching
 their seven-byte footer. Those corrected production paths now have regression
-tests. Migrating the Core framing itself to CoreWire is separate from the Magma
-integration; existing Tesla/Cryo/Shatterbolt/Plasma codecs also remain explicit
-adapters. New skills should use the typed API rather than copy those older codecs.
+tests. Migrating the Core framing itself to CoreWire remains separate from the
+Orrery codec migration.
+
+All five damaging spell presentations now use typed `Channel<T>` formats.
+The 2026-09-14 Opus patch batch converted Tesla, Cryo and Shatterbolt and reworked
+Plasma gameplay. Integration also converted Plasma's remaining byte codecs,
+added its separate Immolation presentation group, and reran the actual harness.
+Core framing itself still uses its existing tested serializer.
+
+Plasma uses codec 2 with three groups: 0 is the unchanged 20-byte stroke; 1 is
+Plasma Burn refresh; 2 is Immolation refresh. Refresh lists contain a count plus
+up to six `(uint target, byte remaining)` entries. Remaining time is quantized
+at 0.05 seconds, capped at 12.75 seconds. A shared six-effect sampling limit and
+round-robin cursor bound total capture work. The two effects retain separate
+remote lifetimes even on the same target; both currently use native fire visuals.
+This extends the earlier protocol: old builds do not know group 2 and reject
+refresh durations over five seconds. Distribute the same rebuilt package to peers.
+
+`Channel<T>` now rejects nonminimal part counts and zero generations centrally,
+so individual codecs do not need to restate those transport checks. Shatterbolt
+can use four records for its full 94-byte orb-plus-ten-impact snapshot; its old
+three-record ceiling dropped that valid shape. Whole-group budget selection still
+applies, so larger frames can be omitted when essential state leaves insufficient
+room. Remaining live checks include overlapping Plasma/Immolation effects and
+visual refresh under packet loss/budget pressure.

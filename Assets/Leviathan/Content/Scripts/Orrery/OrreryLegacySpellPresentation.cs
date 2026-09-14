@@ -4,7 +4,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 /// <summary>
@@ -27,12 +26,56 @@ public static class OrreryLegacySpellPresentation
 
     private const int MagmaSpellId = 1;
     private const int TeslaSpellId = 2;
-    private const byte GroupId = 0;
-    private const int PreferredRecord = 0;
 
     private static readonly OrreryNetwork.Channel<MagmaWireState> MagmaChannel =
         new OrreryNetwork.Channel<MagmaWireState>(
             OrreryPresentationNetwork.CodecMagmaCannon, WireMagma);
+
+    private static readonly OrreryNetwork.Channel<CryoWireState> CryoChannel =
+        new OrreryNetwork.Channel<CryoWireState>(
+            OrreryPresentationNetwork.CodecConeOfCold, WireCryo);
+
+    private static readonly OrreryNetwork.Channel<TeslaWireState> TeslaChannel =
+        new OrreryNetwork.Channel<TeslaWireState>(
+            OrreryPresentationNetwork.CodecTeslaCoil, WireTesla);
+
+    internal static void WireCryo(ref CoreWire wire, ref CryoWireState state)
+    {
+        wire.Position(ref state.Origin);
+        wire.Float(ref state.AimDegrees);
+    }
+
+    /// <summary>
+    /// Segment count leads, so both directions take the same branches. Width is
+    /// Positive rather than Float because a zero or negative beam width was
+    /// already rejected by the hand-written reader; the constraint now lives in
+    /// the declaration instead of being restated on each side.
+    /// </summary>
+    internal static void WireTesla(ref CoreWire wire, ref TeslaWireState state)
+    {
+        wire.Count(ref state.SegmentCount);
+        if (!wire.Ok)
+            return;
+        if (state.SegmentCount < 1 || state.SegmentCount > Tuning.MaxTeslaSegments)
+        {
+            wire.Fail();
+            return;
+        }
+
+        wire.Positive(ref state.Width);
+        wire.Position(ref state.Start0);
+        wire.Position(ref state.End0);
+        if (state.SegmentCount > 1)
+        {
+            wire.Position(ref state.Start1);
+            wire.Position(ref state.End1);
+        }
+        if (state.SegmentCount > 2)
+        {
+            wire.Position(ref state.Start2);
+            wire.Position(ref state.End2);
+        }
+    }
 
     internal static void WireMagma(ref CoreWire wire, ref MagmaWireState state)
     {
@@ -127,19 +170,11 @@ public static class OrreryLegacySpellPresentation
         public float CryoPublishUntil;
     }
 
-    [StructLayout(LayoutKind.Explicit)]
-    private struct FloatBits
-    {
-        [FieldOffset(0)] public float Value;
-        [FieldOffset(0)] public uint Bits;
-    }
-
     private static readonly Dictionary<GameShip, OwnerCapture> owners =
         new Dictionary<GameShip, OwnerCapture>(4);
     private static readonly Dictionary<Projectile, GameShip> magmaOwners =
         new Dictionary<Projectile, GameShip>(4);
 
-    private static readonly byte[] payload = new byte[96];
     private static readonly Vector2[] teslaStarts =
         new Vector2[Tuning.MaxTeslaSegments];
     private static readonly Vector2[] teslaEnds =
@@ -418,25 +453,17 @@ public static class OrreryLegacySpellPresentation
 
     private static void PublishCryo(OwnerCapture capture)
     {
-        if (capture == null || capture.CryoGeneration == 0u ||
-            !OrreryNetwork.IsFinite(capture.CryoOrigin) ||
-            !OrreryNetwork.IsFinite(capture.CryoAimDegrees))
-        {
+        // Finite checks are not repeated here: Position and Float refuse
+        // non-finite values, so the encode fails and nothing is published.
+        if (capture == null || capture.CryoGeneration == 0u)
             return;
-        }
 
-        int offset = 0;
-        WritePosition(payload, ref offset, capture.CryoOrigin);
-        WriteFloat(payload, ref offset, capture.CryoAimDegrees);
-
-        OrreryPresentationNetwork.WriteGroup(
-            PreferredRecord,
-            OrreryPresentationNetwork.CodecConeOfCold,
-            GroupId,
-            1,
-            capture.CryoGeneration,
-            payload,
-            offset);
+        CryoWireState state = new CryoWireState
+        {
+            Origin = capture.CryoOrigin,
+            AimDegrees = capture.CryoAimDegrees
+        };
+        CryoChannel.Publish(capture.CryoGeneration, ref state);
     }
 
     private static void PublishTesla(GameShip owner, OwnerCapture capture)
@@ -451,33 +478,18 @@ public static class OrreryLegacySpellPresentation
         }
 
         int segmentCount = CaptureTeslaSegments(capture.TeslaWeapon);
-        if (segmentCount <= 0 || !OrreryNetwork.IsFinite(teslaWidth) ||
-            teslaWidth <= 0f)
-        {
+        if (segmentCount <= 0)
             return;
-        }
 
-        int offset = 0;
-        payload[offset++] = (byte)segmentCount;
-        WriteFloat(payload, ref offset, teslaWidth);
+        // Width and segment bounds are enforced by WireTesla; the channel picks
+        // the record count and refuses a payload that will not fit.
+        TeslaWireState state = default(TeslaWireState);
+        state.SegmentCount = segmentCount;
+        state.Width = teslaWidth;
         for (int i = 0; i < segmentCount; i++)
-        {
-            WritePosition(payload, ref offset, teslaStarts[i]);
-            WritePosition(payload, ref offset, teslaEnds[i]);
-        }
+            state.SetSegment(i, teslaStarts[i], teslaEnds[i]);
 
-        int partCount = RequiredPartCount(offset);
-        if (partCount <= 0)
-            return;
-
-        OrreryPresentationNetwork.WriteGroup(
-            PreferredRecord,
-            OrreryPresentationNetwork.CodecTeslaCoil,
-            GroupId,
-            partCount,
-            capture.TeslaGeneration,
-            payload,
-            offset);
+        TeslaChannel.Publish(capture.TeslaGeneration, ref state);
     }
 
     private static int CaptureTeslaSegments(BeamWeapon weapon)
@@ -548,30 +560,15 @@ public static class OrreryLegacySpellPresentation
     {
         state = default(CryoWireState);
 
-        OrreryPresentationNetwork.GroupReader reader;
-        if (!OrreryPresentationNetwork.TryReadGroup(
-                owner,
-                PreferredRecord,
-                OrreryPresentationNetwork.CodecConeOfCold,
-                GroupId,
-                1,
-                out reader) || reader.Length != 12)
-        {
-            return false;
-        }
-
-        state.Origin = ReadPosition(ref reader);
-        state.AimDegrees = ReadFloat(ref reader);
-        if (reader.Remaining != 0 ||
-            !OrreryNetwork.IsFinite(state.Origin) ||
-            !OrreryNetwork.IsFinite(state.AimDegrees))
+        uint generation;
+        if (!CryoChannel.TryRead(owner, ref state, out generation) ||
+            generation == 0u)
         {
             state = default(CryoWireState);
             return false;
         }
-
-        state.Generation = reader.Generation;
-        return state.Generation != 0u;
+        state.Generation = generation;
+        return true;
     }
 
     internal static bool TryReadTesla(
@@ -580,54 +577,15 @@ public static class OrreryLegacySpellPresentation
     {
         state = default(TeslaWireState);
 
-        OrreryPresentationNetwork.GroupReader reader =
-            default(OrreryPresentationNetwork.GroupReader);
-        bool found = false;
-        for (int parts = 1; parts <= 2; parts++)
+        uint generation;
+        if (!TeslaChannel.TryRead(owner, ref state, out generation) ||
+            generation == 0u)
         {
-            if (OrreryPresentationNetwork.TryReadGroup(
-                    owner,
-                    PreferredRecord,
-                    OrreryPresentationNetwork.CodecTeslaCoil,
-                    GroupId,
-                    parts,
-                    out reader))
-            {
-                found = true;
-                break;
-            }
-        }
-        if (!found || reader.Length < 5)
-            return false;
-
-        int segmentCount = reader.Byte();
-        float width = ReadFloat(ref reader);
-        if (segmentCount < 1 || segmentCount > Tuning.MaxTeslaSegments ||
-            !OrreryNetwork.IsFinite(width) || width <= 0f ||
-            reader.Length != 5 + segmentCount * 16 ||
-            RequiredPartCount(reader.Length) != reader.PartCount)
-        {
+            state = default(TeslaWireState);
             return false;
         }
-
-        state.SegmentCount = segmentCount;
-        state.Width = width;
-        for (int i = 0; i < segmentCount; i++)
-        {
-            Vector2 start = ReadPosition(ref reader);
-            Vector2 end = ReadPosition(ref reader);
-            if (!OrreryNetwork.IsFinite(start) || !OrreryNetwork.IsFinite(end))
-            {
-                state = default(TeslaWireState);
-                return false;
-            }
-            state.SetSegment(i, start, end);
-        }
-
-        if (reader.Remaining != 0)
-            return false;
-        state.Generation = reader.Generation;
-        return state.Generation != 0u;
+        state.Generation = generation;
+        return true;
     }
 
     private static OwnerCapture GetOrCreateOwner(GameShip owner)
@@ -715,48 +673,6 @@ public static class OrreryLegacySpellPresentation
         return counter;
     }
 
-    private static int RequiredPartCount(int payloadLength)
-    {
-        for (int parts = 1;
-            parts <= OrreryPresentationNetwork.MaximumPartsPerGroup;
-            parts++)
-        {
-            if (payloadLength <= OrreryPresentationNetwork.GetPayloadCapacity(parts))
-                return parts;
-        }
-        return 0;
-    }
-
-    private static void WritePosition(byte[] buffer, ref int offset, Vector2 value)
-    {
-        WriteFloat(buffer, ref offset, value.x);
-        WriteFloat(buffer, ref offset, value.y);
-    }
-
-    private static Vector2 ReadPosition(
-        ref OrreryPresentationNetwork.GroupReader reader)
-    {
-        return new Vector2(ReadFloat(ref reader), ReadFloat(ref reader));
-    }
-
-    private static void WriteFloat(byte[] buffer, ref int offset, float value)
-    {
-        FloatBits bits = new FloatBits { Value = value };
-        buffer[offset++] = (byte)bits.Bits;
-        buffer[offset++] = (byte)(bits.Bits >> 8);
-        buffer[offset++] = (byte)(bits.Bits >> 16);
-        buffer[offset++] = (byte)(bits.Bits >> 24);
-    }
-
-    private static float ReadFloat(
-        ref OrreryPresentationNetwork.GroupReader reader)
-    {
-        uint bits = (uint)reader.Byte() |
-            ((uint)reader.Byte() << 8) |
-            ((uint)reader.Byte() << 16) |
-            ((uint)reader.Byte() << 24);
-        return new FloatBits { Bits = bits }.Value;
-    }
 }
 
 [HarmonyPatch(typeof(OrrerySpellRuntime), nameof(OrrerySpellRuntime.ExecuteMagma))]

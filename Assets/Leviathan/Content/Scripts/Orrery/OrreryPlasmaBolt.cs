@@ -7,9 +7,12 @@ using UnityEngine;
 ///
 /// Fires one wide Electric stroke. The first valid hostile intersected by the
 /// swept circle takes the direct hit. Once CoreCombat confirms the authoritative
-/// amount actually lost by that target, that exact amount becomes the authored
-/// Thermal budget of Plasma Burn. Plasma Burn lasts five seconds, recursively
-/// spreads to nearby hostiles, and uses a separate ten-second reinfection lockout.
+/// amount actually lost by that target, it seeds independently tuned Thermal
+/// budgets for Plasma Burn and Immolation. Fire damage bonuses apply once to
+/// each seed. Plasma Burn spreads its frozen budget; Immolation stays on its
+/// initial target. Both use Fire status/bypass/kill traits and separate lockouts.
+/// The copied strike is an explicit damage-snapshot exception to elemental
+/// isolation: its already-resolved crit is not rolled again on each DOT tick.
 ///
 /// Gameplay is source-owner authoritative. Presentation spawned here is local;
 /// remote bolt/burn presentation uses bounded snapshots and never applies damage.
@@ -49,10 +52,82 @@ public static class OrreryPlasmaBolt
         public float SpreadRadiusMeters;
         public ushort CastId;
         public CoreCombat.ContributorKey FireContributor;
+        public OrreryFocusProfile.Resolved FireProfile;
+    }
+
+    /// <summary>
+    /// Which damage-over-time an infection slot is running. Plasma Burn spreads
+    /// and is budgeted off the confirmed hit; Immolation never spreads and
+    /// restores the strike's pre-nerf value on its single target. Everything
+    /// below reads its timings from this, so the two are tuned independently.
+    /// </summary>
+    private enum DotKind : byte
+    {
+        PlasmaBurn = 0,
+        Immolation = 1,
+    }
+
+    private static bool DotSpreads(DotKind kind)
+    {
+        return kind == DotKind.PlasmaBurn;
+    }
+
+    private static float DotBudgetMultiplier(DotKind kind)
+    {
+        return kind == DotKind.Immolation
+            ? OrrerySpellCompendium.PlasmaBolt.ImmolationBudgetMultiplier
+            : OrrerySpellCompendium.PlasmaBolt.BurnBudgetMultiplier;
+    }
+
+    private static float DotDurationSeconds(DotKind kind)
+    {
+        return kind == DotKind.Immolation
+            ? OrrerySpellCompendium.PlasmaBolt.ImmolationDurationSeconds
+            : OrrerySpellCompendium.PlasmaBolt.BurnDurationSeconds;
+    }
+
+    private static float DotLockoutSeconds(DotKind kind)
+    {
+        return kind == DotKind.Immolation
+            ? OrrerySpellCompendium.PlasmaBolt.ImmolationReapplyLockoutSeconds
+            : OrrerySpellCompendium.PlasmaBolt.ReinfectionLockoutSeconds;
+    }
+
+    private static float DotTickIntervalSeconds(DotKind kind)
+    {
+        return kind == DotKind.Immolation
+            ? OrrerySpellCompendium.PlasmaBolt.ImmolationTickIntervalSeconds
+            : OrrerySpellCompendium.PlasmaBolt.BurnTickIntervalSeconds;
+    }
+
+    private static int DotTickCount(DotKind kind)
+    {
+        return kind == DotKind.Immolation
+            ? OrrerySpellCompendium.PlasmaBolt.ImmolationTickCount
+            : OrrerySpellCompendium.PlasmaBolt.BurnTickCount;
+    }
+
+    private static CoreCombat.SemanticKey DotStateKey(DotKind kind)
+    {
+        return kind == DotKind.Immolation
+            ? OrreryCombat.Immolation : OrreryCombat.PlasmaBurn;
+    }
+
+    private static CoreCombat.SemanticKey DotRecentKey(DotKind kind)
+    {
+        return kind == DotKind.Immolation
+            ? OrreryCombat.ImmolationRecent : OrreryCombat.PlasmaBurnRecent;
+    }
+
+    private static CoreCombat.SemanticKey DotTickKey(DotKind kind)
+    {
+        return kind == DotKind.Immolation
+            ? OrreryCombat.ImmolationTick : OrreryCombat.PlasmaBurnTick;
     }
 
     private sealed class Infection
     {
+        public DotKind Kind;
         public bool Active;
         public bool VisualRetiring;
         public GameShip Target;
@@ -66,6 +141,7 @@ public static class OrreryPlasmaBolt
         public float SpreadRadiusMeters;
         public ushort CastId;
         public CoreCombat.ContributorKey FireContributor;
+        public OrreryFocusProfile.Resolved FireProfile;
         public StatusEffectLayer Visual;
         public float ReleaseVisualAt;
     }
@@ -123,9 +199,9 @@ public static class OrreryPlasmaBolt
     private static bool warnedMissingZap;
     private static bool warnedMissingMeaningfulHistory;
 
-    // Six active targets per actual network send. At 20Hz even a full 64-target
-    // population refreshes in <=0.55s. No per-tick event log or unbounded queue.
-    internal static bool ReadPresentation(uint[] targets, byte[] remaining,
+    // Six active effects per send; both kinds share a bounded round-robin cursor.
+    // At 20Hz a full 96-effect population refreshes in 0.8s before budget drops.
+    internal static bool ReadPresentation(uint[] targets, byte[] remaining, byte[] kinds,
         out ushort sequence, out Vector2 start, out Vector2 end, out float width,
         out bool bolt, out int count)
     {
@@ -146,8 +222,9 @@ public static class OrreryPlasmaBolt
                 Time.time >= infection.ExpiresAt)
                 continue;
             targets[count] = infection.Target.netId;
+            kinds[count] = (byte)infection.Kind;
             remaining[count] = (byte)Mathf.Clamp(
-                Mathf.CeilToInt((infection.ExpiresAt - Time.time) * 20f), 1, 100);
+                Mathf.CeilToInt((infection.ExpiresAt - Time.time) * 20f), 1, 255);
             count++;
         }
         return bolt || count > 0;
@@ -193,8 +270,8 @@ public static class OrreryPlasmaBolt
             return false;
         }
 
-        // Lightning owns strike power/length; Fire range owns spread reach.
-        // The confirmed burn budget is never damage-scaled a second time.
+        // Lightning owns strike power/length. Fire owns spread range and its own
+        // bonuses on the confirmed strike seed; descendants never rescale it.
         OrreryFocusProfile.Resolved fireFocus;
         OrreryFocusProfile.TryResolve(owner, OrreryElement.Fire, out fireFocus);
 
@@ -244,7 +321,7 @@ public static class OrreryPlasmaBolt
             state.BoltPublishedUntil = Time.time + 0.75f;
 
             if (target != null && !target.IsDodging())
-                RouteInitialHit(owner, state, target, impactPoint, damage, invocation, geometry.SpreadRadiusMeters);
+                RouteInitialHit(owner, state, target, impactPoint, damage, invocation, geometry.SpreadRadiusMeters, fireFocus);
 
             // Completion cannot happen from inside SpellRegistry.TryCommit():
             // ending the CoreAbilityExecution while TryCommit is still on-stack
@@ -333,7 +410,7 @@ public static class OrreryPlasmaBolt
         Vector2 impactPoint,
         DamageProfile profile,
         OrreryCastInvocation invocation,
-        float spreadRadiusMeters)
+        float spreadRadiusMeters, OrreryFocusProfile.Resolved fireProfile)
     {
         bool crit = CoreNativeCriticalHits.CritRoll(profile.CritChance, target);
         float damage = crit
@@ -373,7 +450,7 @@ public static class OrreryPlasmaBolt
         }
 
         if (scope.EventId != 0U)
-            AddPendingImpact(state, scope.EventId, target, impactPoint, spreadRadiusMeters, invocation);
+            AddPendingImpact(state, scope.EventId, target, impactPoint, spreadRadiusMeters, invocation, fireProfile);
         else if (!warnedMissingMeaningfulHistory)
         {
             warnedMissingMeaningfulHistory = true;
@@ -439,8 +516,11 @@ public static class OrreryPlasmaBolt
             return result;
 
         float referenceDps = focus.GetReferenceDps(OrrerySpellPower.ReferenceMode.Mean);
+        // Folded in before the focus bonus so this is exactly equivalent to
+        // lowering LightningDamageMultiplier, with the original left visible.
         result.DamageDps = focus.ApplySpellDamageBonus(referenceDps *
-            OrrerySpellCompendium.PlasmaBolt.LightningDamageMultiplier);
+            OrrerySpellCompendium.PlasmaBolt.LightningDamageMultiplier *
+            OrrerySpellCompendium.PlasmaBolt.StrikeDamageMultiplier);
         result.NeutralDamage = result.DamageDps *
             OrrerySpellCompendium.PlasmaBolt.IntegratedReferenceSeconds;
         result.CritChance = focus.CritChance;
@@ -528,14 +608,30 @@ public static class OrreryPlasmaBolt
 
             if (!damaged || confirmedDamage <= 0f)
                 continue;
+            // The confirmed strike remains the authored seed. Fire bonuses apply
+            // once, before either effect is created; spread copies this frozen value.
+            float burnBudget = ResolveDotBudget(pending.FireProfile, confirmedDamage,
+                DotBudgetMultiplier(DotKind.PlasmaBurn));
+            float immolationBudget = ResolveDotBudget(pending.FireProfile, confirmedDamage,
+                DotBudgetMultiplier(DotKind.Immolation));
             // Captured position survives destruction of the original target.
             if (destroyed)
-                SpreadAt(owner, state, pending.Position, null, confirmedDamage,
-                    evt.OccurredAt, pending.SpreadRadiusMeters, pending.CastId, pending.FireContributor);
+                SpreadAt(owner, state, pending.Position, null, burnBudget,
+                    evt.OccurredAt, pending.SpreadRadiusMeters, pending.CastId, pending.FireContributor, pending.FireProfile);
             else if (IsValidHostile(owner, target))
-                TryApplyBurn(owner, state, target, confirmedDamage,
+            {
+                // Both damage-over-time effects are seeded from the same
+                // confirmed hit and are independent afterwards: Plasma Burn
+                // spreads on its own schedule, Immolation stays on this target.
+                // Each scales the shared budget by its own multiplier and has
+                // its own reapply lockout, so neither blocks the other.
+                TryApplyDot(DotKind.PlasmaBurn, owner, state, target, burnBudget,
                     evt.OccurredAt, evt.EventId, pending.SpreadRadiusMeters,
-                    pending.CastId, pending.FireContributor);
+                    pending.CastId, pending.FireContributor, pending.FireProfile);
+                TryApplyDot(DotKind.Immolation, owner, state, target, immolationBudget,
+                    evt.OccurredAt, evt.EventId, 0f,
+                    pending.CastId, pending.FireContributor, pending.FireProfile);
+            }
         }
     }
 
@@ -543,7 +639,7 @@ public static class OrreryPlasmaBolt
         OwnerState state,
         uint eventId,
         GameShip target, Vector2 position, float spreadRadiusMeters,
-        OrreryCastInvocation invocation)
+        OrreryCastInvocation invocation, OrreryFocusProfile.Resolved fireProfile)
     {
         int free = -1;
         int oldest = -1;
@@ -571,6 +667,7 @@ public static class OrreryPlasmaBolt
 
         PendingImpact next = new PendingImpact();
         next.Active = true;
+        next.FireProfile = fireProfile;
         next.EventId = eventId;
         next.Target = target;
         next.Position = position;
@@ -611,31 +708,41 @@ public static class OrreryPlasmaBolt
     // Plasma Burn lifecycle / spread
     // ---------------------------------------------------------------------
 
-    private static bool TryApplyBurn(
+    internal static float ResolveDotBudget(OrreryFocusProfile.Resolved fireProfile,
+        float confirmedStrikeDamage, float multiplier)
+    {
+        return fireProfile.ApplySpellDamageBonus(Mathf.Max(0f, confirmedStrikeDamage) *
+            Mathf.Max(0f, multiplier));
+    }
+
+    private static bool TryApplyDot(
+        DotKind kind,
         GameShip owner,
         OwnerState state,
         GameShip target,
         float frozenBudget,
         float occurredAt,
         uint authoredEventId, float spreadRadiusMeters, ushort castId,
-        CoreCombat.ContributorKey fireContributor)
+        CoreCombat.ContributorKey fireContributor, OrreryFocusProfile.Resolved fireProfile)
     {
         if (!IsValidHostile(owner, target) || frozenBudget <= 0f)
+            return false;
+
+        if (frozenBudget <= 0f)
             return false;
 
         if (CoreCombatState.Has(
             owner,
             target,
-            OrreryCombat.PlasmaBurnRecent,
+            DotRecentKey(kind),
             CoreCombatState.Scope.OwnerTarget))
         {
             return false;
         }
 
         float age = Mathf.Max(0f, Time.time - occurredAt);
-        float burnDuration = OrrerySpellCompendium.PlasmaBolt.BurnDurationSeconds;
-        float lockoutDuration =
-            OrrerySpellCompendium.PlasmaBolt.ReinfectionLockoutSeconds;
+        float burnDuration = DotDurationSeconds(kind);
+        float lockoutDuration = DotLockoutSeconds(kind);
 
         // A very late confirmation can arrive after the five-second burn window.
         // Preserve the ten-second "has had Plasma Burn" history without inventing
@@ -647,7 +754,7 @@ public static class OrreryPlasmaBolt
                 CoreCombatState.ApplyAt(
                     owner,
                     target,
-                    OrreryCombat.PlasmaBurnRecent,
+                    DotRecentKey(kind),
                     CoreCombatState.Scope.OwnerTarget,
                     occurredAt,
                     authoredEventId,
@@ -665,7 +772,7 @@ public static class OrreryPlasmaBolt
         if (!CoreCombatState.ApplyAt(
             owner,
             target,
-            OrreryCombat.PlasmaBurn,
+            DotStateKey(kind),
             CoreCombatState.Scope.OwnerTarget,
             occurredAt,
             authoredEventId,
@@ -679,7 +786,7 @@ public static class OrreryPlasmaBolt
         if (!CoreCombatState.ApplyAt(
             owner,
             target,
-            OrreryCombat.PlasmaBurnRecent,
+            DotRecentKey(kind),
             CoreCombatState.Scope.OwnerTarget,
             occurredAt,
             authoredEventId,
@@ -690,27 +797,28 @@ public static class OrreryPlasmaBolt
             CoreCombatState.Remove(
                 owner,
                 target,
-                OrreryCombat.PlasmaBurn,
+                DotStateKey(kind),
                 CoreCombatState.Scope.OwnerTarget);
             return false;
         }
 
+        infection.Kind = kind;
         infection.Active = true;
         infection.VisualRetiring = false;
         infection.Target = target;
         infection.TotalBudget = frozenBudget;
         infection.RemainingBudget = frozenBudget;
         infection.AppliedAt = occurredAt;
-        infection.ExpiresAt = occurredAt +
-            OrrerySpellCompendium.PlasmaBolt.BurnDurationSeconds;
-        infection.NextTickAt = occurredAt +
-            OrrerySpellCompendium.PlasmaBolt.BurnTickIntervalSeconds;
+        infection.ExpiresAt = occurredAt + DotDurationSeconds(kind);
+        infection.NextTickAt = occurredAt + DotTickIntervalSeconds(kind);
         infection.NextSpreadAt = Mathf.Max(Time.time, occurredAt) +
             OrrerySpellCompendium.PlasmaBolt.SpreadScanIntervalSeconds;
         infection.TicksApplied = 0;
         infection.SpreadRadiusMeters = spreadRadiusMeters;
         infection.CastId = castId;
         infection.FireContributor = fireContributor;
+        infection.FireProfile = fireProfile;
+        // Both effects use native fire presentation; network groups retain separate lifetimes.
         infection.Visual = SpawnFauxBurnVisual(target);
         infection.ReleaseVisualAt = 0f;
         return true;
@@ -760,8 +868,7 @@ public static class OrreryPlasmaBolt
 
             TickBurnDamage(owner, state, infection, now);
 
-            if (infection.TicksApplied >=
-                    OrrerySpellCompendium.PlasmaBolt.BurnTickCount ||
+            if (infection.TicksApplied >= DotTickCount(infection.Kind) ||
                 now >= infection.ExpiresAt)
             {
                 ClearInfection(owner, infection, false);
@@ -774,6 +881,7 @@ public static class OrreryPlasmaBolt
         {
             Infection infection = state.Infections[i];
             if (infection == null || !infection.Active ||
+                !DotSpreads(infection.Kind) ||
                 now < infection.NextSpreadAt)
             {
                 continue;
@@ -791,8 +899,8 @@ public static class OrreryPlasmaBolt
         Infection infection,
         float now)
     {
-        int maxTicks = OrrerySpellCompendium.PlasmaBolt.BurnTickCount;
-        float interval = OrrerySpellCompendium.PlasmaBolt.BurnTickIntervalSeconds;
+        int maxTicks = DotTickCount(infection.Kind);
+        float interval = DotTickIntervalSeconds(infection.Kind);
         if (maxTicks <= 0 || interval <= 0f)
             return;
 
@@ -817,41 +925,35 @@ public static class OrreryPlasmaBolt
             if (tickDamage > 0f)
             {
                 float burnDps = infection.TotalBudget /
-                    Mathf.Max(0.01f,
-                        OrrerySpellCompendium.PlasmaBolt.BurnDurationSeconds);
+                    Mathf.Max(0.01f, DotDurationSeconds(infection.Kind));
                 state.BurnDamageScratch[0] = new Damageable.DamageData(
                     tickDamage,
                     burnDps);
 
-                // Plasma Burn intentionally has no native slot source: using the
-                // original weapon slot here would rerun native slot/on-kill proc
-                // semantics that the frozen faux-burn budget must not inherit.
-                // Star Vortex can only return MsgDamageResult for a remote-player
-                // target when a valid source slot exists, so this transaction is
-                // explicitly attempt-only instead of creating a NativeResult
-                // pending acknowledgement that can never resolve.
+                // Fire alone supplies native status/bypass and item proc context.
+                // These summary ticks do not wait for a damage acknowledgement.
                 CoreCombat.DamageScope scope = CoreCombat.BeginDamage(
                     owner,
                     infection.Target,
-                    OrreryCombat.PlasmaBurnTick,
+                    DotTickKey(infection.Kind),
                     infection.FireContributor,
                     CoreCombat.AcknowledgementMode.None,
                     CoreCombat.TrackingFlags.Summary, infection.CastId, owner);
                 try
                 {
-                    // Faux burn never rerolls the original crit/status/proc state.
-                    // The frozen amount is merely divided into Thermal packets.
+                    // Preserve the snapshot crit rather than rolling it again per tick.
+                    // Native Thermal status and kill traits come only from Fire.
                     OrreryDamageRouter.Route(
                         owner,
                         infection.Target,
                         Damageable.DamageType.Thermal,
                         state.BurnDamageScratch,
-                        0f,
+                        infection.FireProfile.StatusChance,
                         false,
                         infection.Target.transform.position,
-                        false,
+                        infection.FireProfile.BypassDamageLimit,
                         0f,
-                        null);
+                        infection.FireProfile.HasFocus ? infection.FireProfile.Donor : null);
                 }
                 finally
                 {
@@ -881,12 +983,13 @@ public static class OrreryPlasmaBolt
         }
 
         SpreadAt(owner, state, source.Target.transform.position, source.Target,
-            source.TotalBudget, now, source.SpreadRadiusMeters, source.CastId, source.FireContributor);
+            source.TotalBudget, now, source.SpreadRadiusMeters, source.CastId, source.FireContributor, source.FireProfile);
     }
 
     private static void SpreadAt(GameShip owner, OwnerState state, Vector2 center,
         GameShip sourceTarget, float totalBudget, float now, float spreadRadiusMeters,
-        ushort castId, CoreCombat.ContributorKey fireContributor)
+        ushort castId, CoreCombat.ContributorKey fireContributor,
+        OrreryFocusProfile.Resolved fireProfile)
     {
         if (PhysicsController.instance == null)
             return;
@@ -910,13 +1013,14 @@ public static class OrreryPlasmaBolt
 
             // Every descendant receives the ORIGINAL frozen payload, not whatever
             // happens to remain on the source infection at the moment of spread.
-            TryApplyBurn(
+            TryApplyDot(
+                DotKind.PlasmaBurn,
                 owner,
                 state,
                 candidate,
                 totalBudget,
                 now,
-                0U, spreadRadiusMeters, castId, fireContributor);
+                0U, spreadRadiusMeters, castId, fireContributor, fireProfile);
         }
     }
 
@@ -933,12 +1037,13 @@ public static class OrreryPlasmaBolt
             CoreCombatState.Remove(
                 owner,
                 infection.Target,
-                OrreryCombat.PlasmaBurn,
+                DotStateKey(infection.Kind),
                 CoreCombatState.Scope.OwnerTarget);
         }
 
         infection.Active = false;
         infection.TotalBudget = 0f;
+        infection.FireProfile = default(OrreryFocusProfile.Resolved);
         infection.RemainingBudget = 0f;
         infection.AppliedAt = 0f;
         infection.ExpiresAt = 0f;
@@ -1369,7 +1474,7 @@ public static class OrreryPlasmaBolt
         out Launcher launcher)
     {
         launcher = null;
-        ItemBase itemBase = Resources.Load<ItemBase>(LightningDonorPath);
+        ItemBase itemBase = ModContent.Load<ItemBase>(LightningDonorPath);
         if (itemBase == null)
         {
             Debug.LogError(

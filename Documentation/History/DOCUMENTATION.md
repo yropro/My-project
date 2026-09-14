@@ -1,3 +1,7 @@
+> Historical snapshot archived 2026-09-14. Current guidance starts in
+> [Skill development](../../SKILL_DEVELOPMENT.md). Do not treat this document as
+> the current implementation, backlog or validation result.
+
 # Development documentation
 
 Reviewed against the local source on 2026-09-14. Start here when adding skills or
@@ -7,11 +11,11 @@ resuming work from an old handoff.
 
 | Subject | Maintained reference |
 |---|---|
-| Networking and remote presentation | [Networking for skill authors](Assets/Leviathan/Content/Scripts/NETWORKING.md) |
-| Skill mechanics, focus inheritance, geometry and tuning | [Spell design standard](ORRERY_SPELL_DESIGN_IMPLEMENTATION_STANDARDS_V3.md) |
-| Authoritative persistent-spell ticking and teardown | [Gameplay lifetime standard](ORRERY_SPELL_LIFETIME_STANDARD.md) |
-| Installed-game API compatibility | [Native API compatibility](NATIVE_API_COMPATIBILITY.md) |
-| Automated network checks and their limits | [Networking validation](Assets/Leviathan/Content/Scripts/NETWORKING.md#validation) |
+| Networking and remote presentation | [Networking for skill authors](<../../Assets/Leviathan/Content/Scripts/NETWORKING.md>) |
+| Skill mechanics, focus inheritance, geometry and tuning | [Spell design standard](<ORRERY_SPELL_DESIGN_IMPLEMENTATION_STANDARDS_V3.md>) |
+| Authoritative persistent-spell ticking and teardown | [Gameplay lifetime standard](<ORRERY_SPELL_LIFETIME_STANDARD.md>) |
+| Installed-game API compatibility | [Native API compatibility](<../../NATIVE_API_COMPATIBILITY.md>) |
+| Automated network checks and their limits | [Networking validation](<../../Assets/Leviathan/Content/Scripts/NETWORKING.md#validation>) |
 
 These documents have different scopes; none should duplicate another's protocol
 tables. Networking belongs in Core and the per-mod networking adapters. Skill
@@ -39,7 +43,7 @@ to design packet formats or engine networking hooks.
 | `ORRERY_STATUS_D_TBD.md` | 2026-09-13 status snapshot, not the current backlog |
 | `ORRERY_PRESENTATION_NETWORK_STANDARD.md` | Redirect to the maintained networking guide |
 | `orrery_presentation_network_agent.md` | Historical pointer, not an implementation plan |
-| [Earlier network standard](Documentation/History/ORRERY_PRESENTATION_NETWORK_STANDARD_2026-09-13.md) | Archived six-record/send-prefix design |
+| [Earlier network standard](<ORRERY_PRESENTATION_NETWORK_STANDARD_2026-09-13.md>) | Archived six-record/send-prefix design |
 
 OpusMax's CoreWire review lives in the separate Notes_Readme_Documentation folder.
 Its proposal and patch are review artifacts; do not apply them over an integrated

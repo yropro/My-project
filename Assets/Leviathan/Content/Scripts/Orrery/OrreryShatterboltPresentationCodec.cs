@@ -1,5 +1,4 @@
 using StarVortex;
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 /// <summary>
@@ -9,13 +8,104 @@ using UnityEngine;
 /// </summary>
 public static class OrreryShatterboltPresentationCodec
 {
-    private const int FirstRecordIndex = 0;
-    private const int MaximumPartCount = 3;
-    private const byte GroupId = 0;
-    private const byte FlagOrbActive = 1 << 0;
-    private const int MaxPayloadBytes = 86;
 
-    private static readonly byte[] payloadScratch = new byte[MaxPayloadBytes];
+    private static readonly OrreryNetwork.Channel<ShatterboltWireState> Channel =
+        new OrreryNetwork.Channel<ShatterboltWireState>(
+            OrreryPresentationNetwork.CodecShatterbolt, WireShatterbolt);
+
+    /// <summary>
+    /// Wire-only view of the Shatterbolt payload. Deliberately separate from
+    /// OrreryNetwork.PresentationState: CoreWire.TryDecode starts from
+    /// default(T) and commits the whole struct, so decoding straight into
+    /// PresentationState would blank every field this codec does not own.
+    /// </summary>
+    internal struct ShatterboltWireState
+    {
+        public bool OrbActive;
+        public byte ImpactCount;
+        public float ExplosionRadiusMeters;
+        public Vector2 OrbPosition;
+        public Vector2 Impact0;
+        public Vector2 Impact1;
+        public Vector2 Impact2;
+        public Vector2 Impact3;
+        public Vector2 Impact4;
+        public Vector2 Impact5;
+        public Vector2 Impact6;
+        public Vector2 Impact7;
+        public Vector2 Impact8;
+        public Vector2 Impact9;
+
+        public Vector2 GetImpact(int index)
+        {
+            switch (index)
+            {
+                case 0: return Impact0;
+                case 1: return Impact1;
+                case 2: return Impact2;
+                case 3: return Impact3;
+                case 4: return Impact4;
+                case 5: return Impact5;
+                case 6: return Impact6;
+                case 7: return Impact7;
+                case 8: return Impact8;
+                default: return Impact9;
+            }
+        }
+
+        public void SetImpact(int index, Vector2 value)
+        {
+            switch (index)
+            {
+                case 0: Impact0 = value; break;
+                case 1: Impact1 = value; break;
+                case 2: Impact2 = value; break;
+                case 3: Impact3 = value; break;
+                case 4: Impact4 = value; break;
+                case 5: Impact5 = value; break;
+                case 6: Impact6 = value; break;
+                case 7: Impact7 = value; break;
+                case 8: Impact8 = value; break;
+                default: Impact9 = value; break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Orb flag and impact count lead, so both directions take the same
+    /// branches. Impacts are unrolled rather than looped because each is a
+    /// distinct field and CoreWire takes them by ref; the count gate above
+    /// each one is what makes the layout conditional.
+    /// </summary>
+    internal static void WireShatterbolt(
+        ref CoreWire wire,
+        ref ShatterboltWireState state)
+    {
+        wire.Flags(ref state.OrbActive);
+        wire.Byte(ref state.ImpactCount);
+        if (!wire.Ok)
+            return;
+        if (state.ImpactCount > OrrerySpellCompendium.Shatterbolt.MaximumImpacts)
+        {
+            wire.Fail();
+            return;
+        }
+
+        wire.Positive(ref state.ExplosionRadiusMeters);
+        if (state.OrbActive)
+            wire.Position(ref state.OrbPosition);
+
+        if (state.ImpactCount > 0) wire.Position(ref state.Impact0);
+        if (state.ImpactCount > 1) wire.Position(ref state.Impact1);
+        if (state.ImpactCount > 2) wire.Position(ref state.Impact2);
+        if (state.ImpactCount > 3) wire.Position(ref state.Impact3);
+        if (state.ImpactCount > 4) wire.Position(ref state.Impact4);
+        if (state.ImpactCount > 5) wire.Position(ref state.Impact5);
+        if (state.ImpactCount > 6) wire.Position(ref state.Impact6);
+        if (state.ImpactCount > 7) wire.Position(ref state.Impact7);
+        if (state.ImpactCount > 8) wire.Position(ref state.Impact8);
+        if (state.ImpactCount > 9) wire.Position(ref state.Impact9);
+    }
 
     // The gameplay invocation currently exposes an 8-bit presentation sequence.
     // Lift that into a transport-owned 32-bit generation by observing owner or
@@ -35,124 +125,45 @@ public static class OrreryShatterboltPresentationCodec
             state.ShatterboltImpactCount,
             0,
             OrrerySpellCompendium.Shatterbolt.MaximumImpacts);
-        int payloadLength = 6 +
-            (state.ShatterboltOrbActive ? 8 : 0) +
-            impactCount * 8;
-        if (payloadLength > MaxPayloadBytes)
-            return;
 
-        int offset = 0;
-        payloadScratch[offset++] = state.ShatterboltOrbActive
-            ? FlagOrbActive
-            : (byte)0;
-        payloadScratch[offset++] = (byte)impactCount;
-        WriteFloat(payloadScratch, ref offset, state.ShatterboltExplosionRadiusMeters);
-
-        if (state.ShatterboltOrbActive)
-            WritePosition(payloadScratch, ref offset, state.ShatterboltOrbPosition);
-
+        // Radius, impact bound and record count are all enforced by the format
+        // and the channel; an over-large or non-finite frame simply fails to
+        // encode and nothing is published.
+        ShatterboltWireState wireState = default(ShatterboltWireState);
+        wireState.OrbActive = state.ShatterboltOrbActive;
+        wireState.ImpactCount = (byte)impactCount;
+        wireState.ExplosionRadiusMeters = state.ShatterboltExplosionRadiusMeters;
+        wireState.OrbPosition = state.ShatterboltOrbPosition;
         for (int i = 0; i < impactCount; i++)
-            WritePosition(payloadScratch, ref offset, state.GetShatterboltImpact(i));
+            wireState.SetImpact(i, state.GetShatterboltImpact(i));
 
-        int partCount = RequiredPartCount(offset);
-        if (partCount <= 0)
-            return;
-
-        uint generation = ResolveGeneration(owner, state.ShatterboltCastSequence);
-        OrreryPresentationNetwork.WriteGroup(
-            FirstRecordIndex,
-            OrreryPresentationNetwork.CodecShatterbolt,
-            GroupId,
-            partCount,
-            generation,
-            payloadScratch,
-            offset);
+        Channel.Publish(
+            ResolveGeneration(owner, state.ShatterboltCastSequence),
+            ref wireState);
     }
 
     public static bool TryRead(
         GameShip remoteOwner,
         ref OrreryNetwork.PresentationState state)
     {
-        OrreryPresentationNetwork.GroupReader reader =
-            default(OrreryPresentationNetwork.GroupReader);
-        bool found = false;
-        for (int partCount = 1; partCount <= MaximumPartCount; partCount++)
-        {
-            if (OrreryPresentationNetwork.TryReadGroup(
-                    remoteOwner,
-                    FirstRecordIndex,
-                    OrreryPresentationNetwork.CodecShatterbolt,
-                    GroupId,
-                    partCount,
-                    out reader))
-            {
-                found = true;
-                break;
-            }
-        }
-
-        if (!found || reader.Length < 6)
-            return false;
-
-        byte flags = reader.Byte();
-        if ((flags & ~FlagOrbActive) != 0)
-            return false;
-
-        bool orbActive = (flags & FlagOrbActive) != 0;
-        int impactCount = reader.Byte();
-        if (impactCount > OrrerySpellCompendium.Shatterbolt.MaximumImpacts)
-            return false;
-
-        int expectedLength = 6 + (orbActive ? 8 : 0) + impactCount * 8;
-        if (reader.Length != expectedLength ||
-            expectedLength > MaxPayloadBytes ||
-            RequiredPartCount(expectedLength) != reader.PartCount)
-        {
-            return false;
-        }
-
-        float radiusMeters = ReadFloat(ref reader);
-        if (!OrreryNetwork.IsFinite(radiusMeters) || radiusMeters <= 0f)
+        ShatterboltWireState wireState = default(ShatterboltWireState);
+        uint generation;
+        if (!Channel.TryRead(remoteOwner, ref wireState, out generation))
             return false;
 
         OrreryNetwork.PresentationState decoded = state;
-        decoded.ShatterboltGeneration = reader.Generation;
-        decoded.ShatterboltCastSequence = (byte)(reader.Generation & 0xFFu);
-        decoded.ShatterboltImpactCount = (byte)impactCount;
-        decoded.ShatterboltExplosionRadiusMeters = radiusMeters;
-        decoded.ShatterboltOrbActive = orbActive;
-
-        if (orbActive)
-        {
-            decoded.ShatterboltOrbPosition = ReadPosition(ref reader);
-            if (!OrreryNetwork.IsFinite(decoded.ShatterboltOrbPosition))
-                return false;
-        }
-
-        for (int i = 0; i < impactCount; i++)
-        {
-            Vector2 position = ReadPosition(ref reader);
-            if (!OrreryNetwork.IsFinite(position))
-                return false;
-            decoded.SetShatterboltImpact(i, position);
-        }
-
-        if (reader.Remaining != 0)
-            return false;
+        decoded.ShatterboltGeneration = generation;
+        decoded.ShatterboltCastSequence = (byte)(generation & 0xFFu);
+        decoded.ShatterboltImpactCount = wireState.ImpactCount;
+        decoded.ShatterboltExplosionRadiusMeters = wireState.ExplosionRadiusMeters;
+        decoded.ShatterboltOrbActive = wireState.OrbActive;
+        decoded.ShatterboltOrbPosition = wireState.OrbPosition;
+        for (int i = 0; i < wireState.ImpactCount; i++)
+            decoded.SetShatterboltImpact(i, wireState.GetImpact(i));
 
         decoded.ShatterboltPresent = true;
         state = decoded;
         return true;
-    }
-
-    private static int RequiredPartCount(int payloadLength)
-    {
-        for (int parts = 1; parts <= MaximumPartCount; parts++)
-        {
-            if (payloadLength <= OrreryPresentationNetwork.GetPayloadCapacity(parts))
-                return parts;
-        }
-        return 0;
     }
 
     private static uint ResolveGeneration(GameShip owner, byte castSequence)
@@ -173,39 +184,4 @@ public static class OrreryShatterboltPresentationCodec
         return generationCounter;
     }
 
-    [StructLayout(LayoutKind.Explicit)]
-    private struct FloatBits
-    {
-        [FieldOffset(0)] public float Value;
-        [FieldOffset(0)] public uint Bits;
-    }
-
-    private static void WriteFloat(byte[] buffer, ref int offset, float value)
-    {
-        FloatBits bits = new FloatBits { Value = value };
-        buffer[offset++] = (byte)bits.Bits;
-        buffer[offset++] = (byte)(bits.Bits >> 8);
-        buffer[offset++] = (byte)(bits.Bits >> 16);
-        buffer[offset++] = (byte)(bits.Bits >> 24);
-    }
-
-    private static float ReadFloat(ref OrreryPresentationNetwork.GroupReader reader)
-    {
-        uint bits = (uint)reader.Byte() |
-            ((uint)reader.Byte() << 8) |
-            ((uint)reader.Byte() << 16) |
-            ((uint)reader.Byte() << 24);
-        return new FloatBits { Bits = bits }.Value;
-    }
-
-    private static void WritePosition(byte[] buffer, ref int offset, Vector2 position)
-    {
-        WriteFloat(buffer, ref offset, position.x);
-        WriteFloat(buffer, ref offset, position.y);
-    }
-
-    private static Vector2 ReadPosition(ref OrreryPresentationNetwork.GroupReader reader)
-    {
-        return new Vector2(ReadFloat(ref reader), ReadFloat(ref reader));
-    }
 }

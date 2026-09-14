@@ -82,7 +82,9 @@ public static class OrreryNetwork
                 OrreryPresentationNetwork.GroupReader group;
                 if (!OrreryPresentationNetwork.TryReadGroup(owner, 0, codecId, groupId, parts, out group))
                     continue;
-                if (group.Length > incoming.Length) return false;
+                if (group.Length > incoming.Length || group.Generation == 0 ||
+                    (parts > 1 && group.Length <=
+                        OrreryPresentationNetwork.GetPayloadCapacity(parts - 1))) return false;
                 for (int i = 0; i < group.Length; i++) incoming[i] = group.Byte();
                 if (!CoreWire.TryDecode(incoming, 0, group.Length, format, ref state)) return false;
                 generation = group.Generation;

@@ -240,11 +240,11 @@ public static class CoreWireSelfTest
     /// path an escaping exception becomes a malformed-message strike against a
     /// peer under NetSession.HandleData, so the safe entry points contain it.
     ///
-    /// This narrows the throw surface to the format method only. It does not
-    /// make the whole receive path exception-proof - notably,
-    /// OrreryPresentationNetwork.PublishForSend uses try/finally rather than
-    /// try/catch, so throws from capture code that runs before any wire call
-    /// still escape into native packet sending.
+    /// This narrows the throw surface to the format method only. Capture code
+    /// that runs before any wire call - reflection into native weapon state,
+    /// array indexing during sampling - is outside this boundary and is caught
+    /// one level up by CoreNetworkPresentation.Publish, which also clears local
+    /// slots so a half-written group is never serialised.
     /// </summary>
     private static void ContainsThrowingFormat()
     {

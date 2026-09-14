@@ -23,8 +23,11 @@ public static class OrreryCombat
         public const byte ShatterboltFrostBurst = 5;
         public const byte PlasmaBolt = 6;
         public const byte PlasmaBurnTick = 7;
+        public const byte ImmolationTick = 8;
         public const byte PlasmaBurnState = 64;
         public const byte PlasmaBurnRecent = 65;
+        public const byte ImmolationState = 66;
+        public const byte ImmolationRecent = 67;
         public const byte CastInvoked = 128;
     }
 
@@ -47,8 +50,14 @@ public static class OrreryCombat
         CoreCombat.SemanticKey.Create(SkillId, EffectIds.PlasmaBurnTick);
     public static readonly CoreCombat.SemanticKey PlasmaBurn =
         CoreCombat.SemanticKey.Create(SkillId, EffectIds.PlasmaBurnState);
+    public static readonly CoreCombat.SemanticKey ImmolationTick =
+        CoreCombat.SemanticKey.Create(SkillId, EffectIds.ImmolationTick);
+    public static readonly CoreCombat.SemanticKey Immolation =
+        CoreCombat.SemanticKey.Create(SkillId, EffectIds.ImmolationState);
     public static readonly CoreCombat.SemanticKey PlasmaBurnRecent =
         CoreCombat.SemanticKey.Create(SkillId, EffectIds.PlasmaBurnRecent);
+    public static readonly CoreCombat.SemanticKey ImmolationRecent =
+        CoreCombat.SemanticKey.Create(SkillId, EffectIds.ImmolationRecent);
 
     public static CoreCombat.ContributorKey SatelliteFor(
         OrreryCastInvocation invocation, OrreryElement element)

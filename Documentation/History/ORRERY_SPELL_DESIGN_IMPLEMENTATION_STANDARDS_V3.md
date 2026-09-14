@@ -1,3 +1,7 @@
+> Historical snapshot archived 2026-09-14. Current guidance starts in
+> [Skill development](../../SKILL_DEVELOPMENT.md). Do not treat this document as
+> the current implementation, backlog or validation result.
+
 # Orrery Spell Design & Implementation Standards
 
 **Project:** Star Vortex — Orrery / Celestial Mage / Sphereweaver  
@@ -10,8 +14,8 @@
 # 1. Scope and source evidence
 
 **Reviewed 2026-09-14.** This document governs skill mechanics, inheritance,
-geometry and tuning. [DOCUMENTATION.md](DOCUMENTATION.md) identifies the maintained
-reference for each subject. [Networking for skill authors](Assets/Leviathan/Content/Scripts/NETWORKING.md) governs
+geometry and tuning. [DOCUMENTATION.md](<DOCUMENTATION.md>) identifies the maintained
+reference for each subject. [Networking for skill authors](<../../Assets/Leviathan/Content/Scripts/NETWORKING.md>) governs
 transport, presentation callbacks, serialization and cross-owner grants.
 
 Follow explicit user requirements. Check source for implemented behavior and the
@@ -1015,7 +1019,7 @@ Remote replicas reconstruct visuals and never run a second damage simulation.
 For buffs on another player, the recipient's authoritative local ship applies the
 registered grant handler; the sender must not mutate a remote replica.
 
-Implement networking through [Networking for skill authors](Assets/Leviathan/Content/Scripts/NETWORKING.md).
+Implement networking through [Networking for skill authors](<../../Assets/Leviathan/Content/Scripts/NETWORKING.md>).
 `OrreryNetwork` / `LeviathanNetwork` own mod-specific contracts; Core owns transport,
 validation and engine lifecycle hooks. Skills expose semantic state and visual
 behavior. They do not add send/receive hooks or duplicate JSON/byte parsing.

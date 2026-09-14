@@ -1,10 +1,14 @@
+> Historical snapshot archived 2026-09-14. Current guidance starts in
+> [Skill development](../../SKILL_DEVELOPMENT.md). Do not treat this document as
+> the current implementation, backlog or validation result.
+
 # Orrery Implementation Handoff
 
 > **Historical snapshot (2026-09-11); not current instructions or status.**
 > Labeled on 2026-09-14. Preserve the findings below as evidence of that snapshot;
 > do not copy its tuning, native signatures, missing-feature list or next-step plan
 > into current work without checking the source. Start with
-> [DOCUMENTATION.md](DOCUMENTATION.md) and [current networking](Assets/Leviathan/Content/Scripts/NETWORKING.md).
+> [DOCUMENTATION.md](<DOCUMENTATION.md>) and [current networking](<../../Assets/Leviathan/Content/Scripts/NETWORKING.md>).
 
 **Branch:** `skill-trees`  
 **State:** runtime-foundation chunk implemented; not yet claimed compile/playtest/coop verified  

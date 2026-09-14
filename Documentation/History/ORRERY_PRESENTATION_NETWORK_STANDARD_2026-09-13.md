@@ -3,7 +3,7 @@
 **Archived on 2026-09-14. Not current implementation guidance.**
 The document below describes the old six-record bank and send-prefix hook.
 Use [the current networking guide](../../Assets/Leviathan/Content/Scripts/NETWORKING.md) and
-[the documentation index](../../DOCUMENTATION.md).
+[Skill development](../../SKILL_DEVELOPMENT.md).
 The original text is preserved below for design history.
 
 ---

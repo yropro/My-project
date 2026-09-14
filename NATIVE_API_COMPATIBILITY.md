@@ -1,7 +1,7 @@
 # Native API compatibility
 
 **Scope:** installed-game integration. Reviewed 2026-09-14.
-Start with [DOCUMENTATION.md](DOCUMENTATION.md) for the other development guides.
+Start with [Skill development](SKILL_DEVELOPMENT.md) for the other development guides.
 
 ## Evidence before bindings
 
@@ -14,6 +14,26 @@ Check reflected targets and full overload signatures against the installed game'
 `Star Vortex_Data/Managed/Assembly-CSharp.dll`. Compilation against the editor
 reference alone does not establish runtime compatibility. Do not copy old method
 signatures from the historical precompile audit.
+
+## Developer reference and build environment
+
+The [developer's modding reference](<../starvortex/Notes_Readme_Documentation/MODDING_REFERENCE.md>)
+is a verbatim external source for v0.8.21, generated 2026-09-14. It identifies Mono,
+URP 2D and Unity 2022.3.62f2, requiring the same Unity version for AssetBundles.
+The local standalone test runner currently defaults to 2022.3.62f1; a successful
+DLL check there does not validate f2 bundle packaging. Do not silently upgrade the
+project or treat compiler success as proof of compatible assets.
+
+DLL initialization precedes bundle loading. A failed `Init`/Harmony patch marks
+the mod as errored and prevents its bundles loading, explaining missing classes
+and missing-mod save warnings after a DLL load failure. Do not access Main-scene
+singletons during Splash initialization. Load runtime content through `ModContent`
+to honor overrides. The SDK uses an asmdef and generated `components.json` to
+restore native components; missing native scripts in the mod editor can be expected.
+
+That reference deliberately does not repeat signatures; inspect the installed
+assembly for those. The older decompile in the notes still has boolean critical
+arguments and is not evidence of the installed ABI.
 
 ## Critical-hit boundary
 

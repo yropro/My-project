@@ -1,3 +1,7 @@
+> Historical snapshot archived 2026-09-14. Current guidance starts in
+> [Skill development](../../SKILL_DEVELOPMENT.md). Do not treat this document as
+> the current implementation, backlog or validation result.
+
 # Orrery Spell Lifetime Standard
 
 **Project:** Star Vortex — Orrery / Celestial Mage / Sphereweaver  
@@ -7,9 +11,9 @@
 
 ---
 
-See [DOCUMENTATION.md](DOCUMENTATION.md) for reference scopes.
+See [DOCUMENTATION.md](<DOCUMENTATION.md>) for reference scopes.
 Remote presentation lifecycle and network exception containment are governed by
-[Networking for skill authors](Assets/Leviathan/Content/Scripts/NETWORKING.md). Shared presentation callbacks do not
+[Networking for skill authors](<../../Assets/Leviathan/Content/Scripts/NETWORKING.md>). Shared presentation callbacks do not
 replace or duplicate this authoritative gameplay fixed-step dispatcher.
 
 # 1. Purpose
