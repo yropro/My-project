@@ -329,9 +329,8 @@ public static class OrreryPresentationNetwork
 
     /// <summary>
     /// Samples the local Orrery presentation immediately before Core serializes
-    /// this ship-state packet. Primary spell state claims the bank first,
-    /// Shatterbolt/Plasma fill their bounded history/refresh needs next, and
-    /// secondary reflected Magma projectiles consume only leftover capacity.
+    /// this ship-state packet. The current active legacy spell gets first claim on
+    /// the bank; bounded Shatterbolt/Plasma tail state then fills remaining space.
     /// Gameplay remains owner-authoritative regardless of presentation pressure.
     /// </summary>
     public static void PublishForSend()
@@ -355,9 +354,6 @@ public static class OrreryPresentationNetwork
             }
 
             OrreryPlasmaBoltPresentation.Publish();
-
-            if (owner != null && OrreryRuntime.IsActive(owner))
-                OrreryReflectedMagmaPresentation.Publish(owner);
         }
         finally
         {
