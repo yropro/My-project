@@ -202,6 +202,11 @@ public static class OrreryColdFusionPresentationLease
         }
     }
 
+    /// <summary>
+    /// Bare Unity destruction can be a harmless remote-replica replacement. Keep
+    /// the player-id lease in that case and let Tick attach it to the replacement
+    /// replica for only the authored remaining duration.
+    /// </summary>
     public static void OnShipDestroyed(GameShip ship)
     {
         if (object.ReferenceEquals(ship, null))
@@ -216,11 +221,32 @@ public static class OrreryColdFusionPresentationLease
                 continue;
             }
 
-            // Keep the player-id lease alive until its authored expiry. If native
-            // networking rebuilds this replica, Tick will bind the aura to the new
-            // GameShip for only the remaining duration.
             lease.BoundShip = null;
             leases[i] = lease;
+        }
+    }
+
+    /// <summary>
+    /// Native GameShip.Destroyed is an actual gameplay death/retirement boundary,
+    /// not merely a replica object replacement. The timed gameplay effect dies with
+    /// that ship, so its presentation lease must not migrate onto a respawned ship.
+    /// </summary>
+    public static void OnShipDied(GameShip ship)
+    {
+        if (object.ReferenceEquals(ship, null))
+            return;
+
+        for (int i = 0; i < leases.Length; i++)
+        {
+            Lease lease = leases[i];
+            if (!lease.Active ||
+                !object.ReferenceEquals(lease.BoundShip, ship))
+            {
+                continue;
+            }
+
+            OrreryColdFusionPresentation.Hide(ship);
+            leases[i] = default(Lease);
         }
     }
 
@@ -293,6 +319,15 @@ public static class OrreryColdFusionPresentationLeaseTickPatch
     public static void Postfix()
     {
         OrreryColdFusionPresentationLease.Tick();
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "Destroyed")]
+public static class OrreryColdFusionPresentationLeaseShipDiedPatch
+{
+    public static void Prefix(GameShip __instance)
+    {
+        OrreryColdFusionPresentationLease.OnShipDied(__instance);
     }
 }
 
