@@ -5,10 +5,11 @@ using System.Reflection;
 using UnityEngine;
 
 /// <summary>
-/// Presentation only. Plasma uses explicit groups in the shared Orrery bank:
-/// record 3 carries the brief bolt stroke; records 4-5 carry bounded rotating
-/// burn-visual refreshes. Gameplay spread, damage and reinfection lockout remain
-/// owner-authoritative in OrreryPlasmaBolt.
+/// Presentation only. Plasma uses explicit groups in the shared multiplexed Orrery
+/// bank. Preferred record locations are only packing hints; readers identify the
+/// stroke and burn-refresh groups by codec/group headers wherever they were packed.
+/// Gameplay spread, damage and reinfection lockout remain owner-authoritative in
+/// OrreryPlasmaBolt.
 /// </summary>
 public static class OrreryPlasmaBoltPresentation
 {
@@ -198,14 +199,11 @@ public static class OrreryPlasmaBoltPresentation
             }
         }
 
-        // Explicit absence of all Plasma groups means the source currently has no
-        // presentable Plasma state. This mirrors the old missing-slot clear path.
-        if (!hasStroke && !hasBurnRefresh)
-        {
-            Forget(owner);
-            return;
-        }
-
+        // The physical presentation bank is multiplexed. A group can be absent
+        // from one send because another higher-priority presentation claimed the
+        // bounded records, so absence is not allowed to destroy already-observed
+        // timer-backed visuals. The bolt and each burn already carry their own
+        // authoritative presentation lifetime/refresh backstop.
         OrreryPlasmaBolt.TickBoltVisual(state.Bolt, owner, Time.time);
         for (int i = 0; i < state.Burns.Length; i++)
         {
@@ -217,6 +215,31 @@ public static class OrreryPlasmaBoltPresentation
                 ClearBurn(burn);
             }
         }
+
+        if (!hasStroke && !hasBurnRefresh &&
+            Time.time >= state.Bolt.BoltVisibleUntil &&
+            !HasActiveBurns(state))
+        {
+            Forget(owner);
+        }
+    }
+
+    private static bool HasActiveBurns(RemoteState state)
+    {
+        if (state == null)
+            return false;
+
+        for (int i = 0; i < state.Burns.Length; i++)
+        {
+            BurnVisual burn = state.Burns[i];
+            if (burn != null && burn.Target != null &&
+                Time.time < burn.ExpiresAt &&
+                Time.unscaledTime < burn.RefreshUntil)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static bool TryReadStroke(
@@ -493,6 +516,20 @@ public static class OrreryPlasmaBoltRemoteRenderPatch
     {
         if (__instance != null)
             OrreryPlasmaBoltPresentation.Tick(__instance.gameShip);
+    }
+}
+
+[HarmonyPatch(typeof(GameShip), "OnDestroy")]
+public static class OrreryPlasmaBoltRemoteShipDestroyedPatch
+{
+    public static void Prefix(GameShip __instance)
+    {
+        if (__instance == null)
+            return;
+
+        OrreryPlasmaBoltPresentation.ForgetTarget(__instance);
+        if (__instance.IsRemotePlayer())
+            OrreryPlasmaBoltPresentation.Forget(__instance);
     }
 }
 
