@@ -117,19 +117,10 @@ using UnityEngine;
 /// ---------------------------------------------------------------------------
 /// SIZE
 /// ---------------------------------------------------------------------------
-/// A typical native PlayerShipState is 44 bytes (41 fixed plus three empty
-/// array counts). Header is 5 bytes. A dynamic block with one active skill slot
-/// is about 8; an idle packet carries a one-byte zero count instead. The spec
-/// block for the current node set is about 27. Worst observed case is therefore
-/// roughly 84 bytes on the packets that carry a spec block and about 57 on the
-/// rest, dropping to 50 when no skill is active.
-///
-/// LiteNetLib does not fragment DeliveryMethod.Sequenced; NetPeer.Send throws
-/// TooBigPacketException past MTU minus header, and LiteNetLibTransport.Send has
-/// no try/catch. The native packet is variable length (auto targets, tractor
-/// containers, grapple links) with a worst case near 1044 bytes, so this class
-/// refuses to append anything once the native packet is already large. See
-/// MaxCombinedBytes.
+/// The Core header is 6 bytes. Payload size is bounded by MaxPayloadBytes and
+/// the finished native + Core packet is additionally bounded by MaxCombinedBytes.
+/// Dynamic presentation therefore degrades by omission on an unusually large
+/// native packet instead of risking LiteNetLib's non-fragmenting Sequenced path.
 ///
 /// ---------------------------------------------------------------------------
 /// FAILURE POLICY
@@ -179,7 +170,7 @@ public static class CoreNetwork
     public const int MaxClassNodes = 512;
     private const int MaxPackedSpecBytes = MaxClassNodes / 2;
 
-    /// <summary>schemaHash (2) + contentHash (4) + nodeCount (1).</summary>
+    /// <summary>classId (1) + schemaHash (2) + contentHash (4) + nodeCount (2).</summary>
     private const int SpecBlockHeaderBytes = 9;
 
     // Skill slot ids for the dynamic block. Stable forever once shipped; a
@@ -213,6 +204,16 @@ public static class CoreNetwork
     public const byte SlotConstrictor = 4;
     public const byte SlotBehemoth = 5;
     public const byte SlotOrrery = 6;
+
+    /// <summary>Use after constructing an owner-controlled native follower.
+    /// Native reconciliation scans these flags; do not also publish the same
+    /// entity through star authority. The caller still sets its owner/team.</summary>
+    public static void ConfigurePlayerOwnedEntity(GameShip entity)
+    {
+        if (entity == null) return;
+        entity.netStarEntity = false;
+        entity.netPlayerEntity = true;
+    }
 
     private const int MaxSlots = 16;
     private const int MaxSlotBytes = 32;
@@ -437,7 +438,6 @@ public static class CoreNetwork
     private static readonly Dictionary<MsgDamageEvent, CoreCombat.CombatEventMetadata>
         combatEventMetadata =
             new Dictionary<MsgDamageEvent, CoreCombat.CombatEventMetadata>(256);
-
     private static readonly Dictionary<MsgDamageResult, CoreCombat.CombatResultMetadata>
         combatResultMetadata =
             new Dictionary<MsgDamageResult, CoreCombat.CombatResultMetadata>(256);
@@ -569,7 +569,7 @@ public static class CoreNetwork
             writer.Write(CombatTrailerMagic);
             writer.Write(CombatProtocolVersion);
             writer.Write(CombatTrailerEvent);
-            writer.Write((ushort)payloadLength);
+            writer.Write((byte)payloadLength);
         }
         catch (Exception ex)
         {
@@ -635,7 +635,7 @@ public static class CoreNetwork
             writer.Write(CombatTrailerMagic);
             writer.Write(CombatProtocolVersion);
             writer.Write(CombatTrailerResult);
-            writer.Write((ushort)payloadLength);
+            writer.Write((byte)payloadLength);
         }
         catch (Exception ex)
         {
@@ -1031,6 +1031,7 @@ public static class CoreNetwork
 
         openSlotIndex = index;
         localSlotLengths[index] = 0;
+        localSlotGroups[index] = 0;
 
         writer.Offset = index * MaxSlotBytes;
         writer.Written = 0;
@@ -1062,6 +1063,18 @@ public static class CoreNetwork
     /// Removes one outgoing slot, shifting the rest down. Only used on the
     /// error paths where a slot was opened but never completed.
     /// </summary>
+    private static readonly byte[] localSlotGroups = new byte[MaxSlots];
+    private static readonly bool[] selectedSlots = new bool[MaxSlots];
+
+    /// <summary>Mark completed consecutive slot ids as one optional group.
+    /// Publication order determines priority. Ungrouped slots stay essential.</summary>
+    public static void GroupLocalSlots(byte firstSlotId, int count)
+    {
+        for (int i = 0; i < localSlotCount; i++)
+            if (localSlotIds[i] >= firstSlotId && localSlotIds[i] < firstSlotId + count)
+                localSlotGroups[i] = firstSlotId;
+    }
+
     private static void RemoveSlot(int index)
     {
         if (index < 0 || index >= localSlotCount)
@@ -1071,6 +1084,7 @@ public static class CoreNetwork
         {
             localSlotIds[i] = localSlotIds[i + 1];
             localSlotLengths[i] = localSlotLengths[i + 1];
+            localSlotGroups[i] = localSlotGroups[i + 1];
 
             Buffer.BlockCopy(
                 localSlotBuffer,
@@ -1310,6 +1324,7 @@ public static class CoreNetwork
         localSpecPacked = null;
         localSpecContentHash = 0u;
 
+        CoreNetworkPresentation.Reset();
         CoreClassRuntime.Reset();
         ResetCombatTransport();
         CoreCombat.Reset();
@@ -1446,6 +1461,7 @@ public static class CoreNetwork
 
         try
         {
+            if (!CoreNetworkPresentation.Publish()) return;
             packetCounter++;
 
             if (openSlotIndex >= 0)
@@ -1488,7 +1504,7 @@ public static class CoreNetwork
             writer.Write(Magic1);
             writer.Write(ProtocolVersion);
             writer.Write(blockFlags);
-            writer.Write((byte)payloadLength);
+            writer.Write((ushort)payloadLength);
             writer.Write(scratch, 0, payloadLength);
 
             // Only count the burst down against packets that actually carried
@@ -1527,19 +1543,24 @@ public static class CoreNetwork
         bool sendSpec = wantSpec && localSpecPacked != null && specLength <= budget;
         if (sendSpec && sentSpecLastPacket && dynamicLength + specLength > budget && localSlotCount > 0)
             sendSpec = false;
-        bool sendDynamic = dynamicLength <= budget - (sendSpec ? specLength : 0);
+        bool sendDynamic = CoreNetworkBudget.Select(localSlotCount, localSlotLengths,
+            localSlotGroups, budget - (sendSpec ? specLength : 0), selectedSlots) >= 0;
         int position = 0;
         if (sendDynamic)
         {
             scratch[position++] = (byte)CoreClassRuntime.ActiveLocalClass;
-            scratch[position++] = (byte)localSlotCount;
+            int countOffset = position++;
+            int selectedCount = 0;
             for (int i = 0; i < localSlotCount; i++)
             {
+                if (!selectedSlots[i]) continue;
+                selectedCount++;
                 scratch[position++] = localSlotIds[i];
                 scratch[position++] = (byte)localSlotLengths[i];
                 Buffer.BlockCopy(localSlotBuffer, i * MaxSlotBytes, scratch, position, localSlotLengths[i]);
                 position += localSlotLengths[i];
             }
+            scratch[countOffset] = (byte)selectedCount;
             blockFlags |= BlockFlagDynamic;
         }
         if (sendSpec)
@@ -1700,7 +1721,8 @@ public static class CoreNetwork
             byte blockFlags = reader.ReadByte();
             int payloadLength = reader.ReadUInt16();
 
-            if (payloadLength <= 0 ||
+            if (blockFlags == 0 || (blockFlags & ~(BlockFlagDynamic | BlockFlagSpec)) != 0 ||
+                payloadLength <= 0 ||
                 payloadLength > MaxPayloadBytes ||
                 stream.Length - stream.Position < payloadLength)
             {

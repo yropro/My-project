@@ -48,7 +48,7 @@ public class LeviathanMod : IStarVortexMod
         // Registration cannot rely on Harmony hooks: PatchAll runs below.
         // These calls are idempotent and independent of policy registration.
         CoreNetwork.RegisterDefaultSlots();
-        OrreryPresentationNetwork.EnsureInitialized();
+        OrreryNetwork.Initialize();
 
         // Catalogs and slot identities must exist before any lifecycle callback.
         if (CoreSpecializationPolicies.Get(CoreClassId.Leviathan) == null)

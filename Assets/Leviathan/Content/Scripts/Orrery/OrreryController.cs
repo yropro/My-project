@@ -603,6 +603,13 @@ public sealed class OrreryController : MonoBehaviour
         satellite.disableMinibars = true;
         satellite.grantXp = false;
         satellite.lootTables = new LootTable[0];
+
+        // Squadron.Build spawns followers through Star.SpawnShip, which initially
+        // classifies them as star-owned. Orrery satellites belong to the local
+        // player, matching native drones/spawners, so switch authority family
+        // synchronously before NetWorldBridge or star authority can reconcile them.
+        CoreNetwork.ConfigurePlayerOwnedEntity(satellite);
+
         satellite.SetTurnMode(GameShip.TurnMode.Independent);
         satellite.SetTarget(null);
         satellite.StopActivating(null);

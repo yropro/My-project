@@ -193,9 +193,9 @@ public static class LeviathanPredatorRuntime
         public static readonly CoreSpecializationKnob HoldOffset = F("hold.offset", "Held Prey Offset", "m");
         public static readonly CoreSpecializationKnob HoldBreakDistance = F("hold.break_distance", "Hold Break Distance", "m");
         public static readonly CoreSpecializationKnob PullSpeed = F("pull.speed", "Pull Speed", "m/s");
-        public static readonly CoreSpecializationKnob PullAcceleration = F("pull.acceleration", "Pull Acceleration", "m/s²");
+        public static readonly CoreSpecializationKnob PullAcceleration = F("pull.acceleration", "Pull Acceleration", "m/sÂ²");
         public static readonly CoreSpecializationKnob ReturnSpeed = F("return.speed", "Return Speed", "m/s");
-        public static readonly CoreSpecializationKnob ReturnAcceleration = F("return.acceleration", "Return Acceleration", "m/s²");
+        public static readonly CoreSpecializationKnob ReturnAcceleration = F("return.acceleration", "Return Acceleration", "m/sÂ²");
         public static readonly CoreSpecializationKnob ReturnDelay = F("return.delay", "Return Delay", "s");
 
         // Swallow / digestion / spit.
@@ -1691,9 +1691,7 @@ public static class LeviathanPredatorRuntime
             GetCombatContext(owner);
             TickLunge(owner, state);
             // Slot 3: lunge-active only. Native replication already carries motion.
-            CoreNetwork.SlotWriter writer = CoreNetwork.BeginSlot(CoreNetwork.SlotPredator);
-            writer.Bool(state.Lunging);
-            CoreNetwork.EndSlot(writer);
+            LeviathanNetwork.PublishPredator(state.Lunging);
         }
 
         OwnerScratch.Clear();
@@ -1704,9 +1702,7 @@ public static class LeviathanPredatorRuntime
     {
         if (player != null && player.IsRemotePlayer())
         {
-            CoreNetwork.SlotReader reader;
-            return CoreNetwork.HasSynchronizedSpecialization(player, CoreClassId.Leviathan) &&
-                CoreNetwork.TryReadSlot(player, CoreNetwork.SlotPredator, out reader) && reader.Bool();
+            return LeviathanNetwork.IsPredatorLunging(player);
         }
         RuntimeState runtime;
         return player != null && RuntimeByOwner.TryGetValue(player, out runtime) &&

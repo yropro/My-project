@@ -1,10 +1,6 @@
-using HarmonyLib;
 using StarVortex;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 /// <summary>
@@ -46,30 +42,13 @@ public static class OrreryColdFusionPresentation
         public int LayerCount;
     }
 
-    [Serializable]
-    private sealed class GrantEnvelopeView
-    {
-        public int targetPlayerId;
-        public int effectId;
-        public int payloadA;
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    private struct FloatBits
-    {
-        [FieldOffset(0)] public float Float;
-        [FieldOffset(0)] public uint UInt;
-    }
-
     private static readonly Dictionary<GameShip, AuraState> active =
         new Dictionary<GameShip, AuraState>(8);
     private static readonly List<GameShip> cleanupScratch =
         new List<GameShip>(8);
 
-    private static readonly FieldInfo ActiveBridgeField =
-        AccessTools.Field(typeof(NetSession), "activeBridge");
-    private static readonly FieldInfo RepsField =
-        AccessTools.Field(typeof(NetWorldBridge), "reps");
+
+
 
     private static PulseItemBase frostNovaBase;
 
@@ -220,61 +199,6 @@ public static class OrreryColdFusionPresentation
         frostNovaBase = null;
     }
 
-    public static void ObserveGrant(NetSession session, string json)
-    {
-        if (session == null || string.IsNullOrEmpty(json))
-            return;
-
-        GrantEnvelopeView envelope;
-        try
-        {
-            envelope = JsonUtility.FromJson<GrantEnvelopeView>(json);
-        }
-        catch (Exception)
-        {
-            return;
-        }
-
-        if (envelope == null ||
-            envelope.effectId != OrreryColdFusion.CrossOwnerEffectId ||
-            envelope.targetPlayerId < 0)
-        {
-            return;
-        }
-
-        float duration = new FloatBits
-        {
-            UInt = unchecked((uint)envelope.payloadA)
-        }.Float;
-        if (float.IsNaN(duration) || float.IsInfinity(duration) || duration <= 0f)
-            return;
-
-        GameShip target = ResolvePlayerShip(session, envelope.targetPlayerId);
-        if (target != null)
-            Show(target, duration);
-    }
-
-    public static void ObserveLocalRequest(
-        int targetPlayerId,
-        ushort effectId,
-        CoreCrossOwnerEffects.GrantPayload payload,
-        bool accepted)
-    {
-        if (!accepted || effectId != OrreryColdFusion.CrossOwnerEffectId ||
-            NetSession.instance == null)
-        {
-            return;
-        }
-
-        float duration = new FloatBits { UInt = payload.A }.Float;
-        if (float.IsNaN(duration) || float.IsInfinity(duration) || duration <= 0f)
-            return;
-
-        GameShip target = ResolvePlayerShip(NetSession.instance, targetPlayerId);
-        if (target != null)
-            Show(target, duration);
-    }
-
     private static void UpdateState(AuraState state, float deltaTime)
     {
         if (state == null || state.Target == null)
@@ -321,33 +245,6 @@ public static class OrreryColdFusionPresentation
             OrrerySpellCompendium.ColdFusion.HaloRadiusMultiplier);
     }
 
-    private static GameShip ResolvePlayerShip(NetSession session, int playerId)
-    {
-        if (session == null || playerId < 0)
-            return null;
-
-        if (playerId == session.localPlayerId)
-        {
-            return WorldController.instance == null
-                ? null
-                : WorldController.instance.GetCurrentPlayerShip();
-        }
-
-        if (ActiveBridgeField == null || RepsField == null)
-            return null;
-
-        NetWorldBridge bridge = ActiveBridgeField.GetValue(session) as NetWorldBridge;
-        if (bridge == null)
-            return null;
-
-        IDictionary reps = RepsField.GetValue(bridge) as IDictionary;
-        if (reps == null || !reps.Contains(playerId))
-            return null;
-
-        RemoteShipDriver driver = reps[playerId] as RemoteShipDriver;
-        return driver == null ? null : driver.gameShip;
-    }
-
     private static void CleanupState(AuraState state)
     {
         if (state == null)
@@ -381,81 +278,5 @@ public static class OrreryColdFusionPresentation
             poolable.PoolDestroy();
         else
             UnityEngine.Object.Destroy(visual);
-    }
-}
-
-[HarmonyPatch(typeof(CoreTimedShipEffects), nameof(CoreTimedShipEffects.ApplyOrRefresh))]
-public static class OrreryColdFusionLocalPresentationPatch
-{
-    public static void Postfix(
-        GameShip target,
-        ushort effectId,
-        float durationSeconds,
-        bool __result)
-    {
-        if (__result && effectId == OrreryColdFusion.TimedEffectId)
-            OrreryColdFusionPresentation.Show(target, durationSeconds);
-    }
-}
-
-[HarmonyPatch(typeof(CoreCrossOwnerEffects), nameof(CoreCrossOwnerEffects.RequestGrant))]
-public static class OrreryColdFusionRequestPresentationPatch
-{
-    public static void Postfix(
-        int targetPlayerId,
-        ushort effectId,
-        CoreCrossOwnerEffects.GrantPayload payload,
-        bool __result)
-    {
-        OrreryColdFusionPresentation.ObserveLocalRequest(
-            targetPlayerId,
-            effectId,
-            payload,
-            __result);
-    }
-}
-
-[HarmonyPatch(typeof(CoreCrossOwnerEffects), "ReceiveAtClient")]
-public static class OrreryColdFusionClientGrantPresentationPatch
-{
-    public static void Postfix(NetSession session, string json)
-    {
-        OrreryColdFusionPresentation.ObserveGrant(session, json);
-    }
-}
-
-[HarmonyPatch(typeof(CoreCrossOwnerEffects), "ReceiveAtHost")]
-public static class OrreryColdFusionHostGrantPresentationPatch
-{
-    public static void Postfix(NetSession session, object connectionKey, string json)
-    {
-        OrreryColdFusionPresentation.ObserveGrant(session, json);
-    }
-}
-
-[HarmonyPatch(typeof(WorldController), nameof(WorldController.Update))]
-public static class OrreryColdFusionPresentationTickPatch
-{
-    public static void Postfix()
-    {
-        OrreryColdFusionPresentation.Tick(Time.deltaTime);
-    }
-}
-
-[HarmonyPatch(typeof(GameShip), "OnDestroy")]
-public static class OrreryColdFusionPresentationShipDestroyedPatch
-{
-    public static void Prefix(GameShip __instance)
-    {
-        OrreryColdFusionPresentation.Hide(__instance);
-    }
-}
-
-[HarmonyPatch(typeof(WorldController), "OnDestroy")]
-public static class OrreryColdFusionPresentationWorldDestroyedPatch
-{
-    public static void Prefix()
-    {
-        OrreryColdFusionPresentation.Reset();
     }
 }

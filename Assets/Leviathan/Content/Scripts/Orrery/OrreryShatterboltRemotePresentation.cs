@@ -464,36 +464,3 @@ public static class OrreryShatterboltRemotePresentation
 // the interpolated remote ship transform. Driving Shatterbolt presentation here
 // keeps its reconstructed positions aligned with what the observer actually sees
 // without patching FixedUpdate on every ship in the world.
-[HarmonyPatch(typeof(RemoteShipDriver), "Render")]
-public static class OrreryShatterboltRemoteRenderPatch
-{
-    public static void Postfix(RemoteShipDriver __instance)
-    {
-        GameShip remoteOwner = __instance == null ? null : __instance.gameShip;
-        if (remoteOwner != null && remoteOwner.IsRemotePlayer())
-        {
-            OrreryShatterboltRemotePresentation.Tick(
-                remoteOwner,
-                Time.deltaTime);
-        }
-    }
-}
-
-[HarmonyPatch(typeof(GameShip), "OnDestroy")]
-public static class OrreryShatterboltRemoteShipDestroyedPatch
-{
-    public static void Prefix(GameShip __instance)
-    {
-        if (__instance != null && __instance.IsRemotePlayer())
-            OrreryShatterboltRemotePresentation.Forget(__instance);
-    }
-}
-
-[HarmonyPatch(typeof(WorldController), "OnDestroy")]
-public static class OrreryShatterboltRemoteWorldDestroyedPatch
-{
-    public static void Prefix()
-    {
-        OrreryShatterboltRemotePresentation.Reset();
-    }
-}

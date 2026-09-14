@@ -7,10 +7,19 @@ using StarVortex;
 /// This layer deliberately owns only transport identity/capacity. Spell codecs
 /// continue to own payload layout, history/refresh semantics, visual lifetime,
 /// and all gameplay behavior.
+///
+/// The physical records are multiplexed per ship-state send. A codec's preferred
+/// record is only a stable packing hint; if that range is occupied this layer finds
+/// another contiguous range and readers scan the bank by self-identifying codec / 
+/// group headers. This prevents record identity from becoming spell identity and
+/// lets short-lived spell presentation share one bounded transport bank.
 /// </summary>
 public static class OrreryPresentationNetwork
 {
-    public const int RecordCount = 6;
+    // Eight records keeps the worst current overlap (active spell + bounded
+    // Shatterbolt tail + Plasma refresh) under the existing Core dynamic budget
+    // without consuming the remaining Core slot id space spell-by-spell.
+    public const int RecordCount = 8;
     public const int RecordBytes = 32;
 
     public const byte Record0SlotId = 7;
@@ -19,10 +28,16 @@ public static class OrreryPresentationNetwork
     public const byte Record3SlotId = 10;
     public const byte Record4SlotId = 11;
     public const byte Record5SlotId = 12;
+    public const byte Record6SlotId = 13;
+    public const byte Record7SlotId = 14;
 
-    // Explicit codec ids. Keep this list intentionally small and manual.
+    // Explicit codec ids. Payload meaning remains spell-owned.
     public const byte CodecShatterbolt = 1;
     public const byte CodecPlasmaBolt = 2;
+    public const byte CodecMagmaCannon = 3;
+    public const byte CodecTeslaCoil = 4;
+    public const byte CodecConeOfCold = 5;
+    public const byte CodecColdFusion = 6;
 
     // Record framing:
     //   every part: byte codec, byte descriptor
@@ -33,6 +48,12 @@ public static class OrreryPresentationNetwork
     public const int ContinuationHeaderBytes = 2;
     public const int MaximumPartsPerGroup = 4;
     public const int MaximumGroupId = 15;
+
+    // Only the final pre-serialization sample is allowed to claim physical bank
+    // records. Transition-time calls to OrreryNetwork.PublishLocal may still update
+    // slot 6, but spell codecs fail closed until PublishForSend opens the bank.
+    private static readonly bool[] sendRecordUsed = new bool[RecordCount];
+    private static bool buildingSendFrame;
 
     public static byte GetSlotId(int recordIndex)
     {
@@ -50,9 +71,13 @@ public static class OrreryPresentationNetwork
     }
 
     /// <summary>
-    /// Writes one complete multipart presentation group into contiguous bank
-    /// records. The payload is opaque to this layer and remains codec-owned.
-    /// A capacity failure simply suppresses this presentation group.
+    /// Writes one complete multipart presentation group. firstRecordIndex is a
+    /// packing preference only; another contiguous free range is chosen when the
+    /// preferred range is already occupied by a higher-priority publisher.
+    ///
+    /// Calls outside the final Core send sample are intentionally suppressed so a
+    /// mid-frame transition can never leave stale physical records in the next
+    /// packet after the bank has been repacked.
     /// </summary>
     public static bool WriteGroup(
         int firstRecordIndex,
@@ -63,23 +88,28 @@ public static class OrreryPresentationNetwork
         byte[] payload,
         int payloadLength)
     {
-        if (codecId == 0 || generation == 0u || groupId > MaximumGroupId ||
+        if (!buildingSendFrame || codecId == 0 || generation == 0u ||
+            groupId > MaximumGroupId ||
             partCount < 1 || partCount > MaximumPartsPerGroup ||
-            firstRecordIndex < 0 || firstRecordIndex + partCount > RecordCount ||
             payload == null || payloadLength < 0 || payloadLength > payload.Length ||
             payloadLength > GetPayloadCapacity(partCount))
         {
             return false;
         }
 
+        int actualFirst = FindFreeRange(firstRecordIndex, partCount);
+        if (actualFirst < 0)
+            return false;
+
         int payloadOffset = 0;
         for (int partIndex = 0; partIndex < partCount; partIndex++)
         {
-            byte slotId = GetSlotId(firstRecordIndex + partIndex);
+            byte slotId = GetSlotId(actualFirst + partIndex);
             if (slotId == 0)
                 return false;
 
             CoreNetwork.SlotWriter writer = CoreNetwork.BeginSlot(slotId);
+            if (!writer.Valid) return false;
             writer.Byte(codecId);
             writer.Byte(PackDescriptor(groupId, partIndex, partCount));
             if (partIndex == 0)
@@ -95,7 +125,13 @@ public static class OrreryPresentationNetwork
             CoreNetwork.EndSlot(writer);
         }
 
-        return payloadOffset == payloadLength;
+        if (payloadOffset != payloadLength)
+            return false;
+
+        CoreNetwork.GroupLocalSlots(GetSlotId(actualFirst), partCount);
+        for (int i = 0; i < partCount; i++)
+            sendRecordUsed[actualFirst + i] = true;
+        return true;
     }
 
     public struct GroupReader
@@ -155,9 +191,10 @@ public static class OrreryPresentationNetwork
     }
 
     /// <summary>
-    /// Reads and validates a complete contiguous multipart group before handing
-    /// any codec payload bytes to presentation code. Missing or malformed parts
-    /// fail presentation-only and cannot partially mutate a replacement instance.
+    /// Finds and validates a complete multipart group. firstRecordIndex is tried
+    /// first for cache/locality stability, then the remaining physical records are
+    /// scanned because multiplexing may have relocated the group for this packet.
+    /// Missing or malformed parts fail presentation-only.
     /// </summary>
     public static bool TryReadGroup(
         GameShip remoteOwner,
@@ -170,8 +207,55 @@ public static class OrreryPresentationNetwork
         group = default(GroupReader);
         if (remoteOwner == null || expectedCodecId == 0 ||
             expectedGroupId > MaximumGroupId ||
-            expectedPartCount < 1 || expectedPartCount > MaximumPartsPerGroup ||
-            firstRecordIndex < 0 ||
+            expectedPartCount < 1 || expectedPartCount > MaximumPartsPerGroup)
+        {
+            return false;
+        }
+
+        if (TryReadGroupAt(
+                remoteOwner,
+                firstRecordIndex,
+                expectedCodecId,
+                expectedGroupId,
+                expectedPartCount,
+                out group))
+        {
+            return true;
+        }
+
+        for (int candidate = 0;
+            candidate + expectedPartCount <= RecordCount;
+            candidate++)
+        {
+            if (candidate == firstRecordIndex)
+                continue;
+
+            if (TryReadGroupAt(
+                    remoteOwner,
+                    candidate,
+                    expectedCodecId,
+                    expectedGroupId,
+                    expectedPartCount,
+                    out group))
+            {
+                return true;
+            }
+        }
+
+        group = default(GroupReader);
+        return false;
+    }
+
+    private static bool TryReadGroupAt(
+        GameShip remoteOwner,
+        int firstRecordIndex,
+        byte expectedCodecId,
+        byte expectedGroupId,
+        int expectedPartCount,
+        out GroupReader group)
+    {
+        group = default(GroupReader);
+        if (firstRecordIndex < 0 ||
             firstRecordIndex + expectedPartCount > RecordCount)
         {
             return false;
@@ -228,8 +312,8 @@ public static class OrreryPresentationNetwork
     }
 
     /// <summary>
-    /// All six physical records belong to this transport bank. A record has no
-    /// spell meaning until an explicit codec writes a self-identifying group.
+    /// All physical records belong to this transport bank. A record has no spell
+    /// meaning until an explicit codec writes a self-identifying group.
     /// </summary>
     private static bool initialized;
 
@@ -248,9 +332,9 @@ public static class OrreryPresentationNetwork
 
     /// <summary>
     /// Samples the local Orrery presentation immediately before Core serializes
-    /// this ship-state packet. Existing transition/fixed-tick publishers may have
-    /// preloaded the same slot ids; Core's latest-value semantics make this final
-    /// sample authoritative without creating duplicate wire records.
+    /// this ship-state packet. The current active legacy spell gets first claim on
+    /// the bank; bounded Shatterbolt/Plasma tail state then fills remaining space.
+    /// Gameplay remains owner-authoritative regardless of presentation pressure.
     /// </summary>
     public static void PublishForSend()
     {
@@ -260,10 +344,53 @@ public static class OrreryPresentationNetwork
                 ? context.Ship
                 : null;
 
-        if (owner != null && OrreryRuntime.IsActive(owner))
-            OrreryNetwork.PublishLocal(owner);
+        for (int i = 0; i < sendRecordUsed.Length; i++)
+            sendRecordUsed[i] = false;
 
-        OrreryPlasmaBoltPresentation.Publish();
+        buildingSendFrame = true;
+        try
+        {
+            if (owner != null && OrreryRuntime.IsActive(owner))
+            {
+                OrreryLegacySpellPresentation.Publish(owner);
+                OrreryNetwork.PublishLocal(owner);
+                OrreryNetwork.PublishTimedEffects(owner);
+            }
+
+            OrreryPlasmaBoltPresentation.Publish();
+        }
+        finally
+        {
+            buildingSendFrame = false;
+        }
+    }
+
+    private static int FindFreeRange(int preferredFirst, int partCount)
+    {
+        if (IsRangeFree(preferredFirst, partCount))
+            return preferredFirst;
+
+        for (int first = 0; first + partCount <= RecordCount; first++)
+        {
+            if (first == preferredFirst)
+                continue;
+            if (IsRangeFree(first, partCount))
+                return first;
+        }
+        return -1;
+    }
+
+    private static bool IsRangeFree(int first, int partCount)
+    {
+        if (first < 0 || partCount < 1 || first + partCount > RecordCount)
+            return false;
+
+        for (int i = 0; i < partCount; i++)
+        {
+            if (sendRecordUsed[first + i])
+                return false;
+        }
+        return true;
     }
 
     private static byte PackDescriptor(byte groupId, int partIndex, int partCount)
@@ -298,14 +425,5 @@ public static class OrreryPresentationNetwork
             ((uint)reader.Byte() << 8) |
             ((uint)reader.Byte() << 16) |
             ((uint)reader.Byte() << 24);
-    }
-}
-
-[HarmonyPatch(typeof(CoreNetwork), "AppendLocalExtension")]
-public static class OrreryPresentationNetworkSendPatch
-{
-    public static void Prefix()
-    {
-        OrreryPresentationNetwork.PublishForSend();
     }
 }

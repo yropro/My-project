@@ -1685,27 +1685,18 @@ public static class LeviathanStellarConverter
         if (phase == Phase.Idle && !projectileActive)
             return;
 
-        CoreNetwork.SlotWriter writer =
-            CoreNetwork.BeginSlot(
-                CoreNetwork.SlotStellarConverter);
-
-        writer.Byte((byte)phase);
-        writer.Percent(GetPhaseProgress(resolved));
-        writer.Sequence(manifestationShotSequence);
-        writer.Flags(
-            projectileActive,
-            projectileActive && gravityProjectileShot.exploding);
-        writer.Percent(
-            GetProjectileNaturalProgress(gravityProjectileShot));
-        writer.Percent(
-            projectileActive &&
-            gravityProjectileShot.mode == GravityProjectileMode.DyingStar
-                ? gravityProjectileShot.detonationScale
-                : 1f);
-        writer.Percent(
-            GetDyingStarExplosionProgress(gravityProjectileShot));
-
-        CoreNetwork.EndSlot(writer);
+        LeviathanNetwork.PublishConverter(new LeviathanNetwork.ConverterState
+        {
+            Phase = (byte)phase,
+            PhaseProgress = GetPhaseProgress(resolved),
+            Sequence = manifestationShotSequence,
+            ProjectileActive = projectileActive,
+            Detonating = projectileActive && gravityProjectileShot.exploding,
+            ProjectileProgress = GetProjectileNaturalProgress(gravityProjectileShot),
+            DetonationScale = projectileActive && gravityProjectileShot.mode == GravityProjectileMode.DyingStar
+                ? gravityProjectileShot.detonationScale : 1f,
+            ExplosionProgress = GetDyingStarExplosionProgress(gravityProjectileShot)
+        });
     }
 
     private static bool ReadRemoteNetworkState(
@@ -1717,11 +1708,8 @@ public static class LeviathanStellarConverter
         if (laser == null || player == null || resolved == null || state == null)
             return false;
 
-        CoreNetwork.SlotReader reader;
-        if (!CoreNetwork.TryReadSlot(
-                player,
-                CoreNetwork.SlotStellarConverter,
-                out reader))
+        LeviathanNetwork.ConverterState incoming;
+        if (!LeviathanNetwork.TryReadConverter(player, out incoming))
         {
             state.hasNetworkState = false;
             state.phase = Phase.Idle;
@@ -1737,20 +1725,19 @@ public static class LeviathanStellarConverter
             return false;
         }
 
-        int rawPhase = reader.Byte();
+        int rawPhase = incoming.Phase;
         Phase incomingPhase =
             rawPhase >= (int)Phase.Idle && rawPhase <= (int)Phase.Recovery
                 ? (Phase)rawPhase
                 : Phase.Idle;
 
-        float incomingPhaseProgress = reader.Percent();
-        int incomingSequence = reader.Sequence();
-        byte flags = reader.FlagsByte();
-        bool incomingProjectileActive = (flags & (1 << 0)) != 0;
-        bool incomingDetonating = (flags & (1 << 1)) != 0;
-        float incomingProjectileProgress = reader.Percent();
-        float incomingDetonationScale = reader.Percent();
-        float incomingExplosionProgress = reader.Percent();
+        float incomingPhaseProgress = incoming.PhaseProgress;
+        int incomingSequence = incoming.Sequence;
+        bool incomingProjectileActive = incoming.ProjectileActive;
+        bool incomingDetonating = incoming.Detonating;
+        float incomingProjectileProgress = incoming.ProjectileProgress;
+        float incomingDetonationScale = incoming.DetonationScale;
+        float incomingExplosionProgress = incoming.ExplosionProgress;
 
         bool phaseChanged =
             !state.hasNetworkState ||

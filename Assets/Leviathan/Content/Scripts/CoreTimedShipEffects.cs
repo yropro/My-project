@@ -53,6 +53,7 @@ public static class CoreTimedShipEffects
     {
         public bool Active;
         public ushort EffectId;
+        public uint Revision;
         public float AppliedAt;
         public float ExpiresAt;
         public Profile Profile;
@@ -69,6 +70,50 @@ public static class CoreTimedShipEffects
 
     private static readonly Dictionary<GameShip, ShipState> states =
         new Dictionary<GameShip, ShipState>(8);
+    private static uint nextRevision;
+
+    private static uint NextRevision()
+    {
+        unchecked { nextRevision++; if (nextRevision == 0) nextRevision++; }
+        return nextRevision;
+    }
+
+    /// <summary>Presentation snapshot of an authoritative timed effect. Revision
+    /// changes only when applied/refreshed, so repeated packets cannot restart it.</summary>
+    public static bool TryGetPresentation(GameShip target, ushort effectId,
+        out uint revision, out float remainingSeconds)
+    {
+        revision = 0; remainingSeconds = 0;
+        ShipState state;
+        if (target == null || !states.TryGetValue(target, out state)) return false;
+        foreach (Entry entry in state.Entries)
+        {
+            if (!entry.Active || entry.EffectId != effectId) continue;
+            float remaining = entry.ExpiresAt - Time.time;
+            if (remaining <= 0f) return false;
+            revision = entry.Revision; remainingSeconds = remaining;
+            return true;
+        }
+        return false;
+    }
+
+    private static readonly Dictionary<ushort, Action<GameShip, float>> presentationObservers =
+        new Dictionary<ushort, Action<GameShip, float>>();
+
+    public static void RegisterPresentation(ushort effectId, Action<GameShip, float> observer)
+    {
+        if (effectId == 0 || observer == null) throw new ArgumentException("Invalid timed-effect presentation.");
+        if (presentationObservers.ContainsKey(effectId)) throw new InvalidOperationException("Duplicate timed-effect presentation.");
+        presentationObservers.Add(effectId, observer);
+    }
+
+    private static void NotifyPresentation(GameShip target, ushort effectId, float duration)
+    {
+        Action<GameShip, float> observer;
+        if (!presentationObservers.TryGetValue(effectId, out observer)) return;
+        try { observer(target, duration); }
+        catch (Exception ex) { Debug.LogWarning("[CoreTimedShipEffects] Presentation failed: " + ex.Message); }
+    }
 
     [ThreadStatic]
     private static GameShip heatUpdateShip;
@@ -105,10 +150,12 @@ public static class CoreTimedShipEffects
             if (entry.Active && entry.EffectId == effectId)
             {
                 entry.AppliedAt = Time.time;
+                entry.Revision = NextRevision();
                 entry.ExpiresAt = Time.time + durationSeconds;
                 entry.Profile = profile.Sanitized();
                 state.Entries[i] = entry;
                 RebuildAggregate(state);
+                NotifyPresentation(target, effectId, durationSeconds);
                 return true;
             }
 
@@ -127,12 +174,14 @@ public static class CoreTimedShipEffects
         Entry added = new Entry();
         added.Active = true;
         added.EffectId = effectId;
+        added.Revision = NextRevision();
         added.AppliedAt = Time.time;
         added.ExpiresAt = Time.time + durationSeconds;
         added.Profile = profile.Sanitized();
         state.Entries[freeIndex] = added;
         state.ActiveCount++;
         RebuildAggregate(state);
+        NotifyPresentation(target, effectId, durationSeconds);
         return true;
     }
 

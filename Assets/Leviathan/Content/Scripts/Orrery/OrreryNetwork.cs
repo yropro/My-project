@@ -10,6 +10,150 @@ using UnityEngine;
 /// </summary>
 public static class OrreryNetwork
 {
+    private struct TimedEffectState { public float RemainingSeconds; }
+    private static readonly Channel<TimedEffectState> coldFusionChannel =
+        new Channel<TimedEffectState>(OrreryPresentationNetwork.CodecColdFusion,
+            WireTimedEffect);
+    private static readonly System.Collections.Generic.Dictionary<GameShip, uint> coldFusionRevisions =
+        new System.Collections.Generic.Dictionary<GameShip, uint>();
+
+    private static void WireTimedEffect(ref CoreWire wire, ref TimedEffectState state)
+    {
+        wire.Positive(ref state.RemainingSeconds);
+    }
+
+    internal static void PublishTimedEffects(GameShip owner)
+    {
+        uint revision; float remaining;
+        if (!CoreTimedShipEffects.TryGetPresentation(owner, OrreryColdFusion.TimedEffectId,
+                out revision, out remaining)) return;
+        var state = new TimedEffectState { RemainingSeconds = remaining };
+        coldFusionChannel.Publish(revision, ref state);
+    }
+
+    private static void RenderTimedEffects(GameShip owner, float deltaTime)
+    {
+        var state = default(TimedEffectState);
+        uint revision, previous;
+        if (!coldFusionChannel.TryRead(owner, ref state, out revision)) return;
+        if (coldFusionRevisions.TryGetValue(owner, out previous) && previous == revision) return;
+        coldFusionRevisions[owner] = revision;
+        OrreryColdFusionPresentation.Show(owner, state.RemainingSeconds);
+    }
+
+    /// <summary>A typed presentation channel. Define one static channel per
+    /// codec, then supply one format method for both directions. Buffers are
+    /// reused on Unity's main thread; callbacks must not reenter the channel.
+    /// Generation is the identity of the cast, not a packet sequence.</summary>
+    public sealed class Channel<T> where T : struct
+    {
+        private readonly byte codecId;
+        private readonly byte groupId;
+        private readonly CoreWireFormat<T> format;
+        private readonly byte[] outgoing = new byte[116];
+        private readonly byte[] incoming = new byte[116];
+
+        public Channel(byte codecId, CoreWireFormat<T> format, byte groupId = 0)
+        {
+            if (codecId == 0 || groupId > OrreryPresentationNetwork.MaximumGroupId || format == null)
+                throw new System.ArgumentException("Invalid Orrery presentation channel.");
+            this.codecId = codecId;
+            this.groupId = groupId;
+            this.format = format;
+        }
+
+        public bool Publish(uint generation, ref T state)
+        {
+            int length;
+            if (!CoreWire.TryEncode(outgoing, 0, outgoing.Length, format, ref state, out length))
+                return false;
+            int parts = 1;
+            while (parts < OrreryPresentationNetwork.MaximumPartsPerGroup &&
+                length > OrreryPresentationNetwork.GetPayloadCapacity(parts)) parts++;
+            return OrreryPresentationNetwork.WriteGroup(0, codecId, groupId,
+                parts, generation, outgoing, length);
+        }
+
+        public bool TryRead(GameShip owner, ref T state, out uint generation)
+        {
+            generation = 0;
+            for (int parts = 1; parts <= OrreryPresentationNetwork.MaximumPartsPerGroup; parts++)
+            {
+                OrreryPresentationNetwork.GroupReader group;
+                if (!OrreryPresentationNetwork.TryReadGroup(owner, 0, codecId, groupId, parts, out group))
+                    continue;
+                if (group.Length > incoming.Length) return false;
+                for (int i = 0; i < group.Length; i++) incoming[i] = group.Byte();
+                if (!CoreWire.TryDecode(incoming, 0, group.Length, format, ref state)) return false;
+                generation = group.Generation;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    private static bool initialized;
+
+    /// <summary>The Orrery networking composition root. New presentation codecs
+    /// register here; they do not patch engine send/render/destruction methods.</summary>
+    public static void Initialize()
+    {
+        if (initialized) return;
+        OrreryPresentationNetwork.EnsureInitialized();
+        CoreNetworkPresentation.Register("Orrery/send",
+            publish: OrreryPresentationNetwork.PublishForSend);
+        CoreNetworkPresentation.Register("Orrery/Magma-Tesla-Cryo",
+            render: OrreryLegacySpellRemotePresentation.Tick,
+            forget: OrreryLegacySpellRemotePresentation.Forget,
+            reset: OrreryLegacySpellRemotePresentation.Reset);
+        CoreNetworkPresentation.Register("Orrery/Shatterbolt",
+            render: OrreryShatterboltRemotePresentation.Tick,
+            forget: OrreryShatterboltRemotePresentation.Forget,
+            reset: OrreryShatterboltRemotePresentation.Reset);
+        CoreNetworkPresentation.Register("Orrery/Plasma",
+            render: RenderPlasma,
+            forget: ForgetPlasma,
+            reset: OrreryPlasmaBoltPresentation.Reset);
+        CoreNetworkPresentation.Register("Orrery/sectors",
+            render: (owner, dt) => OrreryRemoteSectorPresentation.Tick(owner),
+            forget: OrreryRemoteSectorPresentation.Forget,
+            reset: () => OrrerySectorPresentation.Hide());
+        CoreCrossOwnerEffects.RegisterObserver(OrreryColdFusion.CrossOwnerEffectId,
+            OrreryColdFusionPresentationLease.ObserveGrant);
+        CoreTimedShipEffects.RegisterPresentation(OrreryColdFusion.TimedEffectId,
+            OrreryColdFusionPresentation.Show);
+        CoreNetworkPresentation.Register("Orrery/ColdFusion",
+            render: RenderTimedEffects,
+            update: OrreryColdFusionPresentation.Tick,
+            forget: owner => { coldFusionRevisions.Remove(owner); OrreryColdFusionPresentation.Hide(owner); },
+            died: owner => OrreryColdFusionPresentation.Hide(owner),
+            reset: () => { coldFusionRevisions.Clear(); OrreryColdFusionPresentation.Reset(); });
+        CoreNetworkPresentation.Register("Orrery/ColdFusion-lease",
+            update: dt => OrreryColdFusionPresentationLease.Tick(),
+            forget: OrreryColdFusionPresentationLease.OnShipDestroyed,
+            died: OrreryColdFusionPresentationLease.OnShipDied,
+            reset: OrreryColdFusionPresentationLease.Reset);
+        initialized = true;
+    }
+
+    private static void RenderPlasma(GameShip owner, float deltaTime)
+    {
+        CoreNetwork.SlotReader common;
+        if (!CoreNetwork.TryReadSlot(owner, SharedSlotId, out common) ||
+            common.Byte() != PayloadVersion)
+        {
+            OrreryPlasmaBoltPresentation.Forget(owner);
+            return;
+        }
+        OrreryPlasmaBoltPresentation.Tick(owner);
+    }
+
+    private static void ForgetPlasma(GameShip owner)
+    {
+        OrreryPlasmaBoltPresentation.ForgetTarget(owner);
+        OrreryPlasmaBoltPresentation.Forget(owner);
+    }
+
     public const byte SharedSlotId = CoreNetwork.SlotOrrery;
     public const byte PayloadVersion = 3;
     public const int MaxPresentedSatellites = 8;

@@ -823,12 +823,19 @@ public static class OrreryPlasmaBolt
                     tickDamage,
                     burnDps);
 
+                // Plasma Burn intentionally has no native slot source: using the
+                // original weapon slot here would rerun native slot/on-kill proc
+                // semantics that the frozen faux-burn budget must not inherit.
+                // Star Vortex can only return MsgDamageResult for a remote-player
+                // target when a valid source slot exists, so this transaction is
+                // explicitly attempt-only instead of creating a NativeResult
+                // pending acknowledgement that can never resolve.
                 CoreCombat.DamageScope scope = CoreCombat.BeginDamage(
                     owner,
                     infection.Target,
                     OrreryCombat.PlasmaBurnTick,
                     infection.FireContributor,
-                    CoreCombat.AcknowledgementMode.NativeResult,
+                    CoreCombat.AcknowledgementMode.None,
                     CoreCombat.TrackingFlags.Summary, infection.CastId, owner);
                 try
                 {

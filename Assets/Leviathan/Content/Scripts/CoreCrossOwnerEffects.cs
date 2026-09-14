@@ -88,6 +88,41 @@ public static class CoreCrossOwnerEffects
     private static readonly Dictionary<ushort, GrantHandler> handlers =
         new Dictionary<ushort, GrantHandler>();
 
+    /// <summary>Host-validated presentation notification, not a recipient ACK.
+    /// Only Core parses the envelope; effects never patch private receive paths.</summary>
+    public struct GrantNotice
+    {
+        public int SourcePlayerId, TargetPlayerId, Sequence;
+        public ushort EffectId;
+        public GrantPayload Payload;
+    }
+    private static readonly Dictionary<ushort, Action<NetSession, GrantNotice>> observers =
+        new Dictionary<ushort, Action<NetSession, GrantNotice>>();
+
+    public static void RegisterObserver(ushort effectId, Action<NetSession, GrantNotice> observer)
+    {
+        if (effectId == 0 || observer == null) throw new ArgumentException("Invalid grant observer.");
+        if (observers.ContainsKey(effectId)) throw new InvalidOperationException("Duplicate grant observer.");
+        observers.Add(effectId, observer);
+    }
+
+    private static void Notify(NetSession session, GrantEnvelope envelope)
+    {
+        Action<NetSession, GrantNotice> observer;
+        if (!observers.TryGetValue((ushort)envelope.effectId, out observer)) return;
+        try
+        {
+            observer(session, new GrantNotice {
+                SourcePlayerId = envelope.sourcePlayerId, TargetPlayerId = envelope.targetPlayerId,
+                Sequence = envelope.sequence, EffectId = (ushort)envelope.effectId,
+                Payload = new GrantPayload(unchecked((uint)envelope.payloadA), unchecked((uint)envelope.payloadB),
+                    unchecked((uint)envelope.payloadC), unchecked((uint)envelope.payloadD),
+                    unchecked((uint)envelope.payloadE), unchecked((uint)envelope.payloadF))
+            });
+        }
+        catch (Exception ex) { Debug.LogWarning("[CoreCrossOwnerEffects] Presentation observer failed: " + ex.Message); }
+    }
+
     private static readonly FieldInfo ConnToPlayerField =
         AccessTools.Field(typeof(NetSession), "connToPlayer");
 
@@ -95,6 +130,17 @@ public static class CoreCrossOwnerEffects
     private static bool messageTypeAvailable = true;
     private static int nextSequence;
     private static int recentCursor;
+
+    /// <summary>
+    /// Sequence assigned to the most recent successfully-authored local grant.
+    /// Presentation observers use this synchronously after RequestGrant returns
+    /// so the immediate local observation and later reliable relay share one
+    /// event identity without reflecting Core's private storage.
+    /// </summary>
+    internal static int CurrentLocalSequence
+    {
+        get { return nextSequence; }
+    }
 
     public static void EnsureInitialized()
     {
@@ -230,13 +276,13 @@ public static class CoreCrossOwnerEffects
             return;
 
         GrantEnvelope envelope = Parse(json);
-        if (envelope == null || !ValidateEnvelope(session, envelope) ||
-            envelope.targetPlayerId != session.localPlayerId)
+        if (envelope == null || !ValidateEnvelope(session, envelope))
         {
             return;
         }
 
-        ApplyLocal(session, envelope);
+        if (envelope.targetPlayerId != session.localPlayerId || ApplyLocal(session, envelope))
+            Notify(session, envelope);
     }
 
     public static void ResetWorld()
@@ -254,13 +300,14 @@ public static class CoreCrossOwnerEffects
         if (!ValidateEnvelope(session, envelope))
             return false;
 
-        if (envelope.targetPlayerId == session.localPlayerId)
-            return ApplyLocal(session, envelope);
+        if (envelope.targetPlayerId == session.localPlayerId && !ApplyLocal(session, envelope))
+            return false;
 
         // SendStarEntityMessage is native ReliableOrdered transport. On the host
         // it relays only to clients in this star; non-target clients receive the
         // tiny envelope but discard it by targetPlayerId.
         session.SendStarEntityMessage(MessageType, json, envelope.starId);
+        Notify(session, envelope);
         return true;
     }
 

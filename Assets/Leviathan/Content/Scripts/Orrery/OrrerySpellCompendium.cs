@@ -12,11 +12,13 @@ public static class OrrerySpellCompendium
         public const float IntegratedReferenceSeconds = 1f;
         public const float DamageMultiplier = 3f;
         public const float VelocityMultiplier = 0.65f;
-        public const float TurnDegreesPerSecond = 150f;
-        public const float ProjectileVisualScale = 2f;
+        public const float TurnDegreesPerSecond = 155f;
+        public const float ProjectileVisualScale = 4f;
         public const float ExplosionRadiusMeters = 40f;
         public const float LifetimeSeconds = 5f;
         public const float SpawnGraceSeconds = 0.15f;
+        public const float ContactRearmSeconds = 0.10f;
+        public const int MaxTrackedContactTargets = 64;
     }
 
     public static class TeslaCoil
@@ -41,7 +43,7 @@ public static class OrrerySpellCompendium
     {
         // Mechanical cone and native presentation volley.
         public const float IntegratedReferenceSeconds = 1f;
-        public const float DamageMultiplier = 2f;
+        public const float DamageMultiplier = 3f;
         public const float ConeRangeMeters = 60f;
         public const float ConeAngleDegrees = 30f;
         public const float FreezeChanceAdditive = 0.50f;
@@ -121,7 +123,7 @@ public static class OrrerySpellCompendium
         public static readonly OrreryRecipeKey Recipe = default(OrreryRecipeKey)
             .Add(OrreryElement.Fire).Add(OrreryElement.Lightning);
         public const float IntegratedReferenceSeconds = 1f;
-        public const float LightningDamageMultiplier = 2f;
+        public const float LightningDamageMultiplier = 4f;
         public const float BoltLengthMeters = 220f;
         public const float BoltWidthMeters = 25f;
         public const float SpreadRadiusMeters = 42f;
@@ -200,7 +202,7 @@ public static class OrrerySpellCompendium
         public const int MaxTargetsPerExplosion = 64;
 
         // Motion
-        public const float ProjectileSpeedMetersPerSecond = 140f;
+        public const float ProjectileSpeedMetersPerSecond = 155f;
         public const float MaximumLegSeconds = 3.5f;
 
         // Explosion
