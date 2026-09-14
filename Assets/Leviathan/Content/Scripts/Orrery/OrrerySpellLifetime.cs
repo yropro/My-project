@@ -10,9 +10,9 @@ using UnityEngine;
 /// behaves while alive. Keep this dispatcher deliberately explicit; it is not a
 /// generic spell engine or registry.
 ///
-/// Shatterbolt and Plasma Bolt are both migrated here. Their spell files retain
-/// their mechanics, presentation state, combat provenance, and other spell-specific
-/// behavior; this layer only owns shared fixed-step and teardown timing.
+/// Shatterbolt, Plasma Bolt and Void Wave are migrated here. Their spell files
+/// retain mechanics, presentation state, combat provenance, and other spell-
+/// specific behavior; this layer only owns shared fixed-step and teardown timing.
 /// </summary>
 public static class OrrerySpellLifetime
 {
@@ -51,6 +51,7 @@ public static class OrrerySpellLifetime
     /// </summary>
     private static void FixedTickOwner(GameShip owner, float deltaTime)
     {
+        OrreryVoidWave.FixedTick(owner, deltaTime);
         OrreryShatterbolt.FixedTick(owner, deltaTime);
         OrreryPlasmaBolt.FixedTick(owner, deltaTime);
     }
@@ -65,6 +66,7 @@ public static class OrrerySpellLifetime
         if (object.ReferenceEquals(owner, null))
             return;
 
+        OrreryVoidWave.Forget(owner);
         OrreryShatterbolt.Forget(owner);
         OrreryPlasmaBolt.Forget(owner);
 
@@ -96,6 +98,7 @@ public static class OrrerySpellLifetime
     /// </summary>
     public static void ResetWorld()
     {
+        OrreryVoidWave.Reset();
         OrreryShatterbolt.Reset();
         OrreryPlasmaBolt.Reset();
         OrreryDamageRouter.Reset();
