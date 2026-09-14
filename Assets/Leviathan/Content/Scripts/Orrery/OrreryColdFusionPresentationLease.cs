@@ -52,8 +52,6 @@ public static class OrreryColdFusionPresentationLease
         AccessTools.Field(typeof(NetSession), "activeBridge");
     private static readonly FieldInfo RepsField =
         AccessTools.Field(typeof(NetWorldBridge), "reps");
-    private static readonly FieldInfo NextGrantSequenceField =
-        AccessTools.Field(typeof(CoreCrossOwnerEffects), "nextSequence");
 
     public static void ObserveGrant(NetSession session, string json)
     {
@@ -107,7 +105,7 @@ public static class OrreryColdFusionPresentationLease
         // This postfix runs synchronously after RequestGrant increments the source
         // sequence. Reusing that identity lets the later reliable relay be treated
         // as the same presentation event instead of restarting its duration.
-        int sequence = ReadCurrentLocalGrantSequence();
+        int sequence = CoreCrossOwnerEffects.CurrentLocalSequence;
         if (sequence <= 0)
             return;
 
@@ -118,15 +116,6 @@ public static class OrreryColdFusionPresentationLease
             targetPlayerId,
             sequence,
             duration);
-    }
-
-    private static int ReadCurrentLocalGrantSequence()
-    {
-        if (NextGrantSequenceField == null)
-            return 0;
-
-        object raw = NextGrantSequenceField.GetValue(null);
-        return raw is int ? (int)raw : 0;
     }
 
     private static void Remember(
