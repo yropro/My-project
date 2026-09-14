@@ -17,7 +17,6 @@ using UnityEngine;
 /// </summary>
 public static class OrreryColdFusionPresentation
 {
-    private const string FrostNovaPath = "Base/Items/Special/Frost Nova Pulse";
     private const int MaxHaloLayers = 6;
 
     private sealed class HaloLayer
@@ -47,11 +46,6 @@ public static class OrreryColdFusionPresentation
     private static readonly List<GameShip> cleanupScratch =
         new List<GameShip>(8);
 
-
-
-
-    private static PulseItemBase frostNovaBase;
-
     public static void Show(GameShip target, float durationSeconds)
     {
         if (target == null || durationSeconds <= 0f)
@@ -68,8 +62,7 @@ public static class OrreryColdFusionPresentation
         if (PoolController.instance == null)
             return;
 
-        if (frostNovaBase == null)
-            frostNovaBase = Resources.Load<PulseItemBase>(FrostNovaPath);
+        PulseItemBase frostNovaBase = OrreryContent.FrostNovaPulse;
         GameObject prefab = frostNovaBase == null ? null : frostNovaBase.wave;
         if (prefab == null)
             return;
@@ -196,7 +189,6 @@ public static class OrreryColdFusionPresentation
         for (int i = 0; i < cleanupScratch.Count; i++)
             Hide(cleanupScratch[i]);
         cleanupScratch.Clear();
-        frostNovaBase = null;
     }
 
     private static void UpdateState(AuraState state, float deltaTime)
