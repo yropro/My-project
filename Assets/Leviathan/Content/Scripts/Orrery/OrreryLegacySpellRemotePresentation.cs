@@ -18,10 +18,9 @@ public static class OrreryLegacySpellRemotePresentation
         public const int MaxCryoShards = 45;
     }
 
-    private const string InfernoCannonPath =
-        "Base/Items/PrimaryWeapon/Inferno Cannon";
-    private const string CryoGunPath =
-        "Base/Items/PrimaryWeapon/Cryo Gun";
+    // Tesla is intentionally left on its legacy dedicated lookup path until the
+    // planned Conductor replacement. Inferno and Cryo use OrreryContent so their
+    // local/remote presentations resolve the same override-aware source assets.
     private const string TeslaCoilPath =
         "Base/Items/PrimaryWeapon/Tesla Coil";
 
@@ -69,8 +68,6 @@ public static class OrreryLegacySpellRemotePresentation
     private static readonly Dictionary<GameShip, RemoteState> states =
         new Dictionary<GameShip, RemoteState>(4);
 
-    private static LauncherItemBase infernoBase;
-    private static LauncherItemBase cryoBase;
     private static BeamWeaponItemBase teslaBase;
     private static float baseCryoVisualSpeedWorld;
     private static bool baseCryoSpeedResolved;
@@ -671,16 +668,12 @@ public static class OrreryLegacySpellRemotePresentation
 
     private static LauncherItemBase GetInfernoBase()
     {
-        if (infernoBase == null)
-            infernoBase = Resources.Load<LauncherItemBase>(InfernoCannonPath);
-        return infernoBase;
+        return OrreryContent.InfernoCannon;
     }
 
     private static LauncherItemBase GetCryoBase()
     {
-        if (cryoBase == null)
-            cryoBase = Resources.Load<LauncherItemBase>(CryoGunPath);
-        return cryoBase;
+        return OrreryContent.CryoGun;
     }
 
     private static BeamWeaponItemBase GetTeslaBase()
@@ -794,8 +787,6 @@ public static class OrreryLegacySpellRemotePresentation
             DestroyTesla(state);
         }
         states.Clear();
-        infernoBase = null;
-        cryoBase = null;
         teslaBase = null;
         baseCryoVisualSpeedWorld = 0f;
         baseCryoSpeedResolved = false;
