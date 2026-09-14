@@ -17,6 +17,9 @@ using UnityEngine;
 /// </summary>
 public static class OrreryColdFusionPresentationLease
 {
+    // Co-op player counts are far below this in ordinary Star Vortex sessions.
+    // The fixed table keeps this presentation bridge allocation-stable and gives
+    // bounded behavior even if a future lobby configuration grows substantially.
     private const int MaxLeases = 16;
 
     private struct Lease
