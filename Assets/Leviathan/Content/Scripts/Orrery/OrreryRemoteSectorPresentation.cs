@@ -28,9 +28,17 @@ public static class OrreryRemoteSectorPresentation
             return;
         }
 
-        OrreryNetwork.PresentationState network;
-        if (!OrreryNetwork.TryReadRemote(remoteOwner, out network) ||
-            !network.Active)
+        // The wheel only needs proof that the common Orrery dynamic stream is
+        // live. Avoid TryReadRemote here because that also scans/decodes the
+        // Shatterbolt multipart bank even though sector geometry consumes none of
+        // it. Presence plus the base payload version is sufficient after the
+        // exact specialization gate above.
+        CoreNetwork.SlotReader common;
+        if (!CoreNetwork.TryReadSlot(
+                remoteOwner,
+                OrreryNetwork.SharedSlotId,
+                out common) ||
+            common.Byte() != OrreryNetwork.PayloadVersion)
         {
             OrrerySectorPresentation.Hide(remoteOwner);
             return;
