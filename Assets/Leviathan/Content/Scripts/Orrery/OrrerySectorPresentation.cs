@@ -27,10 +27,6 @@ public static class OrrerySectorPresentation
         public const float InnerLayerOpacity = 0.18f;
     }
 
-    private const string ThermalHaloPath = "Base/Items/AutoSpecial/Thermal Halo";
-    private const string ColdHaloPath = "Base/Items/AutoSpecial/Cold Halo";
-    private const string ElectricHaloPath = "Base/Items/AutoSpecial/Electric Halo";
-
     private sealed class PresentationState
     {
         public GameShip Owner;
@@ -42,6 +38,8 @@ public static class OrrerySectorPresentation
 
     private static readonly Dictionary<GameShip, PresentationState> states =
         new Dictionary<GameShip, PresentationState>(8);
+    private static readonly HashSet<OrreryElement> warnedInvalidHaloFields =
+        new HashSet<OrreryElement>();
 
     private static GameShip localOwner;
 
@@ -409,37 +407,31 @@ public static class OrrerySectorPresentation
 
     private static SpriteRenderer GetHaloFieldRenderer(OrreryElement element)
     {
-        string path = GetHaloPath(element);
-        if (string.IsNullOrEmpty(path))
+        HaloItemBase itemBase = OrreryContent.GetElementalHalo(element);
+        if (itemBase == null)
             return null;
 
-        HaloItemBase itemBase = Resources.Load<HaloItemBase>(path);
-        if (itemBase == null || itemBase.field == null)
+        if (itemBase.field == null)
         {
-            Debug.LogWarning(
-                "[Orrery] Could not load native Halo field for " + element + ".");
+            WarnInvalidHaloField(element, "has no field prefab");
             return null;
         }
 
         SpriteRenderer renderer = itemBase.field.GetComponent<SpriteRenderer>();
         if (renderer == null || renderer.sprite == null)
         {
-            Debug.LogWarning(
-                "[Orrery] Native Halo field for " + element +
-                " has no root SpriteRenderer.");
+            WarnInvalidHaloField(element, "has no root SpriteRenderer with a sprite");
             return null;
         }
         return renderer;
     }
 
-    private static string GetHaloPath(OrreryElement element)
+    private static void WarnInvalidHaloField(OrreryElement element, string reason)
     {
-        if (element == OrreryElement.Fire)
-            return ThermalHaloPath;
-        if (element == OrreryElement.Ice)
-            return ColdHaloPath;
-        if (element == OrreryElement.Lightning)
-            return ElectricHaloPath;
-        return null;
+        if (!warnedInvalidHaloFields.Add(element))
+            return;
+
+        Debug.LogWarning(
+            "[Orrery] Native Halo field for " + element + " " + reason + ".");
     }
 }
