@@ -12,11 +12,6 @@ using UnityEngine;
 /// </summary>
 public static class OrreryShatterboltRemotePresentation
 {
-    private const string LightningOrbPath =
-        "Base/Items/SecondaryWeapon/Lightning Orb Launcher";
-    private const string FrostNovaPath =
-        "Base/Items/Special/Frost Nova Pulse";
-
     private sealed class OrbVisualState
     {
         public Projectile Projectile;
@@ -59,9 +54,8 @@ public static class OrreryShatterboltRemotePresentation
 
     private static readonly Dictionary<GameShip, RemoteState> states =
         new Dictionary<GameShip, RemoteState>(4);
-
-    private static LauncherItemBase lightningOrbBase;
-    private static PulseItemBase frostNovaBase;
+    private static bool warnedInvalidOrbVisual;
+    private static bool warnedInvalidBurstVisual;
 
     public static void Tick(GameShip remoteOwner, float deltaTime)
     {
@@ -160,8 +154,6 @@ public static class OrreryShatterboltRemotePresentation
         }
 
         states.Clear();
-        lightningOrbBase = null;
-        frostNovaBase = null;
     }
 
     private static OrbVisualState SpawnOrb(GameShip owner, Vector2 position)
@@ -169,8 +161,7 @@ public static class OrreryShatterboltRemotePresentation
         if (PoolController.instance == null)
             return null;
 
-        if (lightningOrbBase == null)
-            lightningOrbBase = Resources.Load<LauncherItemBase>(LightningOrbPath);
+        LauncherItemBase lightningOrbBase = OrreryContent.LightningOrbLauncher;
         if (lightningOrbBase == null)
             return null;
 
@@ -190,6 +181,13 @@ public static class OrreryShatterboltRemotePresentation
         if (!visualObject.TryGetComponent<Projectile>(out projectile) ||
             projectile == null)
         {
+            if (!warnedInvalidOrbVisual)
+            {
+                warnedInvalidOrbVisual = true;
+                Debug.LogWarning(
+                    "[Orrery] Lightning Orb presentation prefab has no Projectile component; " +
+                    "remote Shatterbolt orb presentation was omitted.");
+            }
             ReturnUnexpectedVisual(visualObject);
             return null;
         }
@@ -303,8 +301,7 @@ public static class OrreryShatterboltRemotePresentation
         if (burst == null)
             return;
 
-        if (frostNovaBase == null)
-            frostNovaBase = Resources.Load<PulseItemBase>(FrostNovaPath);
+        PulseItemBase frostNovaBase = OrreryContent.FrostNovaPulse;
         GameObject prefab = frostNovaBase == null ? null : frostNovaBase.wave;
         if (prefab == null)
             return;
@@ -325,6 +322,13 @@ public static class OrreryShatterboltRemotePresentation
             circle == null ||
             circle.radius <= 0f)
         {
+            if (!warnedInvalidBurstVisual)
+            {
+                warnedInvalidBurstVisual = true;
+                Debug.LogWarning(
+                    "[Orrery] Frost Nova presentation prefab is missing a Wave or valid " +
+                    "CircleCollider2D; remote Shatterbolt burst presentation was omitted.");
+            }
             ReturnUnexpectedVisual(visualObject);
             return;
         }
