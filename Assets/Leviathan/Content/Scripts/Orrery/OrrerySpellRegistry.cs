@@ -89,12 +89,12 @@ public static class OrrerySpellRegistry
             OrrerySpellRuntime.ExecuteTesla));
 
         Register(new SpellDefinition(
-            3,
-            "Cone of Cold",
-            OrreryRecipeKey.Pure(OrreryElement.Ice, 2),
+            OrrerySpellCompendium.VoidWave.Id,
+            OrrerySpellCompendium.VoidWave.Name,
+            OrrerySpellCompendium.VoidWave.Recipe,
             OrrerySpellExecutionKind.Custom,
-            OrreryCombat.EffectIds.CryoGun,
-            OrrerySpellRuntime.ExecuteCryo));
+            0,
+            OrreryVoidWave.Execute));
 
         Register(new SpellDefinition(
             OrrerySpellCompendium.ColdFusion.Id,
