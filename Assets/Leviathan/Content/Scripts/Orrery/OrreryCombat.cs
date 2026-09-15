@@ -24,12 +24,16 @@ public static class OrreryCombat
         public const byte PlasmaBolt = 6;
         public const byte PlasmaBurnTick = 7;
         public const byte ImmolationTick = 8;
+        public const byte ArcResonance = 9;
         public const byte PlasmaBurnState = 64;
         public const byte PlasmaBurnRecent = 65;
         public const byte ImmolationState = 66;
         public const byte ImmolationRecent = 67;
         public const byte CastInvoked = 128;
     }
+
+    public static readonly CoreCombat.SemanticKey ArcResonance =
+        CoreCombat.SemanticKey.Create(SkillId, EffectIds.ArcResonance);
 
     public static readonly CoreCombat.SemanticKey MagmaCannon =
         CoreCombat.SemanticKey.Create(SkillId, EffectIds.MagmaCannon);

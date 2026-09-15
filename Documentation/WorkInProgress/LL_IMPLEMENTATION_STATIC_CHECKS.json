@@ -1,0 +1,30 @@
+{
+  "validation": "static source checks only",
+  "base_commit": "42fd79733de00151bac0788eb8c531cfae83fbf9",
+  "passed_checks": [
+    "Baseline audio source matches GitHub blob SHA",
+    "Existing asset lookup and cache discovery implementation preserved byte-for-byte",
+    "Preserved DefaultSpatialBlend",
+    "Preserved UseNativeDistance",
+    "Preserved PositionalAudioCleanupPaddingSeconds",
+    "Preserved one-second minimum object cleanup lifetime",
+    "New per-playback arguments are optional trailing parameters",
+    "Native base pitch and Effects mixer category retained",
+    "Clip default read only during playback setup, not during voice updates",
+    "Single replacement playback-lifetime component, no duplicate old timer",
+    "CoreAudioPlaybackTiming.cs: no Unity or Harmony dependency in portable state",
+    "OrreryLightningRodState.cs: no Unity or Harmony dependency in portable state",
+    "Stored target reference is immutable",
+    "Late strikes do not shorten the next cadence interval",
+    "Test compile input exists: Program.cs",
+    "Test compile input exists: ../../Assets/Leviathan/Content/Scripts/CoreAudioPlaybackTiming.cs",
+    "Test compile input exists: ../../Assets/Leviathan/Content/Scripts/Orrery/OrreryLightningRodState.cs",
+    "CoreAudioRuntime.cs: lexical delimiters balanced (not compilation)",
+    "CoreAudioPlaybackTiming.cs: lexical delimiters balanced (not compilation)",
+    "OrreryLightningRodState.cs: lexical delimiters balanced (not compilation)",
+    "Program.cs: lexical delimiters balanced (not compilation)"
+  ],
+  "csharp_tests_executed": false,
+  "unity_compiled": false,
+  "two_peer_playtest": false
+}

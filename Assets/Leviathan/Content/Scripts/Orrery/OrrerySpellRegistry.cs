@@ -81,12 +81,12 @@ public static class OrrerySpellRegistry
             OrrerySpellRuntime.ExecuteMagma));
 
         Register(new SpellDefinition(
-            2,
-            "Tesla Coil",
-            OrreryRecipeKey.Pure(OrreryElement.Lightning, 2),
-            OrrerySpellExecutionKind.ContinuousBeam,
-            OrreryCombat.EffectIds.TeslaCoil,
-            OrrerySpellRuntime.ExecuteTesla));
+            OrrerySpellCompendium.ArcResonance.Id,
+            OrrerySpellCompendium.ArcResonance.Name,
+            OrrerySpellCompendium.ArcResonance.Recipe,
+            OrrerySpellExecutionKind.Custom,
+            OrreryCombat.EffectIds.ArcResonance,
+            OrreryArcResonance.Execute));
 
         Register(new SpellDefinition(
             3,

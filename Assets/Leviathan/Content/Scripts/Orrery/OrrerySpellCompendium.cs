@@ -243,4 +243,105 @@ public static class OrrerySpellCompendium
         public const float ExplosionVisualScale = 1f;
         public const float PresentationTailSeconds = 1f;
     }
+
+    /// <summary>
+    /// Arc Resonance: one immutable target, discrete strikes, a moving blue arc.
+    /// LL is the two-element profile. LLL is a value-copy profile for the later
+    /// three-element unlock; no arbitrary power gap or new unlock is imposed here.
+    /// </summary>
+    public static class ArcResonance
+    {
+        public const ushort Id = 2; // Preserve the existing LL recipe identity.
+        public const string Name = "Arc Resonance";
+        public static readonly OrreryRecipeKey Recipe =
+            OrreryRecipeKey.Pure(OrreryElement.Lightning, 2);
+        public const string ZapPrefabPath =
+            "Assets/Leviathan/Content/Scripts/Orrery/ArcResonanceVFX/OrreryArcResonanceZap.prefab";
+        public const string ThunderClipName = "thunder";
+
+        // Value type: copying LL to LLL does not share mutable settings.
+        public struct Profile
+        {
+            // Metres are centre-to-centre. -1 cursor radius means unrestricted
+            // nearest-to-cursor selection among enemies inside the caster range.
+            public float TetherRangeMeters, CursorAcquisitionRadiusMeters;
+            public float RangeBreakGraceSeconds, RangeBonusScale;
+
+            // Independent controls: duration is an exclusive deadline, count a
+            // cap. A fourth hit at exactly t=6 needs duration >6, not merely count=4.
+            public int MaxStrikes;
+            public float DurationSeconds, FirstStrikeDelaySeconds, StrikeIntervalSeconds;
+            public float DurationBonusScale;
+
+            // Per-hit, pre-crit damage; not copied from the preceding hit.
+            // AdditionalDamagePercentPerStrike = 20 means 1.0 / 1.2 / 1.4 ...
+            public float IntegratedSecondsPerStrike, StrikeDamageMultiplier;
+            public float AdditionalDamagePercentPerStrike, FinalStrikeDamageMultiplier;
+            public float ImplementDamageBonusScale;
+            public float CritChanceBonusPoints, CritDamageBonusPercent, StatusChanceBonusPoints;
+
+            // Presentation only. Width is not a hitbox or a tether-range modifier.
+            public float BoltLifetimeSeconds, BoltWidthMeters, ZapWidthMultiplier;
+            public float BoltBrightnessMultiplier, BoltOpacity, BoltFadeOutSeconds;
+            public float BoltTintR, BoltTintG, BoltTintB;
+            public float ZapSampleNormalizedAge, ZapTextureRotationDegrees;
+            public float CasterOffsetXMeters, CasterOffsetYMeters;
+            public float TargetOffsetXMeters, TargetOffsetYMeters;
+            public int BoltSortingOrder;
+
+            // Per playback; never changes the WAV or another spell's envelope.
+            // Duration includes fade; -1 = natural duration / explicitly no fade.
+            public float ThunderVolume, ThunderPlaybackDurationSeconds, ThunderFadeOutStartSeconds;
+            public float ThunderSpatialBlend, ThunderMinDistanceMeters, ThunderMaxDistanceMeters;
+            public float ThunderTargetPositionBlend;
+        }
+
+        public static readonly Profile LL = new Profile
+        {
+            TetherRangeMeters = 85f,
+            CursorAcquisitionRadiusMeters = -1f,
+            RangeBreakGraceSeconds = 0f,
+            RangeBonusScale = 1f,
+            MaxStrikes = 3,
+            DurationSeconds = 6f,
+            FirstStrikeDelaySeconds = 0f,
+            StrikeIntervalSeconds = 2f,
+            DurationBonusScale = 0f,
+            IntegratedSecondsPerStrike = 2f, // Provisional balance, not old-Tesla equivalence.
+            StrikeDamageMultiplier = 1f,
+            AdditionalDamagePercentPerStrike = 0f,
+            FinalStrikeDamageMultiplier = 1f,
+            ImplementDamageBonusScale = 1f,
+            CritChanceBonusPoints = 0f,
+            CritDamageBonusPercent = 0f,
+            StatusChanceBonusPoints = 0f,
+            BoltLifetimeSeconds = 0.5f,
+            BoltWidthMeters = 10f,
+            ZapWidthMultiplier = 2f,
+            BoltBrightnessMultiplier = 1f,
+            BoltOpacity = 1f,
+            BoltFadeOutSeconds = 0.10f,
+            BoltTintR = 1f,
+            BoltTintG = 1f,
+            BoltTintB = 1f,
+            ZapSampleNormalizedAge = 0.20f,
+            ZapTextureRotationDegrees = 0f,
+            CasterOffsetXMeters = 0f,
+            CasterOffsetYMeters = 0f,
+            TargetOffsetXMeters = 0f,
+            TargetOffsetYMeters = 0f,
+            BoltSortingOrder = 20,
+            ThunderVolume = 1f,
+            ThunderPlaybackDurationSeconds = -1f,
+            ThunderFadeOutStartSeconds = 2.235f,
+            ThunderSpatialBlend = 0.75f,
+            ThunderMinDistanceMeters = -1f,
+            ThunderMaxDistanceMeters = -1f,
+            ThunderTargetPositionBlend = 0f
+        };
+
+        // Replace this value-copy with an independent initializer when the LLL
+        // differences are chosen. Recipe size is NOT a strike-count multiplier.
+        public static readonly Profile LLL = LL;
+    }
 }
