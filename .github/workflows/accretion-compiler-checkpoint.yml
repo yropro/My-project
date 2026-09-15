@@ -1,0 +1,43 @@
+# Temporary implementation-time compiler checkpoint. Contains no game binaries.
+name: Accretion compiler checkpoint
+on:
+  push:
+    branches: [codex/orrery-accretion-coop]
+    paths: ['.github/workflows/accretion-compiler-checkpoint.yml']
+permissions:
+  contents: read
+jobs:
+  compiler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+      - name: Package runtime, compiler and framework references only
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(dirname "$(readlink -f "$(command -v dotnet)")")"
+          runtime="$(find "$root/shared/Microsoft.NETCore.App" -mindepth 1 -maxdepth 1 -type d -name '8.*' | sort -V | tail -1)"
+          sdk="$(find "$root/sdk" -mindepth 1 -maxdepth 1 -type d -name '8.*' | sort -V | tail -1)"
+          refs="$(find "$root/packs/Microsoft.NETCore.App.Ref" -mindepth 1 -maxdepth 1 -type d -name '8.*' | sort -V | tail -1)"
+          fxr="$(find "$root/host/fxr" -mindepth 1 -maxdepth 1 -type d -name '8.*' | sort -V | tail -1)"
+          test -n "$runtime" && test -n "$sdk" && test -n "$refs" && test -n "$fxr"
+          dst="$RUNNER_TEMP/compiler-reference"
+          mkdir -p "$dst/shared/Microsoft.NETCore.App" "$dst/host/fxr"
+          cp "$root/dotnet" "$dst/"
+          cp -a "$runtime" "$dst/shared/Microsoft.NETCore.App/"
+          cp -a "$fxr" "$dst/host/fxr/"
+          cp -a "$sdk/Roslyn/bincore" "$dst/compiler"
+          cp -a "$refs/ref/net8.0" "$dst/references"
+          cp "$root/LICENSE.txt" "$root/ThirdPartyNotices.txt" "$dst/"
+          dotnet --info > "$dst/runner-dotnet-info.txt"
+          tar -C "$dst" -czf "$RUNNER_TEMP/compiler-reference.tar.gz" .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: compiler-reference
+          path: ${{ runner.temp }}/compiler-reference.tar.gz
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
