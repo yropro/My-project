@@ -6,6 +6,7 @@ using UnityEngine;
 /// Lightweight local presentation driver. Logical sectors stay in OrreryRuntime;
 /// this only keeps their presentation centered on the active Orrery ship.
 /// </summary>
+[DefaultExecutionOrder(10000)] // Sample parallax after the game camera's LateUpdate.
 public sealed class OrrerySectorPresentationDriver : MonoBehaviour
 {
     private static OrrerySectorPresentationDriver instance;
@@ -38,6 +39,7 @@ public sealed class OrrerySectorPresentationDriver : MonoBehaviour
         if (instance == this)
             instance = null;
         OrrerySectorPresentation.Hide();
+        OrreryVoidGallery.Hide();
     }
 
     public static bool Exists { get { return instance != null; } }

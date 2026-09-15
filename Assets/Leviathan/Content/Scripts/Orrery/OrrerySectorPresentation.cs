@@ -18,6 +18,7 @@ public static class OrrerySectorPresentation
         public const float OuterPaddingMeters = 8f;
         public const float SectorGapDegrees = 0f;
         public const int ArcSegmentsPer120Degrees = 28;
+        public const float VoidStarMotionMultiplier = 1.5f;
 
         // Two copies of each elemental Halo slice give a readable field without
         // making the wheel opaque enough to hide combat underneath it.
@@ -207,6 +208,11 @@ public static class OrrerySectorPresentation
         {
             OrreryRuntime.Sector sector = resolved.Sectors.Get(i);
             if (sector.Element == OrreryElement.None || sector.ArcDegrees <= 0f)
+                continue;
+
+            if (sector.Element == OrreryElement.Ice &&
+                VoidStarfieldSurface.CreateSector(state.Root.transform, outerRadiusWorld,
+                    sector.StartDegrees, sector.ArcDegrees, Tuning.VoidStarMotionMultiplier) != null)
                 continue;
 
             SpriteRenderer haloSource = GetHaloFieldRenderer(sector.Element);
