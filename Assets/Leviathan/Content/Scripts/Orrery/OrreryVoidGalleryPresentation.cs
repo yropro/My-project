@@ -14,9 +14,9 @@ using UnityEngine;
 /// </summary>
 public static class OrreryVoidGalleryPresentation
 {
-    // Temporary kill switch. Non-const so production sector code remains reachable
-    // to the compiler while the gallery is enabled for this visual test.
-    public static bool Enabled = true;
+    // Opt-in visual test. Default false restores the normal local/remote sectors.
+    // Keep non-const so both presentation paths remain reachable to the compiler.
+    public static bool Enabled = false;
 
     public const int GridSize = 6;
     public const float CellSizeMeters = 65f;
