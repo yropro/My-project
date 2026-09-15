@@ -102,6 +102,7 @@ public static class OrreryNetwork
     {
         if (initialized) return;
         OrreryPresentationNetwork.EnsureInitialized();
+        OrreryAccretionDisk.EnsureInitialized();
         CoreNetworkPresentation.Register("Orrery/send",
             publish: OrreryPresentationNetwork.PublishForSend);
         CoreNetworkPresentation.Register("Orrery/Magma-Tesla-Cryo",
@@ -135,6 +136,19 @@ public static class OrreryNetwork
             forget: OrreryColdFusionPresentationLease.OnShipDestroyed,
             died: OrreryColdFusionPresentationLease.OnShipDied,
             reset: OrreryColdFusionPresentationLease.Reset);
+        CoreCrossOwnerEffects.RegisterObserver(
+            OrreryAccretionDisk.ApplyEffectId,
+            OrreryAccretionDiskPresentationLease.ObserveGrant);
+        CoreNetworkPresentation.Register("Orrery/AccretionDisk",
+            update: OrreryAccretionDiskPresentation.Tick,
+            forget: OrreryAccretionDiskPresentation.Hide,
+            died: OrreryAccretionDiskPresentation.Hide,
+            reset: OrreryAccretionDiskPresentation.Reset);
+        CoreNetworkPresentation.Register("Orrery/AccretionDisk-lease",
+            update: dt => OrreryAccretionDiskPresentationLease.Tick(),
+            forget: OrreryAccretionDiskPresentationLease.OnShipDestroyed,
+            died: OrreryAccretionDiskPresentationLease.OnShipDied,
+            reset: OrreryAccretionDiskPresentationLease.Reset);
         initialized = true;
     }
 
