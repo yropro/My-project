@@ -200,3 +200,81 @@ three-record ceiling dropped that valid shape. Whole-group budget selection stil
 applies, so larger frames can be omitted when essential state leaves insufficient
 room. Remaining live checks include overlapping Plasma/Immolation effects and
 visual refresh under packet loss/budget pressure.
+
+## Recipient barriers and shared projectile capture (2026-09-15)
+
+Accretion is the first consumer of `CoreIncomingDamage`'s **whole-application**
+veto. Its GameShip gate is after incoming scaling/caps and before the native base
+call. A blocked application returns from the enclosing override; it does not
+merely mutate the caller's shared damage array. `CoreDamageApplicationObservation`
+tracks the first application of a scoped native received-hit call, propagating
+only pre-native section forwarding, not independent reflected/conduit hits.
+`CoreIncomingDamageTails` prevents network knockback/impale and local ImpaleMissile
+received-hit tails after that exact application is vetoed. Ordinary inactive paths
+continue normally. Direct resource costs that bypass damage are not intercepted.
+
+`CoreProjectileCapture` reserves cross-owner effect id **0x0101** on the existing
+reliable `CoreCrossOwnerEffects` lane (no new native receive hook). Providers own
+ReadField/Reserve/Settle/Fault/Eligible policy; Core owns fixed records, identity,
+packet validation, native authority and retries. Accretion provider id is **1**;
+its cast grant remains **0x0202**. Retired prototype ids 0x0203/0x0204 are not used.
+
+The six existing uint payload words are `(generation, transaction-or-field-sequence,
+projectile-id-or-radius-bits, value-or-duration-bits, zero, version/phase/provider)`.
+The final word packs version 1 in bits 16..31, phase in 8..15 and provider in 0..7.
+Phases are Announce=1, Prepare=2, Authorize=3, Reject=4, Captured=5, Aborted=6,
+Receipt=7, Unknown=8, Query=9. Unexpected control payloads and non-finite/zero shot
+costs are rejected. Announcements carry geometry, remaining duration and generation,
+**not capacity**. They are gameplay leases, independent of optional VFX snapshots.
+
+Simulator contact holds the exact authoritative projectile, including native
+lifetime/physics, while the recipient earmarks capacity before Authorize. Only
+Captured settles expenditure/healing; explicit Aborted restores the earmark.
+Simulator results are retained/retried until Receipt. Duplicate/stale exchanges
+cannot consume a second ticket. A process-lifetime id/high-watermark prevents
+reallocating completed old proposals. An authorization may settle after authored
+expiry, but never mutate a replaced generation. Unknown outcomes are not refunded:
+after the bounded retry window the affected generation is retired without healing.
+This conservative degradation is preferable to unlimited free captures.
+
+Bounds per client: 4 registered providers, 16 peer slots, 64 simulator exchanges,
+64 recipient exchanges, 32 new remote captures/second, 192 outgoing service
+messages/second and 12/tick. Hold timeout is 1.25 seconds, retry interval 0.20,
+uncertainty window 8 seconds. Field refresh interval is 0.25 seconds with a 1-second
+lease. Exhausted budgets preserve native projectiles (or explicitly abort/resume
+held ones); the recipient damage veto remains active. Terminal exchanges may stay
+until receipt/world cleanup, so persistent transport failure can temporarily exhaust
+capture slots; it never grants free absorption. Reliable grants already use the
+native star-scoped relay. No per-hit capacity broadcast was introduced.
+
+`CoreProjectileSweep` uses the installed Projectile/FuzzyProjectile native queries
+and inserts field contact before the next accepted native collision. It preserves
+prior obstacles, radius, piercing/reflect continuation and subclass cadence. Mine
+and fired CapturedProjectile retain their virtual behavior; starting-inside checks
+also cover stationary mines. Orbiting/drawn captured shots and unvalued/source-less
+shots are deliberately not captured; any actual incoming damage still reaches the
+receiver gate. Nominal launcher Damage values ordinary/explosive shots, without a
+fictional crit or multiplication by potential explosion victims. Fired captured
+shots add their explicit flat/percentage budget, excluding the cannon's transient
+per-hit bonus.
+
+`CoreProjectileSpawnGuard` is necessary because native Projectile.Init sweeps before
+Launcher.AddProjectile/RegisterNetProjectile. An init contact can stop/hold that
+sweep, but despawn waits for the enclosing launcher completion or the shared next
+tick for another native spawn path. The field is revalidated then. Pool reset,
+recast, object replacement and world teardown cannot capture a reused instance.
+
+Accretion's lifetime bridge ticks the local recipient independently of Orrery class
+membership. Typed presentation codec **7** is likewise published before class-only
+send gating. Active payloads are **18 bytes**, ended payloads **5 bytes**, plus the
+existing channel framing/generation. The active payload is flags, uint sample,
+float remaining, float authored duration, float radius, byte capacity fraction.
+Monotone samples, bounded deadlines and ended-generation tombstones prevent stale
+snapshots from restarting a disk. Whole-group omission is not cancellation.
+
+Tests: `Tests/run-network-tests.ps1` retains the full installed-reference build,
+network integration/selector suites and adds native Accretion IL/codec assertions.
+Its multi-runtime protocol tests use .NET 8, not Unity Mono. A .NET 8 SDK is needed.
+`python Tests/run-portable-tests.py` runs portable production-code suites without
+installed game DLLs. The GitHub workflow runs these same sources with explicitly
+named Unity/transport doubles; passing it is not live physics/socket validation.

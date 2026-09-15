@@ -38,6 +38,7 @@ public static class OrreryPresentationNetwork
     public const byte CodecTeslaCoil = 4;
     public const byte CodecConeOfCold = 5;
     public const byte CodecColdFusion = 6;
+    public const byte CodecAccretion = 7;
 
     // Record framing:
     //   every part: byte codec, byte descriptor
@@ -350,6 +351,9 @@ public static class OrreryPresentationNetwork
         buildingSendFrame = true;
         try
         {
+            // Support recipients publish even without Orrery class/common state.
+            // Small active/terminal state takes priority over large spell tails.
+            OrreryAccretionDiskPresentationLease.Publish();
             if (owner != null && OrreryRuntime.IsActive(owner))
             {
                 OrreryLegacySpellPresentation.Publish(owner);

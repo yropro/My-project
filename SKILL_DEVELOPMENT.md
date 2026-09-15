@@ -165,3 +165,20 @@ Run the appropriate build and regression checks. A compile, selector check or
 standalone test double is not a live-game result. Report what changed, what passed,
 and what still needs in-game verification. Update the relevant one of these three
 guides when a shared contract changes; keep review history in the archive.
+
+### Accretion Disk playtest integration (2026-09-15)
+
+Accretion uses one recipient-owned reservoir for whole-hit incoming vetoes and
+confirmed projectile captures. Full final-hit blocking is intentional; healing
+uses only consumed capacity. The Void implement supplies barrier power/range/
+duration; Stellar supplies conversion scaling. Tuning is in
+`OrrerySpellCompendium.AccretionDisk`, not in Core transport constants.
+
+The approved unordered Stellar/Void/Void recipe remains Fire/Ice/Ice internally.
+Because the baseline class currently assembles two-rune formulas, the isolated
+co-op playtest build exposes **Ctrl+Shift+F8** via the existing local Orrery
+controller. It executes the same focus resolution, ally-near-cursor/self fallback,
+reliable grant and shuffle paths, without silently changing the recipe or granting
+third-satellite progression. `PlaytestShortcutEnabled` disables this temporary
+entry point for a progression release. Cast dispatch is never reported as a remote
+application acknowledgement. See `Documentation/ACCRETION_COOP_IMPLEMENTATION.md`.

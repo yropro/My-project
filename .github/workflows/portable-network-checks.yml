@@ -1,0 +1,44 @@
+name: Portable network regression checks
+on:
+  push:
+    branches: [codex/orrery-accretion-coop]
+  pull_request:
+    paths:
+      - 'Assets/Leviathan/Content/Scripts/**'
+      - '.github/workflows/portable-network-checks.yml'
+permissions:
+  contents: read
+concurrency:
+  group: portable-network-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  portable-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run production code with explicit engine and transport doubles
+        run: python Assets/Leviathan/Content/Scripts/Tests/run-portable-tests.py --output "${{ runner.temp }}/portable-results"
+      - name: Retain test logs and exact reviewed source (no game DLLs)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: network-validation-source
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/portable-results/*.log
+            Assets/Leviathan/Content/Scripts/**
+            Assets/**/SS_*.cs
+            Assets/**/*.asmdef
+            SKILL_DEVELOPMENT.md
+            NATIVE_API_COMPATIBILITY.md
+            Documentation/ACCRETION_COOP_IMPLEMENTATION.md
+            Packages/manifest.json
+            ProjectSettings/ProjectVersion.txt

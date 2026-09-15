@@ -6,25 +6,26 @@ using UnityEngine;
 /// Orrery spell-lifetime orchestration boundary.
 ///
 /// This layer owns WHEN persistent spell runtimes are ticked or torn down.
-/// Individual spells continue to own WHAT their runtime state means and how it
-/// behaves while alive. Keep this dispatcher deliberately explicit; it is not a
-/// generic spell engine or registry.
-///
-/// Shatterbolt and Plasma Bolt are both migrated here. Their spell files retain
-/// their mechanics, presentation state, combat provenance, and other spell-specific
-/// behavior; this layer only owns shared fixed-step and teardown timing.
+/// Individual spells own WHAT their state means. Accretion is unusual only in
+/// that its authoritative runtime may live on a non-Orrery recipient; the same
+/// shared lifetime bridge therefore ticks both the local Orrery owner and the
+/// personally authoritative local player target.
 /// </summary>
 public static class OrrerySpellLifetime
 {
     private static GameShip lastLocalOwner;
 
-    /// <summary>
-    /// Resolves the one locally authoritative Orrery owner, tears down the prior
-    /// owner when that identity changes, then dispatches one bounded fixed step to
-    /// each migrated persistent spell runtime.
-    /// </summary>
     public static void FixedTickLocal(float deltaTime)
     {
+        GameShip localPlayer = WorldController.instance == null
+            ? null
+            : WorldController.instance.GetCurrentPlayerShip();
+
+        // Recipient-authoritative support effects must tick even when this peer's
+        // local class is Leviathan/vanilla rather than Orrery.
+        OrreryAccretionDisk.FixedTickRecipient(localPlayer, deltaTime);
+        CoreProjectileCapture.Tick();
+
         CoreOwnerContext context = CoreClassRuntime.CurrentContext;
         GameShip owner = context != null && context.IsValid &&
             context.ClassId == CoreClassId.Orrery
@@ -35,7 +36,6 @@ public static class OrrerySpellLifetime
         {
             if (!object.ReferenceEquals(lastLocalOwner, null))
                 ForgetOwner(lastLocalOwner);
-
             lastLocalOwner = owner;
         }
 
@@ -45,21 +45,12 @@ public static class OrrerySpellLifetime
         FixedTickOwner(owner, deltaTime);
     }
 
-    /// <summary>
-    /// Explicit fixed-step dispatcher. Spell-specific mechanics and state stay in
-    /// their owning runtime; this method only decides that the runtimes get a tick.
-    /// </summary>
     private static void FixedTickOwner(GameShip owner, float deltaTime)
     {
         OrreryShatterbolt.FixedTick(owner, deltaTime);
         OrreryPlasmaBolt.FixedTick(owner, deltaTime);
     }
 
-    /// <summary>
-    /// Tears down persistent spell state owned by one Orrery ship. Every child
-    /// cleanup remains idempotent so callers may safely converge here from class
-    /// exit, owner replacement, destruction, or controller teardown.
-    /// </summary>
     public static void ForgetOwner(GameShip owner)
     {
         if (object.ReferenceEquals(owner, null))
@@ -67,47 +58,41 @@ public static class OrrerySpellLifetime
 
         OrreryShatterbolt.Forget(owner);
         OrreryPlasmaBolt.Forget(owner);
+        OrreryAccretionDisk.ForgetOrreryOwner(owner);
 
         if (object.ReferenceEquals(lastLocalOwner, owner))
             lastLocalOwner = null;
     }
 
-    /// <summary>
-    /// Handles the wider ship-destruction boundary needed by spells with state
-    /// attached to arbitrary target ships. Plasma Burn target/presentation cleanup
-    /// must run before native pooled-child teardown, exactly as it did in the
-    /// spell-local Destroyed patch before migration.
-    /// </summary>
     public static void ForgetShip(GameShip ship)
     {
         if (object.ReferenceEquals(ship, null))
             return;
 
+        OrreryAccretionDisk.ForgetTarget(ship);
         OrreryPlasmaBolt.ForgetTarget(ship);
         ForgetOwner(ship);
         OrreryPlasmaBoltPresentation.ForgetTarget(ship);
         OrreryPlasmaBoltPresentation.Forget(ship);
+        OrreryAccretionDiskPresentation.Hide(ship);
     }
 
-    /// <summary>
-    /// World-global teardown for migrated persistent Orrery spell runtimes and
-    /// the shared owner-agnostic services those runtimes use. Remote presentation
-    /// remains owned by its presentation-specific world lifecycle.
-    /// </summary>
     public static void ResetWorld()
     {
         OrreryShatterbolt.Reset();
         OrreryPlasmaBolt.Reset();
+        OrreryAccretionDisk.Reset();
         OrreryDamageRouter.Reset();
         lastLocalOwner = null;
     }
 }
 
 /// <summary>
-/// Single fixed-step bridge for persistent Orrery spell lifetime orchestration.
-/// Individual spell files do not own their own controller FixedUpdate patches.
+/// One fixed-step bridge for persistent Orrery lifetimes. WorldController is used
+/// rather than the Orrery controller because recipient-owned support effects must
+/// continue on peers whose local player is using another class.
 /// </summary>
-[HarmonyPatch(typeof(OrreryController), "FixedUpdate")]
+[HarmonyPatch(typeof(WorldController), "FixedUpdate")]
 public static class OrrerySpellLifetimeFixedTickPatch
 {
     public static void Postfix()
@@ -134,8 +119,6 @@ public static class OrrerySpellLifetimeOwnerDestroyedPatch
     }
 }
 
-// Native Destroyed returns/disowns pooled children before Unity OnDestroy.
-// Release spell-owned target presentation before that native sweep runs.
 [HarmonyPatch(typeof(GameShip), "Destroyed")]
 public static class OrrerySpellLifetimeShipDyingPatch
 {

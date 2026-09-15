@@ -70,8 +70,6 @@ public static class OrrerySpellRegistry
         if (defaultsRegistered)
             return;
 
-        // Baseline Orrery formulas use two satellites. Each formula keeps one
-        // stable spell id; mechanically unusual spells remain explicit executors.
         Register(new SpellDefinition(
             1,
             "Magma Cannon",
@@ -119,6 +117,14 @@ public static class OrrerySpellRegistry
             OrrerySpellExecutionKind.Custom,
             OrreryCombat.EffectIds.Shatterbolt,
             OrreryShatterbolt.Execute));
+
+        Register(new SpellDefinition(
+            OrrerySpellCompendium.AccretionDisk.Id,
+            OrrerySpellCompendium.AccretionDisk.Name,
+            OrrerySpellCompendium.AccretionDisk.Recipe,
+            OrrerySpellExecutionKind.Custom,
+            0,
+            OrreryAccretionDisk.Execute));
 
         defaultsRegistered = true;
     }
