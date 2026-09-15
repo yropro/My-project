@@ -116,6 +116,12 @@ public static class OrreryNetwork
             render: RenderPlasma,
             forget: ForgetPlasma,
             reset: OrreryPlasmaBoltPresentation.Reset);
+        CoreNetworkPresentation.Register("Orrery/ArcResonance",
+            render: OrreryArcResonancePresentation.Render,
+            update: OrreryArcResonancePresentation.Update,
+            forget: OrreryArcResonancePresentation.ForgetShip,
+            died: OrreryArcResonancePresentation.ForgetShip,
+            reset: OrreryArcResonancePresentation.Reset);
         CoreNetworkPresentation.Register("Orrery/sectors",
             render: (owner, dt) => OrreryRemoteSectorPresentation.Tick(owner),
             forget: OrreryRemoteSectorPresentation.Forget,

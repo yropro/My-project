@@ -60,9 +60,10 @@ public static class OrreryArcResonance
             PhysicsController.instance == null || !OrreryDamageRouter.EnsureAvailable()) return false;
         if (local != null && !local.Ended) return false;
 
-        int size = invocation.Recipe.RuneCount;
-        if ((size != 2 && size != 3) || !invocation.Recipe.Equals(OrreryRecipeKey.Pure(OrreryElement.Lightning, size)))
+        bool twoRunes = invocation.Recipe.Equals(OrrerySpellCompendium.ArcResonance.Recipe);
+        if (!twoRunes && !invocation.Recipe.Equals(OrreryRecipeKey.Pure(OrreryElement.Lightning, 3)))
             return false;
+        int size = twoRunes ? 2 : 3;
         Profile tuning = GetProfile((byte)size);
         OrreryFocusProfile.Resolved focus;
         if (!OrreryFocusProfile.TryResolve(owner, OrreryElement.Lightning, out focus) || !focus.IsValid)

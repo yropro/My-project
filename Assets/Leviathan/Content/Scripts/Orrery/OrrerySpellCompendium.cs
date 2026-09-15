@@ -256,7 +256,7 @@ public static class OrrerySpellCompendium
         public static readonly OrreryRecipeKey Recipe =
             OrreryRecipeKey.Pure(OrreryElement.Lightning, 2);
         public const string ZapPrefabPath =
-            "Assets/Vefects/Zap VFX URP/VFX/Zap/Particles/VFX_Zap_02_Blue.prefab";
+            "Assets/Leviathan/Content/Scripts/Orrery/ArcResonanceVFX/OrreryArcResonanceZap.prefab";
         public const string ThunderClipName = "thunder";
 
         // Value type: copying LL to LLL does not share mutable settings.
@@ -284,6 +284,7 @@ public static class OrrerySpellCompendium
             public float BoltLifetimeSeconds, BoltWidthMeters, ZapWidthMultiplier;
             public float BoltBrightnessMultiplier, BoltOpacity, BoltFadeOutSeconds;
             public float BoltTintR, BoltTintG, BoltTintB;
+            public float ZapSampleNormalizedAge, ZapTextureRotationDegrees;
             public float CasterOffsetXMeters, CasterOffsetYMeters;
             public float TargetOffsetXMeters, TargetOffsetYMeters;
             public int BoltSortingOrder;
@@ -323,6 +324,8 @@ public static class OrrerySpellCompendium
             BoltTintR = 1f,
             BoltTintG = 1f,
             BoltTintB = 1f,
+            ZapSampleNormalizedAge = 0.20f,
+            ZapTextureRotationDegrees = 0f,
             CasterOffsetXMeters = 0f,
             CasterOffsetYMeters = 0f,
             TargetOffsetXMeters = 0f,

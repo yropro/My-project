@@ -38,6 +38,8 @@ public static class OrreryPresentationNetwork
     public const byte CodecTeslaCoil = 4;
     public const byte CodecConeOfCold = 5;
     public const byte CodecColdFusion = 6;
+    // 7 is reserved by the concurrent Accretion Disk branch. Do not reuse it.
+    public const byte CodecArcResonance = 8;
 
     // Record framing:
     //   every part: byte codec, byte descriptor
@@ -353,6 +355,7 @@ public static class OrreryPresentationNetwork
             if (owner != null && OrreryRuntime.IsActive(owner))
             {
                 OrreryLegacySpellPresentation.Publish(owner);
+                OrreryArcResonancePresentation.Publish(owner);
                 OrreryNetwork.PublishLocal(owner);
                 OrreryNetwork.PublishTimedEffects(owner);
             }
