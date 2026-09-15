@@ -30,7 +30,9 @@ public sealed class OrrerySectorPresentationDriver : MonoBehaviour
                 ? context.Ship
                 : null;
 
-        OrrerySectorPresentation.Tick(owner);
+        // Temporary void comparison: uncomment after visual testing.
+        // OrrerySectorPresentation.Tick(owner);
+        OrreryVoidGallery.Tick(owner);
     }
 
     private void OnDestroy()
@@ -38,6 +40,7 @@ public sealed class OrrerySectorPresentationDriver : MonoBehaviour
         if (instance == this)
             instance = null;
         OrrerySectorPresentation.Hide();
+        OrreryVoidGallery.Hide();
     }
 
     public static bool Exists { get { return instance != null; } }

@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "Unity.TextMeshPro",
+        "StarfieldShaders.Runtime",
         "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [],
