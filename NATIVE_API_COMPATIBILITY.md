@@ -74,3 +74,30 @@ native damage-router binding against the installed game. It also tests framing
 and routing, with test doubles explicitly identified. It does not execute every
 Harmony patch or provide a live Unity/co-op result. Recheck the native boundary
 when the game or reference assemblies change; do not invent fallback signatures.
+
+## Accretion barrier bindings (2026-09-15)
+
+Audited against supplied installed Assembly-CSharp.dll:
+MVID `dacecd9e-6ef3-4df5-8118-67cde157a00b`, SHA-256
+`971e8a13a525ce3fab52074ae1b73926626e533671e696c39b84c84049d93f5b`.
+
+`CoreIncomingDamage` validates the unique direct base-call argument shape in
+GameShip.Damage (integer critical tier) and GameShip.DirectDamage. A whole-hit veto
+returns before native defenses and the enclosing received-hit tail. Separately,
+NetCombat.ApplyDamageEvent and ImpaleMissile.HitObject have tails outside that
+override; the shared application watch suppresses only a vetoed first application.
+The network tail gate remains after ClearPendingKillContext.
+
+`CoreProjectileSweep` validates native Projectile/FuzzyProjectile query, reflect
+and virtual HitObject sites. `CoreProjectileSpawnGuard` covers Projectile.Init's
+pre-registration collision sweep and Launcher.ShootProjectile completion. Native
+CaptureDestroy calls NotifyNetDespawn and AutoDestroy.ScheduleDestroy directly,
+bypassing the ordinary Projectile.ScheduleDestroy explosion override. Fired captured
+shot valuation uses the verified `capturedDamagePercentage` and
+`currentShotBonusDamage` float fields. PoolDestroy/ResetObject invalidate holds.
+
+`AccretionNativeTests` checks these real method bodies, signatures, ordering and
+independent wire bytes. A changed MVID deliberately requires re-auditing rather
+than accepting old selector evidence. Tests transform actual native IL but do not
+execute Unity physics, render placeholders, or certify Harmony patch execution in
+the game's Mono runtime. ProjectVersion.txt and bundle versions are unchanged.

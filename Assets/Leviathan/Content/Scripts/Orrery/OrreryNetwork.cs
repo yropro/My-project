@@ -136,18 +136,11 @@ public static class OrreryNetwork
             forget: OrreryColdFusionPresentationLease.OnShipDestroyed,
             died: OrreryColdFusionPresentationLease.OnShipDied,
             reset: OrreryColdFusionPresentationLease.Reset);
-        CoreCrossOwnerEffects.RegisterObserver(
-            OrreryAccretionDisk.ApplyEffectId,
-            OrreryAccretionDiskPresentationLease.ObserveGrant);
         CoreNetworkPresentation.Register("Orrery/AccretionDisk",
+            render: OrreryAccretionDiskPresentationLease.Render,
             update: OrreryAccretionDiskPresentation.Tick,
-            forget: OrreryAccretionDiskPresentation.Hide,
-            died: OrreryAccretionDiskPresentation.Hide,
-            reset: OrreryAccretionDiskPresentation.Reset);
-        CoreNetworkPresentation.Register("Orrery/AccretionDisk-lease",
-            update: dt => OrreryAccretionDiskPresentationLease.Tick(),
-            forget: OrreryAccretionDiskPresentationLease.OnShipDestroyed,
-            died: OrreryAccretionDiskPresentationLease.OnShipDied,
+            forget: OrreryAccretionDiskPresentationLease.Forget,
+            died: OrreryAccretionDiskPresentationLease.Died,
             reset: OrreryAccretionDiskPresentationLease.Reset);
         initialized = true;
     }

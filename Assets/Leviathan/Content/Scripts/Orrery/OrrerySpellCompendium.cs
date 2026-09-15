@@ -106,34 +106,35 @@ public static class OrrerySpellCompendium
                 .Add(OrreryElement.Ice)
                 .Add(OrreryElement.Ice);
 
-        // Core barrier tuning.
+        // Void owns barrier capacity, duration, and extension; Stellar owns the
+        // conversion bonus. These are separate components, not averaged donors.
         public const float BaseDurationSeconds = 8f;
-        public const float BaseRadiusMeters = 80f;
+        public const float ExtensionMeters = 80f;
         public const float CapacityReferenceSeconds = 4f;
         public const float CapacityMultiplier = 1f;
-        public const float HealFraction = 0.50f;
-
-        // One Stellar + two Void runes: use the same weighting for reference
-        // output, compatible duration rolls and compatible range rolls.
-        public const float MixedFocusVoidWeight = 2f / 3f;
+        public const float HealFraction = 0.30f;
+        public const float MaximumHealFraction = 5f;
         public const float DurationModifierScale = 1f;
         public const float RadiusModifierScale = 1f;
+        public const float HealingModifierScale = 1f;
 
-        // Ally nearest cursor wins; fallback is self.
         public const float CursorTargetRadiusMeters = 120f;
         public const float MaximumTargetRangeMeters = 300f;
         public const int MaxCandidateShips = 16;
 
-        // Projectile-field tuning. 0 scans every target-authority fixed step.
-        public const float ProjectileScanIntervalSeconds = 0f;
-        public const int MaxProjectileCandidatesPerScan = 64;
-        public const float RemoteValidationRadiusPaddingFraction = 0.20f;
+        // Temporary test gesture while the normal class still has two formula
+        // satellites: Ctrl+Shift+F8. Disable for production progression releases.
+        public const bool PlaytestShortcutEnabled = true;
+        public const float PlaytestShortcutCooldownSeconds = 1f;
 
-        // Placeholder presentation. Gameplay radius remains authoritative and the
-        // disabled Frost Nova visual is scaled to this radius.
+        // Visual radius stays mechanically coupled by default. Capacity depletion
+        // increases brightness; duration fading is an independent optional idea.
         public const float VisualRadiusMultiplier = 1f;
         public const float VisualOpacity = 0.38f;
-        public const float MinimumCapacityOpacityFraction = 0.25f;
+        public const float FullCapacityBrightness = 1f;
+        public const float DepletedCapacityBrightness = 3f;
+        public const bool FadeWithDuration = false;
+        public const float MinimumDurationOpacityFraction = 0.35f;
         public const float VisualRotationDegreesPerSecond = 18f;
     }
 

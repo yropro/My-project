@@ -489,7 +489,8 @@ public static class NetworkIntegrationTests
         int entryCount = entries.Count;
         CoreNetwork.RegisterDefaultSlots();
         OrreryNetwork.Initialize();
-        Assert(entries.Count == entryCount && entryCount == 8, "Repeated initialization duplicated callbacks");
+        Assert(entries.Count == entryCount, "Repeated initialization duplicated callbacks");
+        Assert(entryCount == 9, "Unexpected presentation composition (includes Accretion)");
         var slots = (IDictionary)Get("slots");
         for (byte i = 1; i <= 14; i++) Assert(slots.Contains(i), "Missing registered mod slot " + i);
     }

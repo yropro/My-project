@@ -24,6 +24,7 @@ public static class OrrerySpellLifetime
         // Recipient-authoritative support effects must tick even when this peer's
         // local class is Leviathan/vanilla rather than Orrery.
         OrreryAccretionDisk.FixedTickRecipient(localPlayer, deltaTime);
+        CoreProjectileCapture.Tick();
 
         CoreOwnerContext context = CoreClassRuntime.CurrentContext;
         GameShip owner = context != null && context.IsValid &&

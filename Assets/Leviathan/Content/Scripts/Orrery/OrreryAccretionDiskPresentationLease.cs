@@ -1,234 +1,104 @@
 using StarVortex;
+using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Bounded player-identity lease for ally-targeted Accretion presentation.
-/// Gameplay already lives on the protected player's authority; this only keeps
-/// the placeholder aura attached across delayed/replaced remote replicas.
-/// </summary>
+/// <summary>Recipient-authored snapshots replace unconfirmed cast-grant visuals.
+/// Missing optional data does not cancel an effect. Explicit terminal snapshots,
+/// monotone samples and bounded local deadlines prevent resurrection/restarts.</summary>
 public static class OrreryAccretionDiskPresentationLease
 {
-    private const int MaxLeases = 16;
-
-    private struct Lease
+    public struct Snapshot
     {
         public bool Active;
-        public int PlayerId;
-        public int SourcePlayerId;
-        public int Sequence;
-        public float ExpiresAt;
-        public float RadiusMeters;
-        public GameShip BoundShip;
+        public uint Sample;
+        public float RemainingSeconds, DurationSeconds, RadiusWorld;
+        public byte Capacity;
     }
-
-    private static readonly Lease[] leases = new Lease[MaxLeases];
-
-    public static void ObserveGrant(
-        NetSession session,
-        CoreCrossOwnerEffects.GrantNotice notice)
+    private struct Lease
     {
-        float duration;
-        float radius;
-        if (!OrreryAccretionDisk.TryReadPresentationGrant(
-                notice.Payload,
-                out duration,
-                out radius))
-        {
-            return;
-        }
-
-        Remember(
-            session,
-            notice.SourcePlayerId,
-            notice.TargetPlayerId,
-            notice.Sequence,
-            duration,
-            radius);
+        public uint Generation, Sample;
+        public bool Ended;
+        public float ExpiresAt, Duration;
+        public byte Capacity;
     }
+    private static readonly OrreryNetwork.Channel<Snapshot> channel =
+        new OrreryNetwork.Channel<Snapshot>(OrreryPresentationNetwork.CodecAccretion, Wire);
+    private static readonly Dictionary<GameShip, Lease> leases = new Dictionary<GameShip, Lease>(16);
+    private static uint nextSample;
 
-    private static void Remember(
-        NetSession session,
-        int sourcePlayerId,
-        int playerId,
-        int sequence,
-        float durationSeconds,
-        float radiusMeters)
+    // Active payload: 18 bytes; terminal payload: 5 bytes. The enclosing channel
+    // supplies generation. The format has no scene/clock-dependent branches.
+    public static void Wire(ref CoreWire wire, ref Snapshot state)
     {
-        if (session == null || sourcePlayerId < 0 || playerId < 0 ||
-            sequence <= 0 || durationSeconds <= 0f || radiusMeters <= 0f)
-        {
-            return;
-        }
-
-        float now = Time.time;
-        int match = -1;
-        int free = -1;
-        int oldest = -1;
-        float oldestExpiry = float.PositiveInfinity;
-
-        for (int i = 0; i < leases.Length; i++)
-        {
-            Lease lease = leases[i];
-            if (lease.Active && lease.PlayerId == playerId)
-            {
-                match = i;
-                break;
-            }
-
-            if (!lease.Active)
-            {
-                if (free < 0)
-                    free = i;
-                continue;
-            }
-
-            if (lease.ExpiresAt < oldestExpiry)
-            {
-                oldestExpiry = lease.ExpiresAt;
-                oldest = i;
-            }
-        }
-
-        int index = match >= 0 ? match : (free >= 0 ? free : oldest);
-        if (index < 0)
-            return;
-
-        Lease next = match >= 0 ? leases[index] : default(Lease);
-        bool duplicate = match >= 0 &&
-            next.SourcePlayerId == sourcePlayerId &&
-            next.Sequence == sequence;
-
-        if (match >= 0 && next.SourcePlayerId == sourcePlayerId &&
-            sequence < next.Sequence)
-        {
-            return;
-        }
-
-        next.Active = true;
-        next.PlayerId = playerId;
-        if (!duplicate)
-        {
-            next.SourcePlayerId = sourcePlayerId;
-            next.Sequence = sequence;
-            next.ExpiresAt = now + durationSeconds;
-            next.RadiusMeters = radiusMeters;
-        }
-
-        float remaining = next.ExpiresAt - now;
-        if (remaining <= 0f)
-        {
-            Clear(index);
-            return;
-        }
-
-        GameShip target;
-        if (CoreProjectileAuthority.TryGetPlayerShip(playerId, out target) &&
-            target != null)
-        {
-            bool rebound = next.BoundShip == null ||
-                !object.ReferenceEquals(next.BoundShip, target);
-            if (next.BoundShip != null && rebound)
-                OrreryAccretionDiskPresentation.Hide(next.BoundShip);
-
-            next.BoundShip = target;
-            if (!duplicate || rebound)
-            {
-                OrreryAccretionDiskPresentation.Show(
-                    target,
-                    remaining,
-                    next.RadiusMeters,
-                    1f);
-            }
-        }
-
-        leases[index] = next;
+        wire.Flags(ref state.Active);
+        wire.UInt32(ref state.Sample);
+        if (state.Sample == 0u) wire.Fail();
+        if (!state.Active) return;
+        wire.Positive(ref state.RemainingSeconds);
+        wire.Positive(ref state.DurationSeconds);
+        wire.Positive(ref state.RadiusWorld);
+        wire.Byte(ref state.Capacity);
+        if (state.RemainingSeconds > state.DurationSeconds || state.DurationSeconds > 3600f ||
+            state.RadiusWorld > 100000f) wire.Fail();
     }
-
-    public static void Tick()
+    public static void Publish()
     {
-        float now = Time.time;
-        for (int i = 0; i < leases.Length; i++)
-        {
-            Lease lease = leases[i];
-            if (!lease.Active)
-                continue;
-
-            float remaining = lease.ExpiresAt - now;
-            if (remaining <= 0f)
-            {
-                Clear(i);
-                continue;
-            }
-
-            if (lease.BoundShip != null)
-                continue;
-
-            GameShip current;
-            if (!CoreProjectileAuthority.TryGetPlayerShip(
-                    lease.PlayerId,
-                    out current) || current == null)
-            {
-                continue;
-            }
-
-            lease.BoundShip = current;
-            leases[i] = lease;
-            OrreryAccretionDiskPresentation.Show(
-                current,
-                remaining,
-                lease.RadiusMeters,
-                1f);
-        }
+        Snapshot snapshot;
+        uint generation;
+        if (!OrreryAccretionDisk.TryGetPresentation(out snapshot, out generation)) return;
+        do { unchecked { nextSample++; } } while (nextSample == 0u);
+        snapshot.Sample = nextSample;
+        channel.Publish(generation, ref snapshot);
     }
-
-    public static void OnShipDestroyed(GameShip ship)
+    public static void Render(GameShip owner, float deltaTime)
     {
-        if (object.ReferenceEquals(ship, null))
-            return;
-
-        for (int i = 0; i < leases.Length; i++)
+        Snapshot snapshot = default(Snapshot);
+        uint generation;
+        if (owner == null || owner.health <= 0f ||
+            !channel.TryRead(owner, ref snapshot, out generation)) return;
+        Lease lease;
+        bool known = leases.TryGetValue(owner, out lease);
+        bool same = known && lease.Generation == generation;
+        if (known && !same && !Newer(generation, lease.Generation)) return;
+        if (same && (!Newer(snapshot.Sample, lease.Sample) || lease.Ended)) return;
+        if (!known && leases.Count >= 16) return;
+        float expires = Time.time + snapshot.RemainingSeconds;
+        if (same)
         {
-            Lease lease = leases[i];
-            if (!lease.Active ||
-                !object.ReferenceEquals(lease.BoundShip, ship))
-            {
-                continue;
-            }
-
-            lease.BoundShip = null;
-            leases[i] = lease;
+            expires = Mathf.Min(expires, lease.ExpiresAt);
+            if (snapshot.Active && snapshot.DurationSeconds != lease.Duration) return;
+            snapshot.Capacity = (byte)Mathf.Min(snapshot.Capacity, lease.Capacity);
         }
+        bool ended = !snapshot.Active || expires <= Time.time;
+        leases[owner] = new Lease { Generation = generation, Sample = snapshot.Sample,
+            Ended = ended, ExpiresAt = expires, Duration = snapshot.DurationSeconds,
+            Capacity = snapshot.Capacity };
+        if (ended) { OrreryAccretionDiskPresentation.Hide(owner); return; }
+        OrreryAccretionDiskPresentation.Show(owner, expires - Time.time,
+            OrreryUnits.WorldToMeters(snapshot.RadiusWorld), snapshot.Capacity / 255f,
+            generation, Mathf.Clamp01((expires - Time.time) / snapshot.DurationSeconds));
     }
-
-    public static void OnShipDied(GameShip ship)
+    public static void Died(GameShip owner)
     {
-        if (object.ReferenceEquals(ship, null))
-            return;
-
-        for (int i = 0; i < leases.Length; i++)
+        if (object.ReferenceEquals(owner, null)) return;
+        Lease lease;
+        if (leases.TryGetValue(owner, out lease))
         {
-            if (leases[i].Active &&
-                object.ReferenceEquals(leases[i].BoundShip, ship))
-            {
-                Clear(i);
-            }
+            lease.Ended = true;
+            leases[owner] = lease;
         }
+        OrreryAccretionDiskPresentation.Hide(owner);
     }
-
+    public static void Forget(GameShip owner)
+    {
+        if (object.ReferenceEquals(owner, null)) return;
+        leases.Remove(owner);
+        OrreryAccretionDiskPresentation.Hide(owner);
+    }
     public static void Reset()
     {
-        for (int i = 0; i < leases.Length; i++)
-            Clear(i);
+        leases.Clear();
+        OrreryAccretionDiskPresentation.Reset();
     }
-
-    private static void Clear(int index)
-    {
-        if (index < 0 || index >= leases.Length)
-            return;
-
-        Lease lease = leases[index];
-        if (lease.Active && lease.BoundShip != null)
-            OrreryAccretionDiskPresentation.Hide(lease.BoundShip);
-        leases[index] = default(Lease);
-    }
+    private static bool Newer(uint a, uint b) { return unchecked((int)(a - b)) > 0; }
 }

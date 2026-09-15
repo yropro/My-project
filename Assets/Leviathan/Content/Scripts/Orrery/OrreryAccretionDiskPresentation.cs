@@ -21,6 +21,10 @@ public static class OrreryAccretionDiskPresentation
         public float ExpiresAt;
         public float RadiusMeters;
         public float Capacity01;
+        public float DurationSeconds;
+        public uint Generation;
+        public Transform Parent;
+        public Quaternion BaseRotation;
     }
 
     private static readonly Dictionary<GameShip, State> active =
@@ -33,7 +37,9 @@ public static class OrreryAccretionDiskPresentation
         GameShip target,
         float durationSeconds,
         float radiusMeters,
-        float capacity01)
+        float capacity01,
+        uint generation,
+        float duration01)
     {
         if (target == null || durationSeconds <= 0f || radiusMeters <= 0f)
             return;
@@ -41,16 +47,18 @@ public static class OrreryAccretionDiskPresentation
         State existing;
         if (active.TryGetValue(target, out existing) && existing != null)
         {
-            existing.ExpiresAt = Mathf.Max(
-                existing.ExpiresAt,
-                Time.time + durationSeconds);
+            existing.ExpiresAt = existing.Generation == generation
+                ? Mathf.Min(existing.ExpiresAt, Time.time + durationSeconds)
+                : Time.time + durationSeconds;
+            existing.Generation = generation;
+            existing.DurationSeconds = durationSeconds / Mathf.Max(0.000001f, duration01);
             existing.RadiusMeters = radiusMeters;
             existing.Capacity01 = Mathf.Clamp01(capacity01);
             UpdateState(existing, 0f);
             return;
         }
 
-        if (PoolController.instance == null)
+        if (PoolController.instance == null || active.Count >= 16)
             return;
 
         PulseItemBase pulse = OrreryContent.FrostNovaPulse;
@@ -89,6 +97,10 @@ public static class OrreryAccretionDiskPresentation
 
         State state = new State();
         state.Target = target;
+        state.Generation = generation;
+        state.DurationSeconds = durationSeconds / Mathf.Max(0.000001f, duration01);
+        state.Parent = wave.transform.parent;
+        state.BaseRotation = wave.transform.localRotation;
         state.Wave = wave;
         state.Collider = circle;
         state.Sprite = sprite;
@@ -100,6 +112,9 @@ public static class OrreryAccretionDiskPresentation
         state.RadiusMeters = radiusMeters;
         state.Capacity01 = Mathf.Clamp01(capacity01);
 
+        // Render in world space so a nonuniform pooled parent cannot distort
+        // the mechanical circle into an ellipse as the placeholder rotates.
+        wave.transform.SetParent(null, true);
         wave.enabled = false;
         circle.enabled = false;
         OrreryWavePresentation.ResetMask(wave);
@@ -136,7 +151,7 @@ public static class OrreryAccretionDiskPresentation
 
     public static void Hide(GameShip target)
     {
-        if (target == null)
+        if (object.ReferenceEquals(target, null))
             return;
 
         State state;
@@ -180,17 +195,23 @@ public static class OrreryAccretionDiskPresentation
             OrrerySpellCompendium.AccretionDisk.VisualRotationDegreesPerSecond *
                 Mathf.Max(0f, deltaTime));
 
+        // Match the collider's authored centre, not merely its prefab pivot.
+        transform.position = state.Target.transform.position - transform.TransformVector(state.Collider.offset);
         if (state.Sprite != null)
         {
-            float minimum = Mathf.Clamp01(
-                OrrerySpellCompendium.AccretionDisk.MinimumCapacityOpacityFraction);
-            float capacityFactor = Mathf.Lerp(
-                minimum,
-                1f,
-                Mathf.Clamp01(state.Capacity01));
+            float depletion = 1f - Mathf.Clamp01(state.Capacity01);
+            float brightness = Mathf.Lerp(
+                OrrerySpellCompendium.AccretionDisk.FullCapacityBrightness,
+                OrrerySpellCompendium.AccretionDisk.DepletedCapacityBrightness, depletion);
+            float duration = Mathf.Clamp01((state.ExpiresAt - Time.time) / Mathf.Max(0.001f, state.DurationSeconds));
+            float opacity = OrrerySpellCompendium.AccretionDisk.FadeWithDuration
+                ? Mathf.Lerp(OrrerySpellCompendium.AccretionDisk.MinimumDurationOpacityFraction, 1f, duration)
+                : 1f;
             Color color = state.BaseColor;
-            color.a *= Mathf.Clamp01(
-                OrrerySpellCompendium.AccretionDisk.VisualOpacity) * capacityFactor;
+            color.r *= brightness;
+            color.g *= brightness;
+            color.b *= brightness;
+            color.a *= Mathf.Clamp01(OrrerySpellCompendium.AccretionDisk.VisualOpacity * opacity);
             state.Sprite.color = color;
         }
     }
@@ -200,7 +221,9 @@ public static class OrreryAccretionDiskPresentation
         if (state == null || state.Wave == null)
             return;
 
+        state.Wave.transform.SetParent(state.Parent, true);
         state.Wave.transform.localScale = state.BaseScale;
+        state.Wave.transform.localRotation = state.BaseRotation;
         if (state.Sprite != null)
             state.Sprite.color = state.BaseColor;
         if (state.Collider != null)

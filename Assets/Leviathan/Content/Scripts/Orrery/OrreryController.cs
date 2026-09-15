@@ -107,7 +107,10 @@ public sealed class OrreryController : MonoBehaviour
     private void LateUpdate()
     {
         if (currentOwner != null)
+        {
             OrrerySpellRuntime.LateTick(currentOwner);
+            OrreryAccretionDisk.TickPlaytestInput(currentOwner);
+        }
     }
 
     private void OnDestroy()

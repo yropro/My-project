@@ -9,8 +9,11 @@ $projectRoot = [IO.Path]::GetFullPath((Join-Path $scriptsRoot '..\..\..\..'))
 $projectFile = Join-Path $projectRoot 'LeviathanMod.csproj'
 if (!(Test-Path -LiteralPath $projectFile)) { throw 'Generate Unity project files before running this test.' }
 [xml]$project = Get-Content -LiteralPath $projectFile -Raw
+$installedGame = Join-Path $GameManaged 'Assembly-CSharp.dll'
+if (!(Test-Path -LiteralPath $installedGame)) { throw 'Installed Assembly-CSharp.dll is required for this binding check.' }
 $references = @($project.Project.ItemGroup.Reference.HintPath | Where-Object { $_ } | ForEach-Object {
     $referencePath = $_
+    if ([IO.Path]::GetFileName($referencePath) -eq 'Assembly-CSharp.dll') { $referencePath = $installedGame }
     if (![IO.Path]::IsPathRooted($referencePath)) { $referencePath = Join-Path $projectRoot $referencePath }
     '/reference:"' + $referencePath + '"'
 })
@@ -38,6 +41,9 @@ Compile-NetworkCheck 'NetworkIntegrationTests.exe' @('/target:exe','/define:CORE
 $env:CORE_NETWORK_TEST_ASSEMBLIES = $GameManaged + ';' + (Join-Path $projectRoot 'Library\ScriptAssemblies') + ';' + (Join-Path $projectRoot 'Packages\Star Vortex')
 & $mono (Join-Path $OutputDirectory 'NetworkIntegrationTests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Network integration tests failed.' }
+Compile-NetworkCheck 'AccretionNativeTests.exe' @('/target:exe','/define:ACCRETION_NATIVE_TESTS','/main:AccretionNativeTests') $references $sources
+& $mono (Join-Path $OutputDirectory 'AccretionNativeTests.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Accretion installed-assembly boundary tests failed.' }
 Compile-NetworkCheck 'CrossOwnerNetworkTests.exe' @('/target:exe','/define:CROSS_OWNER_NETWORK_TESTS') $framework @(
     ('"' + (Join-Path $scriptsRoot 'CoreCrossOwnerEffects.cs') + '"'),
     ('"' + (Join-Path $PSScriptRoot 'CrossOwnerNetworkTests.cs') + '"'))
@@ -62,4 +68,19 @@ Compile-NetworkCheck 'HarmonySelectorTests.exe' @('/target:exe','/define:CORE_SE
     ('"' + (Join-Path $PSScriptRoot 'HarmonySelectorTests.cs') + '"'))
 & $mono (Join-Path $OutputDirectory 'HarmonySelectorTests.exe')
 if ($LASTEXITCODE -ne 0) { throw 'Installed-game target selectors failed.' }
+$protocolRoot = Join-Path $OutputDirectory 'AccretionProtocol'
+New-Item -ItemType Directory -Path $protocolRoot -Force | Out-Null
+$protocolFiles = @('CoreProjectileCapture.cs','CoreProjectileSpawnGuard.cs','CoreDamageApplicationObservation.cs',
+    'Orrery\OrreryAccretionReservoir.cs','Tests\AccretionProtocolTests.cs')
+$protocolItems = ($protocolFiles | ForEach-Object {
+    '<Compile Include="' + [Security.SecurityElement]::Escape((Join-Path $scriptsRoot $_)) + '" />'
+}) -join "`n"
+$protocolProject = Join-Path $protocolRoot 'AccretionProtocol.csproj'
+$protocolXml = '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType>' +
+    '<TargetFramework>net8.0</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems>' +
+    '<DefineConstants>ACCRETION_PROTOCOL_TESTS</DefineConstants><LangVersion>9.0</LangVersion>' +
+    '</PropertyGroup><ItemGroup>' + $protocolItems + '</ItemGroup></Project>'
+Set-Content -LiteralPath $protocolProject -Value $protocolXml -Encoding utf8
+& dotnet run --project $protocolProject -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Accretion multi-runtime protocol tests failed.' }
 Write-Output "Validated build and tests are in $OutputDirectory. Nothing was deployed."

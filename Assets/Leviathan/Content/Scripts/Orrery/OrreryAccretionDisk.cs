@@ -1,815 +1,360 @@
 using StarVortex;
+using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-/// <summary>
-/// Accretion Disk support spell.
-///
-/// The Orrery caster resolves one immutable profile. The protected player's own
-/// client owns the absorption pool, incoming-damage transformation, projectile
-/// interception and healing. Ally casts use CoreCrossOwnerEffects; no remote
-/// replica is ever mutated as gameplay authority.
-/// </summary>
+/// <summary>Recipient-authoritative Accretion Disk. Core supplies application
+/// vetoes and confirmed projectile transactions; this spell owns the pool,
+/// recovery, live footprint, cast snapshot and generation.</summary>
 public static class OrreryAccretionDisk
 {
-    // Core-wide Orrery effect ids. 0x0201 is Cold Fusion.
     public const ushort ApplyEffectId = 0x0202;
-    public const ushort ProjectileCaptureRequestEffectId = 0x0203;
-    public const ushort ProjectileCaptureAckEffectId = 0x0204;
-
-    // Engineering bounds. Player-facing balance lives in the Compendium.
-    private const int MaxPendingProjectileCaptures = 64;
-    private const float PendingProjectileCaptureSeconds = 1.5f;
-    private const float CapacityEpsilon = 0.0001f;
-
+    private const byte CaptureProvider = 1;
+    private const float TerminalSnapshotSeconds = 8f;
+    private const int MaximumSections = 512;
     private struct Snapshot
     {
-        public float DurationSeconds;
-        public float Capacity;
-        public float HealFraction;
-        public float RadiusMeters;
+        public float Duration, Capacity, HealFraction, ExtensionMeters;
     }
-
-    private struct PendingProjectileCapture
-    {
-        public bool Active;
-        public uint ProjectileNetId;
-        public int ProjectileOwnerPlayerId;
-        public uint EffectRevision;
-        public float ReservedAmount;
-        public float ExpiresAtUnscaled;
-    }
-
     private sealed class LocalState
     {
         public GameShip Target;
-        public int SourcePlayerId;
-        public uint Revision;
-        public float ExpiresAt;
-        public float CapacityMax;
-        public float CapacityRemaining;
-        public float ReservedCapacity;
-        public float HealFraction;
-        public float RadiusMeters;
-        public float ScanAccumulator;
-
-        public float TotalAbsorbed;
-        public float ProjectileDamageAbsorbed;
-        public float ShipDamageAbsorbed;
-
-        public readonly PendingProjectileCapture[] Pending =
-            new PendingProjectileCapture[MaxPendingProjectileCaptures];
+        public uint Generation;
+        public float Duration, HealFraction, ExtensionMeters, RadiusWorld;
+        public readonly OrreryAccretionReservoir Pool = new OrreryAccretionReservoir();
     }
-
     [StructLayout(LayoutKind.Explicit)]
     private struct FloatBits
     {
         [FieldOffset(0)] public float Float;
         [FieldOffset(0)] public uint UInt;
     }
-
     private static readonly GameShip[] targetScratch =
         new GameShip[OrrerySpellCompendium.AccretionDisk.MaxCandidateShips];
-
+    private static readonly List<GameShip> sections = new List<GameShip>(MaximumSections);
     private static LocalState active;
-    private static uint nextRevision;
+    private static uint nextGeneration, lastGeneration;
+    private static GameShip lastTarget;
+    private static float terminalUntil, nextTestCast;
     private static bool initialized;
+    public static float LastSpent { get; private set; }
+    public static float TotalSpent { get; private set; }
 
-    public static bool Execute(
-        GameShip owner,
-        OrreryCastInvocation invocation,
+    public static bool Execute(GameShip owner, OrreryCastInvocation invocation,
         OrrerySpellRegistry.SpellDefinition spell)
     {
-        if (owner == null || spell == null || invocation.Execution == null ||
-            !invocation.Execution.IsValid || !OrreryRuntime.IsActive(owner) ||
-            OrreryController.IsShuffling(owner))
-        {
-            return false;
-        }
-
-        EnsureInitialized();
-
-        Snapshot snapshot;
-        if (!TryResolveCast(owner, out snapshot))
-            return false;
-
-        GameShip target = FindTarget(owner);
-        if (target == null)
-            target = owner;
-
-        bool accepted;
-        if (object.ReferenceEquals(target, owner))
-        {
-            accepted = ApplyLocal(
-                target,
-                ResolveLocalPlayerId(),
-                snapshot);
-        }
-        else
-        {
-            int targetPlayerId;
-            if (!CoreNetwork.TryGetPlayerId(target, out targetPlayerId))
-                return false;
-
-            accepted = CoreCrossOwnerEffects.RequestGrant(
-                targetPlayerId,
-                ApplyEffectId,
-                PackSnapshot(snapshot));
-        }
-
-        if (!accepted)
-            return false;
-
+        if (spell == null || invocation.Execution == null || !invocation.Execution.IsValid ||
+            !TryCast(owner)) return false;
         OrreryCasting.CompleteInvocation(owner, invocation.Execution, 0);
         OrreryController.StartShuffle(owner);
         return true;
     }
-
+    private static bool TryCast(GameShip owner)
+    {
+        if (owner == null || !owner.IsPlayer() || !OrreryRuntime.IsActive(owner) ||
+            OrreryController.IsShuffling(owner)) return false;
+        EnsureInitialized();
+        Snapshot snapshot;
+        if (!Resolve(owner, out snapshot)) return false;
+        GameShip target = FindTarget(owner);
+        if (target == null || ReferenceEquals(target, owner)) return ApplyLocal(owner, snapshot);
+        int targetPlayerId;
+        return CoreNetwork.TryGetPlayerId(target, out targetPlayerId) &&
+            CoreCrossOwnerEffects.RequestGrant(targetPlayerId, ApplyEffectId, Pack(snapshot));
+    }
+    /// <summary>Temporary opt-in gesture for this playtest branch, not a recipe
+    /// change: Ctrl+Shift+F8 casts using the same focus/target/grant path. The
+    /// Compendium switch removes it without changing the three-rune definition.</summary>
+    public static void TickPlaytestInput(GameShip owner)
+    {
+        if (!OrrerySpellCompendium.AccretionDisk.PlaytestShortcutEnabled ||
+            owner == null || !owner.IsPlayer() || !OrreryRuntime.IsActive(owner) ||
+            Time.timeScale <= 0f || !Input.GetKeyDown(KeyCode.F8) ||
+            !(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) ||
+            !(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) ||
+            Time.unscaledTime < nextTestCast) return;
+        nextTestCast = Time.unscaledTime + OrrerySpellCompendium.AccretionDisk.PlaytestShortcutCooldownSeconds;
+        bool dispatched = TryCast(owner);
+        Debug.Log("[Orrery/AccretionDisk] PLAYTEST cast " +
+            (dispatched ? "applied locally or dispatched (remote application is not yet acknowledged)." : "rejected."));
+        if (dispatched) OrreryController.StartShuffle(owner);
+    }
     public static void EnsureInitialized()
     {
-        if (initialized)
-            return;
-
-        CoreCrossOwnerEffects.RegisterHandler(
-            ApplyEffectId,
-            ApplyRemoteGrant);
-        CoreCrossOwnerEffects.RegisterHandler(
-            ProjectileCaptureRequestEffectId,
-            ApplyProjectileCaptureRequest);
-        CoreCrossOwnerEffects.RegisterHandler(
-            ProjectileCaptureAckEffectId,
-            ApplyProjectileCaptureAck);
-        CoreIncomingDamage.Register(
-            "Orrery/AccretionDisk",
-            FilterIncomingPacket,
-            FilterIncomingDirectDamage);
+        if (initialized) return;
+        CoreCrossOwnerEffects.RegisterHandler(ApplyEffectId, ReceiveCast);
+        CoreIncomingDamage.Register("Orrery/AccretionDisk", HasLocalPool,
+            BlockPacket, BlockDirect);
+        CoreProjectileCapture.Register(CaptureProvider, ReadField, ReserveCapture,
+            SettleCapture, CaptureFault, EligibleProjectile);
         initialized = true;
     }
-
-    /// <summary>
-    /// Target-authority fixed step. This intentionally does not require the local
-    /// target to be an Orrery: a protected Leviathan/other-class player owns the
-    /// effect after receiving the grant.
-    /// </summary>
+    private static bool ReceiveCast(GameShip target, int sourcePlayerId,
+        CoreCrossOwnerEffects.GrantPayload payload)
+    {
+        if (sourcePlayerId < 0 || payload.E != 0u || payload.F != 0u) return false;
+        Snapshot snapshot = new Snapshot { Duration = Unpack(payload.A), Capacity = Unpack(payload.B),
+            HealFraction = Unpack(payload.C), ExtensionMeters = Unpack(payload.D) };
+        return ApplyLocal(target, snapshot);
+    }
+    private static bool ApplyLocal(GameShip target, Snapshot snapshot)
+    {
+        if (target == null || !target.IsPlayer() || target.health <= 0f || !Valid(snapshot)) return false;
+        EndActive();
+        do { unchecked { nextGeneration++; } } while (nextGeneration == 0u);
+        var state = new LocalState { Target = target, Generation = nextGeneration,
+            Duration = snapshot.Duration, HealFraction = snapshot.HealFraction,
+            ExtensionMeters = snapshot.ExtensionMeters };
+        state.Pool.Begin(state.Generation, snapshot.Capacity, Time.time + snapshot.Duration);
+        active = state;
+        lastTarget = target;
+        lastGeneration = state.Generation;
+        TotalSpent = LastSpent = 0f;
+        RefreshGeometry(state);
+        RefreshPresentation(state);
+        CoreProjectileCapture.FieldChanged();
+        return true;
+    }
     public static void FixedTickRecipient(GameShip localPlayer, float deltaTime)
     {
         LocalState state = active;
-        if (state == null)
-            return;
-
+        if (state == null) return;
         if (localPlayer == null || !localPlayer.IsPlayer() ||
-            !object.ReferenceEquals(localPlayer, state.Target) ||
-            localPlayer.health <= 0f)
+            !ReferenceEquals(localPlayer, state.Target) || localPlayer.health <= 0f ||
+            !localPlayer.gameObject.activeInHierarchy)
+        { EndActive(); return; }
+        if (Time.time >= state.Pool.ExpiresAt)
         {
-            EndActive();
+            // No new applications after expiry. Already-authorized exchanges
+            // remain earmarked until confirmed/aborted; uncertainty cannot refund.
+            OrreryAccretionDiskPresentation.Hide(state.Target);
+            if (state.Pool.Reserved <= 0f) EndActive();
             return;
         }
-
-        PrunePending(state, Time.unscaledTime);
-
-        if (Time.time >= state.ExpiresAt)
-        {
-            if (state.ReservedCapacity <= CapacityEpsilon)
-                EndActive();
-            return;
-        }
-
-        if (GetAvailableCapacity(state) <= CapacityEpsilon)
-            return;
-
-        float interval = Mathf.Max(
-            0f,
-            OrrerySpellCompendium.AccretionDisk.ProjectileScanIntervalSeconds);
-        if (interval > 0f)
-        {
-            state.ScanAccumulator += Mathf.Max(0f, deltaTime);
-            if (state.ScanAccumulator < interval)
-                return;
-            state.ScanAccumulator %= interval;
-        }
-
-        ScanProjectiles(state);
+        RefreshGeometry(state);
+        RefreshPresentation(state);
     }
-
-    public static void ForgetTarget(GameShip target)
+    private static bool HasLocalPool(GameShip target)
     {
-        if (active != null && target != null &&
-            object.ReferenceEquals(active.Target, target))
-        {
-            EndActive();
-        }
+        return active != null && ReferenceEquals(active.Target, target) &&
+            active.Pool.CanAbsorb(Time.time);
     }
-
-    /// <summary>
-    /// An Orrery class exit retires a self-cast disk. A disk already granted to a
-    /// different player's ship remains owned by that recipient until its own
-    /// duration/capacity/lifecycle ends.
-    /// </summary>
-    public static void ForgetOrreryOwner(GameShip owner)
+    private static bool BlockPacket(GameShip target, Damageable.DamageType type,
+        Damageable.DamageData[] packet)
     {
-        if (active != null && owner != null &&
-            object.ReferenceEquals(active.Target, owner))
-        {
-            EndActive();
-        }
+        float value;
+        return HasLocalPool(target) && TryGetPacketValue(packet, out value) && Absorb(active, value);
     }
-
-    public static void Reset()
+    internal static bool TryGetPacketValue(Damageable.DamageData[] packet, out float value)
     {
+        value = 0f;
+        if (packet == null || packet.Length == 0) return false;
+        double total = 0d;
+        for (int i = 0; i < packet.Length; i++)
+        {
+            float part = packet[i].damage;
+            if (!OrreryAccretionReservoir.Finite(part)) return false;
+            // Gross positive incoming components at the external-barrier boundary.
+            // Negative modifier adjustments cannot create capacity or free healing.
+            if (part > 0f) total += part;
+        }
+        if (total <= 0d) return false;
+        value = (float)Math.Min(total, float.MaxValue);
+        return true;
+    }
+    private static bool BlockDirect(GameShip target, Damageable.DamageType type,
+        float value, bool destroy)
+    {
+        return HasLocalPool(target) && Absorb(active, value);
+    }
+    private static bool Absorb(LocalState state, float value)
+    {
+        float spent;
+        if (state == null || !state.Pool.TryAbsorb(value, Time.time, out spent)) return false;
+        CompleteConsumption(state, spent);
+        return true; // deliberately NOT the remaining fraction of the hit
+    }
+    private static bool ReserveCapture(uint generation, float value, out ulong ticket)
+    {
+        ticket = 0ul;
+        LocalState state = active;
+        GameShip local = WorldController.instance == null ? null : WorldController.instance.GetCurrentPlayerShip();
+        return state != null && ReferenceEquals(state.Target, local) && local != null &&
+            local.IsPlayer() && local.health > 0f && state.Generation == generation &&
+            state.Pool.TryReserve(generation, value, Time.time, out ticket);
+    }
+    private static void SettleCapture(uint generation, ulong ticket, bool captured)
+    {
+        LocalState state = active;
+        float spent;
+        if (state == null || state.Generation != generation ||
+            !state.Pool.Settle(generation, ticket, captured, out spent)) return;
+        if (captured) CompleteConsumption(state, spent);
+        else if (Time.time >= state.Pool.ExpiresAt && state.Pool.Reserved <= 0f) EndActive();
+        else RefreshPresentation(state);
+    }
+    private static void CaptureFault(uint generation)
+    {
+        if (active == null || active.Generation != generation) return;
+        Debug.LogWarning("[Orrery/AccretionDisk] Unresolved capture retired generation " + generation +
+            ". No uncertain refund or healing was granted.");
         EndActive();
-        nextRevision = 0u;
     }
-
-    public static bool TryGetLocalPresentation(
-        GameShip target,
-        out uint revision,
-        out float remainingSeconds,
-        out float radiusMeters,
-        out float capacity01)
+    private static void CompleteConsumption(LocalState state, float spent)
     {
-        revision = 0u;
-        remainingSeconds = 0f;
-        radiusMeters = 0f;
-        capacity01 = 0f;
-
+        LastSpent = spent;
+        TotalSpent += spent;
+        // Collapse gameplay before healing, which may reenter damage/cast code.
+        if (state.Pool.Remaining <= 0f && ReferenceEquals(active, state)) EndActive();
+        else if (ReferenceEquals(active, state)) RefreshPresentation(state);
+        if (state.Target != null && state.Target.health > 0f && spent > 0f && state.HealFraction > 0f)
+            CoreNativeCriticalHits.Heal(state.Target, spent * state.HealFraction, 0,
+                state.Target.transform.position, null, false, false);
+    }
+    private static bool EligibleProjectile(GameShip recipient, Projectile projectile)
+    {
+        GameShip source = projectile == null ? null : projectile.GetParentShip();
+        return recipient != null && source != null && recipient.gameObject.activeInHierarchy &&
+            !ReferenceEquals(recipient, source) && recipient.CanBeDamagedBy(source, false);
+    }
+    private static bool ReadField(out CoreProjectileCapture.Field field)
+    {
+        field = default(CoreProjectileCapture.Field);
         LocalState state = active;
-        if (!IsStateFor(state, target))
-            return false;
-
-        remainingSeconds = state.ExpiresAt - Time.time;
-        if (remainingSeconds <= 0f)
-            return false;
-
-        revision = state.Revision;
-        radiusMeters = state.RadiusMeters;
-        capacity01 = state.CapacityMax <= 0f
-            ? 0f
-            : Mathf.Clamp01(
-                GetAvailableCapacity(state) / state.CapacityMax);
-        return revision != 0u;
-    }
-
-    private static bool ApplyRemoteGrant(
-        GameShip localTarget,
-        int sourcePlayerId,
-        CoreCrossOwnerEffects.GrantPayload payload)
-    {
-        if (localTarget == null || !localTarget.IsPlayer() || sourcePlayerId < 0)
-            return false;
-
-        Snapshot snapshot;
-        if (!TryUnpackSnapshot(payload, out snapshot))
-            return false;
-
-        return ApplyLocal(localTarget, sourcePlayerId, snapshot);
-    }
-
-    private static bool ApplyLocal(
-        GameShip target,
-        int sourcePlayerId,
-        Snapshot snapshot)
-    {
-        if (target == null || !target.IsPlayer() || target.health <= 0f ||
-            !SanitizeSnapshot(ref snapshot))
-        {
-            return false;
-        }
-
-        LocalState state = new LocalState();
-        state.Target = target;
-        state.SourcePlayerId = sourcePlayerId;
-        state.Revision = NextRevision();
-        state.ExpiresAt = Time.time + snapshot.DurationSeconds;
-        state.CapacityMax = snapshot.Capacity;
-        state.CapacityRemaining = snapshot.Capacity;
-        state.HealFraction = snapshot.HealFraction;
-        state.RadiusMeters = snapshot.RadiusMeters;
-        active = state;
-
-        OrreryAccretionDiskPresentation.Show(
-            target,
-            snapshot.DurationSeconds,
-            snapshot.RadiusMeters,
-            1f);
-        return true;
-    }
-
-    private static void FilterIncomingPacket(
-        GameShip target,
-        Damageable.DamageType damageType,
-        Damageable.DamageData[] damageData)
-    {
-        LocalState state = active;
-        if (!CanAbsorb(state, target) || damageData == null)
-            return;
-
-        float baseDamage = 0f;
-        for (int i = 0; i < damageData.Length; i++)
-        {
-            if (damageData[i].modifierType != Modifier.Type.Damage)
-                continue;
-            baseDamage = Mathf.Max(0f, damageData[i].damage);
-            break;
-        }
-
-        if (baseDamage <= 0f)
-            return;
-
-        float absorbed = ConsumeAvailable(state, baseDamage, false);
-        if (absorbed <= 0f)
-            return;
-
-        float survivingFraction = Mathf.Clamp01(
-            (baseDamage - absorbed) / baseDamage);
-        for (int i = 0; i < damageData.Length; i++)
-        {
-            Damageable.DamageData component = damageData[i];
-            component.damage *= survivingFraction;
-            component.dps *= survivingFraction;
-            damageData[i] = component;
-        }
-    }
-
-    private static void FilterIncomingDirectDamage(
-        GameShip target,
-        Damageable.DamageType damageType,
-        ref float damage,
-        bool destroy)
-    {
-        LocalState state = active;
-        if (!CanAbsorb(state, target) || damage <= 0f)
-            return;
-
-        float absorbed = ConsumeAvailable(state, damage, false);
-        if (absorbed > 0f)
-            damage = Mathf.Max(0f, damage - absorbed);
-    }
-
-    private static float ConsumeAvailable(
-        LocalState state,
-        float requested,
-        bool projectile)
-    {
-        if (state == null || requested <= 0f)
-            return 0f;
-
-        float absorbed = Mathf.Min(requested, GetAvailableCapacity(state));
-        if (absorbed <= 0f)
-            return 0f;
-
-        state.CapacityRemaining = Mathf.Max(
-            0f,
-            state.CapacityRemaining - absorbed);
-        state.TotalAbsorbed += absorbed;
-        if (projectile)
-            state.ProjectileDamageAbsorbed += absorbed;
-        else
-            state.ShipDamageAbsorbed += absorbed;
-
-        HealFromAbsorption(state, absorbed);
-        RefreshPresentation(state);
-        FinishIfDepleted(state);
-        return absorbed;
-    }
-
-    private static void HealFromAbsorption(LocalState state, float absorbed)
-    {
-        if (state == null || state.Target == null || absorbed <= 0f ||
-            state.HealFraction <= 0f || state.Target.health <= 0f)
-        {
-            return;
-        }
-
-        CoreNativeCriticalHits.Heal(
-            state.Target,
-            absorbed * state.HealFraction,
-            0,
-            state.Target.transform.position,
-            null,
-            false,
-            false);
-    }
-
-    private static void ScanProjectiles(LocalState state)
-    {
-        if (state == null || state.Target == null ||
-            PhysicsController.instance == null || state.RadiusMeters <= 0f)
-        {
-            return;
-        }
-
-        float radiusWorld = OrreryUnits.MetersToWorld(state.RadiusMeters);
-        Collider2D[] hits = PhysicsController.instance.OverlapCircle(
-            state.Target.transform.position,
-            radiusWorld);
-        if (hits == null)
-            return;
-
-        int processed = 0;
-        int limit = Mathf.Max(
-            1,
-            OrrerySpellCompendium.AccretionDisk.MaxProjectileCandidatesPerScan);
-
-        for (int i = 0; i < hits.Length && processed < limit; i++)
-        {
-            if (GetAvailableCapacity(state) <= CapacityEpsilon)
-                break;
-
-            Collider2D collider = hits[i];
-            if (collider == null)
-                break;
-
-            Projectile projectile;
-            if (!collider.gameObject.TryGetComponent<Projectile>(out projectile) ||
-                projectile == null || projectile is CapturedProjectile ||
-                projectile.IsDestroying() ||
-                !projectile.CanBeDamagedBy(state.Target, true))
-            {
-                continue;
-            }
-
-            processed++;
-
-            if (!projectile.netRendered)
-            {
-                float value = GetProjectileValue(projectile);
-                projectile.CaptureDestroy();
-                ConsumeAvailable(state, value, true);
-                if (active == null)
-                    return;
-                continue;
-            }
-
-            TryRequestRemoteCapture(state, projectile);
-        }
-    }
-
-    private static void TryRequestRemoteCapture(
-        LocalState state,
-        Projectile projectile)
-    {
-        if (state == null || projectile == null || projectile.netId == 0u ||
-            !NetSession.InSession || NetSession.instance == null ||
-            !NetIds.IsProjectileNetId(projectile.netId) ||
-            FindPending(state, projectile.netId) >= 0)
-        {
-            return;
-        }
-
-        int projectileOwnerPlayerId =
-            NetIds.ProjectileOwnerOf(projectile.netId);
-        if (projectileOwnerPlayerId < 0 ||
-            projectileOwnerPlayerId == NetSession.instance.localPlayerId)
-        {
-            return;
-        }
-
-        int free = FindFreePending(state);
-        if (free < 0)
-            return;
-
-        float estimate = GetProjectileValue(projectile);
-        float reservation = Mathf.Min(
-            Mathf.Max(0f, estimate),
-            GetAvailableCapacity(state));
-
-        CoreCrossOwnerEffects.GrantPayload request =
-            new CoreCrossOwnerEffects.GrantPayload(
-                projectile.netId,
-                state.Revision,
-                PackFloat(state.RadiusMeters),
-                0u,
-                0u,
-                0u);
-
-        if (!CoreCrossOwnerEffects.RequestGrant(
-                projectileOwnerPlayerId,
-                ProjectileCaptureRequestEffectId,
-                request))
-        {
-            return;
-        }
-
-        PendingProjectileCapture pending = default(PendingProjectileCapture);
-        pending.Active = true;
-        pending.ProjectileNetId = projectile.netId;
-        pending.ProjectileOwnerPlayerId = projectileOwnerPlayerId;
-        pending.EffectRevision = state.Revision;
-        pending.ReservedAmount = reservation;
-        pending.ExpiresAtUnscaled =
-            Time.unscaledTime + PendingProjectileCaptureSeconds;
-        state.Pending[free] = pending;
-        state.ReservedCapacity += reservation;
-        RefreshPresentation(state);
-    }
-
-    private static bool ApplyProjectileCaptureRequest(
-        GameShip localProjectileOwner,
-        int sourcePlayerId,
-        CoreCrossOwnerEffects.GrantPayload payload)
-    {
-        uint projectileNetId = payload.A;
-        uint effectRevision = payload.B;
-        float radiusMeters = UnpackFloat(payload.C);
-
-        if (localProjectileOwner == null || !localProjectileOwner.IsPlayer() ||
-            sourcePlayerId < 0 || projectileNetId == 0u || effectRevision == 0u ||
-            !IsFinite(radiusMeters) || radiusMeters <= 0f ||
-            NetSession.instance == null ||
-            !NetIds.IsProjectileNetId(projectileNetId) ||
-            NetIds.ProjectileOwnerOf(projectileNetId) !=
-                NetSession.instance.localPlayerId)
-        {
-            return false;
-        }
-
-        Projectile projectile;
-        GameShip protectedPlayer;
-        if (!CoreProjectileAuthority.TryGetLocalAuthoritative(
-                projectileNetId,
-                out projectile) ||
-            !CoreProjectileAuthority.TryGetPlayerShip(
-                sourcePlayerId,
-                out protectedPlayer) ||
-            projectile == null || protectedPlayer == null ||
-            projectile is CapturedProjectile || projectile.IsDestroying() ||
-            !projectile.CanBeDamagedBy(protectedPlayer, true))
-        {
-            return false;
-        }
-
-        float padding = Mathf.Max(
-            0f,
-            OrrerySpellCompendium.AccretionDisk.RemoteValidationRadiusPaddingFraction);
-        float allowedRadius = OrreryUnits.MetersToWorld(
-            radiusMeters * (1f + padding));
-        if (!CoreSpatial.IsPointInCircle(
-                projectile.transform.position,
-                protectedPlayer.transform.position,
-                allowedRadius))
-        {
-            return false;
-        }
-
-        float value = GetProjectileValue(projectile);
-        projectile.CaptureDestroy();
-
-        CoreCrossOwnerEffects.GrantPayload acknowledgement =
-            new CoreCrossOwnerEffects.GrantPayload(
-                projectileNetId,
-                effectRevision,
-                PackFloat(value),
-                0u,
-                0u,
-                0u);
-
-        // The projectile is already authoritatively captured. If the reverse
-        // acknowledgement cannot dispatch, the requester simply releases its
-        // reservation on timeout; gameplay never resurrects the projectile.
-        CoreCrossOwnerEffects.RequestGrant(
-            sourcePlayerId,
-            ProjectileCaptureAckEffectId,
-            acknowledgement);
-        return true;
-    }
-
-    private static bool ApplyProjectileCaptureAck(
-        GameShip localProtectedPlayer,
-        int sourcePlayerId,
-        CoreCrossOwnerEffects.GrantPayload payload)
-    {
-        uint projectileNetId = payload.A;
-        uint effectRevision = payload.B;
-        float value = UnpackFloat(payload.C);
-
-        if (localProtectedPlayer == null || !localProtectedPlayer.IsPlayer() ||
-            sourcePlayerId < 0 || projectileNetId == 0u || effectRevision == 0u ||
-            !IsFinite(value) || value < 0f ||
-            !NetIds.IsProjectileNetId(projectileNetId) ||
-            NetIds.ProjectileOwnerOf(projectileNetId) != sourcePlayerId)
-        {
-            return false;
-        }
-
-        LocalState state = active;
-        if (!IsStateFor(state, localProtectedPlayer) ||
-            state.Revision != effectRevision)
-        {
-            // Valid late acknowledgement for an expired/replaced disk. Consume
-            // it without touching the replacement runtime.
-            return true;
-        }
-
-        int index = FindPending(state, projectileNetId);
-        if (index < 0)
-            return true;
-
-        PendingProjectileCapture pending = state.Pending[index];
-        if (pending.ProjectileOwnerPlayerId != sourcePlayerId ||
-            pending.EffectRevision != effectRevision)
-        {
-            return true;
-        }
-
-        ReleasePending(state, index);
-
-        // Breaking-projectile grace: capture is already complete. Debit at most
-        // what remains in the pool; no partial replacement projectile is created.
-        ConsumeAvailable(state, value, true);
-        return true;
-    }
-
-    private static void PrunePending(LocalState state, float nowUnscaled)
-    {
         if (state == null)
-            return;
-
-        bool changed = false;
-        for (int i = 0; i < state.Pending.Length; i++)
         {
-            PendingProjectileCapture pending = state.Pending[i];
-            if (!pending.Active || pending.ExpiresAtUnscaled > nowUnscaled)
-                continue;
-            ReleasePending(state, i);
-            changed = true;
+            if (lastGeneration == 0u || Time.unscaledTime >= terminalUntil) return false;
+            field.Generation = lastGeneration;
+            field.Ship = lastTarget;
+            return true;
         }
-
-        if (changed)
-        {
-            RefreshPresentation(state);
-            FinishIfDepleted(state);
-        }
+        field.Generation = state.Generation;
+        field.Ship = state.Target;
+        field.RemainingSeconds = Mathf.Max(0f, state.Pool.ExpiresAt - Time.time);
+        field.RadiusWorld = state.RadiusWorld;
+        field.Active = state.Target != null && state.Target.health > 0f &&
+            state.Pool.Remaining > 0f && field.RemainingSeconds > 0f;
+        return true;
     }
-
-    private static int FindPending(LocalState state, uint projectileNetId)
+    public static bool TryGetPresentation(out OrreryAccretionDiskPresentationLease.Snapshot snapshot,
+        out uint generation)
     {
-        if (state == null || projectileNetId == 0u)
-            return -1;
-
-        for (int i = 0; i < state.Pending.Length; i++)
-        {
-            if (state.Pending[i].Active &&
-                state.Pending[i].ProjectileNetId == projectileNetId)
-            {
-                return i;
-            }
-        }
-        return -1;
+        snapshot = default(OrreryAccretionDiskPresentationLease.Snapshot);
+        generation = lastGeneration;
+        LocalState state = active;
+        if (state == null) return generation != 0u && Time.unscaledTime < terminalUntil;
+        generation = state.Generation;
+        float remaining = Mathf.Max(0f, state.Pool.ExpiresAt - Time.time);
+        snapshot.Active = remaining > 0f && state.Pool.Remaining > 0f;
+        if (!snapshot.Active) return true;
+        snapshot.RemainingSeconds = remaining;
+        snapshot.DurationSeconds = state.Duration;
+        snapshot.RadiusWorld = state.RadiusWorld;
+        snapshot.Capacity = (byte)Mathf.Clamp(Mathf.RoundToInt(state.Pool.Remaining / state.Pool.Maximum * 255f), 0, 255);
+        return true;
     }
-
-    private static int FindFreePending(LocalState state)
-    {
-        if (state == null)
-            return -1;
-
-        for (int i = 0; i < state.Pending.Length; i++)
-        {
-            if (!state.Pending[i].Active)
-                return i;
-        }
-        return -1;
-    }
-
-    private static void ReleasePending(LocalState state, int index)
-    {
-        if (state == null || index < 0 || index >= state.Pending.Length)
-            return;
-
-        PendingProjectileCapture pending = state.Pending[index];
-        if (!pending.Active)
-            return;
-
-        state.ReservedCapacity = Mathf.Max(
-            0f,
-            state.ReservedCapacity - pending.ReservedAmount);
-        state.Pending[index] = default(PendingProjectileCapture);
-    }
-
-    private static float GetProjectileValue(Projectile projectile)
-    {
-        Launcher launcher = projectile == null
-            ? null
-            : projectile.GetParentLauncher();
-        return launcher == null ? 0f : Mathf.Max(0f, launcher.Damage);
-    }
-
-    private static float GetAvailableCapacity(LocalState state)
-    {
-        return state == null
-            ? 0f
-            : Mathf.Max(
-                0f,
-                state.CapacityRemaining - state.ReservedCapacity);
-    }
-
-    private static bool CanAbsorb(LocalState state, GameShip target)
-    {
-        return IsStateFor(state, target) &&
-            Time.time < state.ExpiresAt &&
-            GetAvailableCapacity(state) > CapacityEpsilon;
-    }
-
-    private static bool IsStateFor(LocalState state, GameShip target)
-    {
-        return state != null && target != null && target.IsPlayer() &&
-            object.ReferenceEquals(state.Target, target);
-    }
-
-    private static void FinishIfDepleted(LocalState state)
-    {
-        if (state == null || !object.ReferenceEquals(active, state))
-            return;
-
-        if (state.CapacityRemaining <= CapacityEpsilon &&
-            state.ReservedCapacity <= CapacityEpsilon)
-        {
-            EndActive();
-        }
-    }
-
     private static void RefreshPresentation(LocalState state)
     {
-        if (state == null || state.Target == null)
-            return;
-
-        float remaining = state.ExpiresAt - Time.time;
-        if (remaining <= 0f)
-            return;
-
-        float fraction = state.CapacityMax <= 0f
-            ? 0f
-            : Mathf.Clamp01(GetAvailableCapacity(state) / state.CapacityMax);
-        OrreryAccretionDiskPresentation.Show(
-            state.Target,
-            remaining,
-            state.RadiusMeters,
-            fraction);
+        if (!ReferenceEquals(active, state) || Time.time >= state.Pool.ExpiresAt) return;
+        OrreryAccretionDiskPresentation.Show(state.Target, state.Pool.ExpiresAt - Time.time,
+            OrreryUnits.WorldToMeters(state.RadiusWorld), state.Pool.Remaining / state.Pool.Maximum,
+            state.Generation, Mathf.Clamp01((state.Pool.ExpiresAt - Time.time) / state.Duration));
     }
-
+    private static void RefreshGeometry(LocalState state)
+    {
+        Vector2 center = state.Target.transform.position;
+        float radius = Extent(state.Target, center);
+        LeviathanGrowth.CollectScalingShips(state.Target, sections);
+        int limit = Mathf.Min(sections.Count, MaximumSections);
+        for (int i = 0; i < limit; i++) radius = Mathf.Max(radius, Extent(sections[i], center));
+        sections.Clear();
+        state.RadiusWorld = radius + OrreryUnits.MetersToWorld(state.ExtensionMeters);
+    }
+    private static float Extent(GameShip ship, Vector2 center)
+    {
+        if (ship == null || !ship.gameObject.activeInHierarchy) return 0f;
+        float result = Vector2.Distance(center, ship.transform.position) + Mathf.Max(0f, ship.GetShieldWorldRadius());
+        Collider2D hull = ship.GetComponent<CompositeCollider2D>();
+        if (hull == null || !hull.enabled) hull = ship.GetComponent<CircleCollider2D>();
+        if (hull != null && hull.enabled)
+        {
+            Bounds b = hull.bounds;
+            Vector2 far = new Vector2(Mathf.Max(Mathf.Abs(b.min.x - center.x), Mathf.Abs(b.max.x - center.x)),
+                Mathf.Max(Mathf.Abs(b.min.y - center.y), Mathf.Abs(b.max.y - center.y)));
+            result = Mathf.Max(result, far.magnitude);
+        }
+        return result;
+    }
+    private static GameShip CanonicalPlayer(GameShip ship)
+    {
+        GameShip owner;
+        return ship != null && LeviathanGrowth.TryGetAnatomyOwner(ship, out owner) ? owner : ship;
+    }
+    public static void ForgetTarget(GameShip target)
+    {
+        CoreProjectileCapture.ForgetShip(target);
+        if (active != null && ReferenceEquals(active.Target, target)) EndActive();
+        if (ReferenceEquals(lastTarget, target)) lastTarget = null;
+    }
+    public static void ForgetOrreryOwner(GameShip owner)
+    {
+        // Class membership is not the recipient-owned effect's lifetime.
+    }
     private static void EndActive()
     {
         LocalState state = active;
+        if (state == null) return;
         active = null;
-        if (state != null && state.Target != null)
-            OrreryAccretionDiskPresentation.Hide(state.Target);
+        state.Pool.Invalidate();
+        CoreProjectileCapture.Retire(CaptureProvider, state.Generation);
+        lastGeneration = state.Generation;
+        lastTarget = state.Target;
+        terminalUntil = Time.unscaledTime + TerminalSnapshotSeconds;
+        OrreryAccretionDiskPresentation.Hide(state.Target);
     }
-
-    private static bool TryResolveCast(GameShip owner, out Snapshot snapshot)
+    public static void Reset()
+    {
+        EndActive();
+        lastGeneration = 0u;
+        lastTarget = null;
+        terminalUntil = 0f;
+        sections.Clear();
+        CoreProjectileCapture.ResetWorld();
+        // nextGeneration is never reset: delayed callbacks cannot alias a new cast.
+    }
+    private static bool Resolve(GameShip owner, out Snapshot snapshot)
     {
         snapshot = default(Snapshot);
-
-        OrreryFocusProfile.Resolved stellar;
-        OrreryFocusProfile.Resolved voidFocus;
-        if (!OrreryFocusProfile.TryResolve(
-                owner,
-                OrreryElement.Fire,
-                out stellar) ||
-            !stellar.IsValid ||
-            !OrreryFocusProfile.TryResolve(
-                owner,
-                OrreryElement.Ice,
-                out voidFocus) ||
-            !voidFocus.IsValid)
-        {
-            return false;
-        }
-
-        float voidWeight = Mathf.Clamp01(
-            OrrerySpellCompendium.AccretionDisk.MixedFocusVoidWeight);
-        float referenceDps = Mathf.Lerp(
-            stellar.GetReferenceDps(),
-            voidFocus.GetReferenceDps(),
-            voidWeight);
-        float durationBonus = Mathf.Lerp(
-            stellar.DurationBonus,
-            voidFocus.DurationBonus,
-            voidWeight) *
-            OrrerySpellCompendium.AccretionDisk.DurationModifierScale;
-        float rangeBonus = Mathf.Lerp(
-            stellar.RangeBonus,
-            voidFocus.RangeBonus,
-            voidWeight) *
-            OrrerySpellCompendium.AccretionDisk.RadiusModifierScale;
-
-        snapshot.DurationSeconds = Mathf.Max(
-            0.01f,
-            OrrerySpellCompendium.AccretionDisk.BaseDurationSeconds *
-            Mathf.Max(0f, 1f + durationBonus));
-        snapshot.Capacity = Mathf.Max(
-            0f,
-            referenceDps *
-            OrrerySpellCompendium.AccretionDisk.CapacityReferenceSeconds *
-            OrrerySpellCompendium.AccretionDisk.CapacityMultiplier);
-        snapshot.HealFraction = Mathf.Max(
-            0f,
-            OrrerySpellCompendium.AccretionDisk.HealFraction);
-        snapshot.RadiusMeters = Mathf.Max(
-            0.01f,
-            OrrerySpellCompendium.AccretionDisk.BaseRadiusMeters *
-            Mathf.Max(0f, 1f + rangeBonus));
-
-        return SanitizeSnapshot(ref snapshot);
+        OrreryFocusProfile.Resolved stellar, barrier;
+        if (!OrreryFocusProfile.TryResolve(owner, OrreryElement.Fire, out stellar) || !stellar.IsValid ||
+            !OrreryFocusProfile.TryResolve(owner, OrreryElement.Ice, out barrier) || !barrier.IsValid) return false;
+        snapshot.Duration = Mathf.Clamp(OrrerySpellCompendium.AccretionDisk.BaseDurationSeconds *
+            Mathf.Max(0f, 1f + barrier.DurationBonus * OrrerySpellCompendium.AccretionDisk.DurationModifierScale), 0.01f, 3600f);
+        snapshot.Capacity = barrier.ApplySpellDamageBonus(barrier.GetReferenceDps()) *
+            OrrerySpellCompendium.AccretionDisk.CapacityReferenceSeconds * OrrerySpellCompendium.AccretionDisk.CapacityMultiplier;
+        snapshot.ExtensionMeters = Mathf.Max(0f, OrrerySpellCompendium.AccretionDisk.ExtensionMeters *
+            Mathf.Max(0f, 1f + barrier.RangeBonus * OrrerySpellCompendium.AccretionDisk.RadiusModifierScale));
+        snapshot.HealFraction = Mathf.Clamp(OrrerySpellCompendium.AccretionDisk.HealFraction *
+            Mathf.Max(0f, 1f + stellar.SpellDamageBonus * OrrerySpellCompendium.AccretionDisk.HealingModifierScale),
+            0f, OrrerySpellCompendium.AccretionDisk.MaximumHealFraction);
+        return Valid(snapshot);
     }
+    private static bool Valid(Snapshot s)
+    {
+        return OrreryAccretionReservoir.Positive(s.Duration) && s.Duration <= 3600f &&
+            OrreryAccretionReservoir.Positive(s.Capacity) &&
+            OrreryAccretionReservoir.Finite(s.HealFraction) && s.HealFraction >= 0f &&
+            s.HealFraction <= OrrerySpellCompendium.AccretionDisk.MaximumHealFraction &&
+            OrreryAccretionReservoir.Finite(s.ExtensionMeters) && s.ExtensionMeters >= 0f && s.ExtensionMeters <= 100000f;
+    }
+    private static CoreCrossOwnerEffects.GrantPayload Pack(Snapshot s)
+    {
+        return new CoreCrossOwnerEffects.GrantPayload(PackFloat(s.Duration), PackFloat(s.Capacity),
+            PackFloat(s.HealFraction), PackFloat(s.ExtensionMeters), 0u, 0u);
+    }
+    private static uint PackFloat(float f) { return new FloatBits { Float = f }.UInt; }
+    private static float Unpack(uint u) { return new FloatBits { UInt = u }.Float; }
 
     private static GameShip FindTarget(GameShip owner)
     {
@@ -860,12 +405,13 @@ public static class OrreryAccretionDisk
 
             GameShip candidate;
             if (!targetObject.TryGetComponent<GameShip>(out candidate) ||
-                !IsEligibleAlly(owner, candidate) ||
-                ContainsTarget(candidate, candidateCount))
+                !IsEligibleAlly(owner, CanonicalPlayer(candidate)) ||
+                ContainsTarget(CanonicalPlayer(candidate), candidateCount))
             {
                 continue;
             }
 
+            candidate = CanonicalPlayer(candidate);
             targetScratch[candidateCount++] = candidate;
             Vector2 candidatePosition = candidate.transform.position;
             if ((candidatePosition - (Vector2)owner.transform.position).sqrMagnitude >
@@ -923,93 +469,4 @@ public static class OrreryAccretionDisk
             : (Vector2)owner.transform.position;
     }
 
-    public static bool TryReadPresentationGrant(
-        CoreCrossOwnerEffects.GrantPayload payload,
-        out float durationSeconds,
-        out float radiusMeters)
-    {
-        durationSeconds = UnpackFloat(payload.A);
-        radiusMeters = UnpackFloat(payload.D);
-        return IsFinite(durationSeconds) && durationSeconds > 0f &&
-            IsFinite(radiusMeters) && radiusMeters > 0f;
-    }
-
-    private static bool SanitizeSnapshot(ref Snapshot snapshot)
-    {
-        if (!IsFinite(snapshot.DurationSeconds) ||
-            !IsFinite(snapshot.Capacity) ||
-            !IsFinite(snapshot.HealFraction) ||
-            !IsFinite(snapshot.RadiusMeters))
-        {
-            return false;
-        }
-
-        snapshot.DurationSeconds = Mathf.Max(0f, snapshot.DurationSeconds);
-        snapshot.Capacity = Mathf.Max(0f, snapshot.Capacity);
-        snapshot.HealFraction = Mathf.Max(0f, snapshot.HealFraction);
-        snapshot.RadiusMeters = Mathf.Max(0f, snapshot.RadiusMeters);
-        return snapshot.DurationSeconds > 0f &&
-            snapshot.Capacity > 0f && snapshot.RadiusMeters > 0f;
-    }
-
-    private static CoreCrossOwnerEffects.GrantPayload PackSnapshot(
-        Snapshot snapshot)
-    {
-        return new CoreCrossOwnerEffects.GrantPayload(
-            PackFloat(snapshot.DurationSeconds),
-            PackFloat(snapshot.Capacity),
-            PackFloat(snapshot.HealFraction),
-            PackFloat(snapshot.RadiusMeters),
-            0u,
-            0u);
-    }
-
-    private static bool TryUnpackSnapshot(
-        CoreCrossOwnerEffects.GrantPayload payload,
-        out Snapshot snapshot)
-    {
-        snapshot = default(Snapshot);
-        snapshot.DurationSeconds = UnpackFloat(payload.A);
-        snapshot.Capacity = UnpackFloat(payload.B);
-        snapshot.HealFraction = UnpackFloat(payload.C);
-        snapshot.RadiusMeters = UnpackFloat(payload.D);
-        return SanitizeSnapshot(ref snapshot);
-    }
-
-    private static int ResolveLocalPlayerId()
-    {
-        return NetSession.InSession && NetSession.instance != null
-            ? NetSession.instance.localPlayerId
-            : -1;
-    }
-
-    private static uint NextRevision()
-    {
-        unchecked
-        {
-            nextRevision++;
-            if (nextRevision == 0u)
-                nextRevision++;
-            return nextRevision;
-        }
-    }
-
-    private static uint PackFloat(float value)
-    {
-        FloatBits bits = default(FloatBits);
-        bits.Float = value;
-        return bits.UInt;
-    }
-
-    private static float UnpackFloat(uint value)
-    {
-        FloatBits bits = default(FloatBits);
-        bits.UInt = value;
-        return bits.Float;
-    }
-
-    private static bool IsFinite(float value)
-    {
-        return !float.IsNaN(value) && !float.IsInfinity(value);
-    }
 }
