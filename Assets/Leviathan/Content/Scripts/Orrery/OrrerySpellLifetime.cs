@@ -53,6 +53,7 @@ public static class OrrerySpellLifetime
     {
         OrreryShatterbolt.FixedTick(owner, deltaTime);
         OrreryPlasmaBolt.FixedTick(owner, deltaTime);
+        OrreryArcResonance.FixedTick(owner, deltaTime);
     }
 
     /// <summary>
@@ -67,6 +68,7 @@ public static class OrrerySpellLifetime
 
         OrreryShatterbolt.Forget(owner);
         OrreryPlasmaBolt.Forget(owner);
+        OrreryArcResonance.Forget(owner);
 
         if (object.ReferenceEquals(lastLocalOwner, owner))
             lastLocalOwner = null;
@@ -84,6 +86,7 @@ public static class OrrerySpellLifetime
             return;
 
         OrreryPlasmaBolt.ForgetTarget(ship);
+        OrreryArcResonance.ForgetTarget(ship);
         ForgetOwner(ship);
         OrreryPlasmaBoltPresentation.ForgetTarget(ship);
         OrreryPlasmaBoltPresentation.Forget(ship);
@@ -98,6 +101,7 @@ public static class OrrerySpellLifetime
     {
         OrreryShatterbolt.Reset();
         OrreryPlasmaBolt.Reset();
+        OrreryArcResonance.Reset();
         OrreryDamageRouter.Reset();
         lastLocalOwner = null;
     }
