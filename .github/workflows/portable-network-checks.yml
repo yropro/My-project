@@ -1,5 +1,4 @@
 name: Portable network regression checks
-
 on:
   push:
     branches: [codex/orrery-accretion-coop]
@@ -7,14 +6,11 @@ on:
     paths:
       - 'Assets/Leviathan/Content/Scripts/**'
       - '.github/workflows/portable-network-checks.yml'
-
 permissions:
   contents: read
-
 concurrency:
   group: portable-network-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   portable-tests:
     runs-on: ubuntu-latest
@@ -27,35 +23,9 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
-      - name: Run production code with explicitly bounded engine test doubles
-        shell: python
-        run: |
-          import os, pathlib, subprocess, tempfile, xml.sax.saxutils as xml
-          root = pathlib.Path('Assets/Leviathan/Content/Scripts').resolve()
-          out = pathlib.Path(tempfile.mkdtemp(prefix='network-checks-'))
-          suites = [
-              ('CrossOwnerNetworkTests', 'CROSS_OWNER_NETWORK_TESTS', [root/'CoreCrossOwnerEffects.cs', root/'Tests/CrossOwnerNetworkTests.cs']),
-              ('WireSelfTest', 'UNITY_EDITOR;CORE_WIRE_TEST_HOST', [root/'CoreWire.cs', root/'CoreWireSelfTest.cs', root/'Tests/WireSelfTestHost.cs']),
-          ]
-          timed = (root/'CoreTimedShipEffects.cs').read_text(encoding='utf-8-sig')
-          timed = timed[:timed.index('[HarmonyPatch')].replace('using HarmonyLib;', '')
-          (out/'CoreTimedShipEffectsUnderTest.cs').write_text(timed)
-          suites.append(('TimedEffectNetworkTests', 'CORE_TIMED_NETWORK_TESTS', [out/'CoreTimedShipEffectsUnderTest.cs', root/'Tests/TimedEffectNetworkTests.cs']))
-          failures = []
-          for name, symbols, files in suites:
-              folder = out/name
-              folder.mkdir()
-              project = folder/(name+'.csproj')
-              items = ''.join('<Compile Include="'+xml.escape(str(p), {'"':'&quot;'})+'" />' for p in files)
-              project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems><DefineConstants>'+symbols+'</DefineConstants><LangVersion>9.0</LangVersion><Nullable>disable</Nullable></PropertyGroup><ItemGroup>'+items+'</ItemGroup></Project>')
-              print('\n=== '+name+' ===', flush=True)
-              result = subprocess.run(['dotnet','run','--project',str(project),'-c','Release'])
-              if result.returncode:
-                  failures.append(name)
-          if failures:
-              raise SystemExit('Failed suites: '+', '.join(failures))
-          print('Portable checks passed. These are NOT a full Unity build, installed-ABI execution, or live co-op result.')
-      - name: Retain exact source used by this validation attempt
+      - name: Run production code with explicit engine and transport doubles
+        run: python Assets/Leviathan/Content/Scripts/Tests/run-portable-tests.py --output "${{ runner.temp }}/portable-results"
+      - name: Retain test logs and exact reviewed source (no game DLLs)
         if: always()
         uses: actions/upload-artifact@v7
         with:
@@ -63,10 +33,12 @@ jobs:
           retention-days: 3
           if-no-files-found: error
           path: |
+            ${{ runner.temp }}/portable-results/*.log
             Assets/Leviathan/Content/Scripts/**
+            Assets/**/SS_*.cs
+            Assets/**/*.asmdef
             SKILL_DEVELOPMENT.md
             NATIVE_API_COMPATIBILITY.md
+            Documentation/ACCRETION_COOP_IMPLEMENTATION.md
             Packages/manifest.json
             ProjectSettings/ProjectVersion.txt
-            **/AGENTS.md
-            **/CLAUDE.md
