@@ -30,17 +30,6 @@ public sealed class OrrerySectorPresentationDriver : MonoBehaviour
                 ? context.Ship
                 : null;
 
-        if (OrreryVoidGalleryPresentation.Enabled)
-        {
-            // Temporary visual audition mode. Keep the production pie-sector
-            // presentation fully intact, but make sure none of it remains visible
-            // while the 4x4 void gallery is active.
-            OrrerySectorPresentation.Hide();
-            OrreryVoidGalleryPresentation.Tick(owner);
-            return;
-        }
-
-        OrreryVoidGalleryPresentation.Hide();
         OrrerySectorPresentation.Tick(owner);
     }
 
@@ -48,7 +37,6 @@ public sealed class OrrerySectorPresentationDriver : MonoBehaviour
     {
         if (instance == this)
             instance = null;
-        OrreryVoidGalleryPresentation.Hide();
         OrrerySectorPresentation.Hide();
     }
 
