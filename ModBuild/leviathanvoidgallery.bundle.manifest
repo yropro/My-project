@@ -1,22 +1,25 @@
 ManifestFileVersion: 0
-CRC: 3549351657
+CRC: 3834929816
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: a6635c2566db809a67cb33bd860ac3c2
+    Hash: 7b68715a4cbb948b3bb4445ed34f3bfd
   TypeTreeHash:
     serializedVersion: 2
-    Hash: 5e762ccb57c4caaabbb5a4199ac82c23
+    Hash: b30fce1a9ad74efb72be6c308c56e365
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: a6635c2566db809a67cb33bd860ac3c2
+    Hash: 7b68715a4cbb948b3bb4445ed34f3bfd
 HashAppended: 0
 ClassTypes:
 - Class: 21
+  Script: {instanceID: 0}
+- Class: 28
   Script: {instanceID: 0}
 - Class: 48
   Script: {instanceID: 0}
 SerializeReferenceClassIdentifiers: []
 Assets:
-- Assets/Leviathan/Content/VoidGallery/OrreryVoidGalleryBase.mat
+- Assets/Leviathan/Content/Scripts/Orrery/VoidGallery/VoidStarfield.mat
+- Assets/Leviathan/Content/Scripts/Orrery/VoidGallery/VoidTexture.mat
 Dependencies: []
